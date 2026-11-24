@@ -274,6 +274,18 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 
 Public tracking and portal order detail include `shipments` when present (additive). Shipment create enqueues `order_shipped_customer` via `email_jobs` and `shipment.created` outbox event.
 
+### 2.10c WhatsApp templates (Agent 10)
+
+Code registry: `WA-V01`…`WA-V08` (vendor), `WA-C01`…`WA-C18` (customer). MVP = deep-link + copy; Brevo `email_jobs` unchanged.
+
+| Method | Path | Auth / permission |
+| --- | --- | --- |
+| GET | `/stores/{storeID}/whatsapp/templates` | `notifications.read` — optional `audience=vendor\|customer` |
+| GET | `/stores/{storeID}/whatsapp/templates/{code}` | `notifications.read` |
+| POST | `/stores/{storeID}/whatsapp/templates/{code}/preview` | `notifications.read` — body `{ order_id?, vendor_id?, customer_id?, overrides? }` → rendered body + `deep_link` |
+| POST | `/stores/{storeID}/whatsapp/templates/{code}/open` | `notifications.read` — logs `whatsapp_template_sends`; returns `deep_link` (`action=open\|copy\|preview`) |
+| GET | `/stores/{storeID}/whatsapp/sends` | `notifications.read` — recent open/copy log |
+
 ### 2.11 Customer portal (Agent 08)
 
 Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from merchant auth. Tokens hashed (SHA-256); raw ≥256-bit.
@@ -311,6 +323,6 @@ Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from mer
 | Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |
 | Vendors / receiving | **Shipped Agent 06** — vendors RBAC + `/purchasing/*` + `/receiving/*` |
 | Live sessions | Agent 12 |
-| WhatsApp template resolve | Agent 10 |
+| WhatsApp template resolve | **Shipped Agent 10** — `/whatsapp/templates/*` + Messages UI |
 
 Additive fields preferred over breaking renames. When extending order JSON, keep existing keys stable.

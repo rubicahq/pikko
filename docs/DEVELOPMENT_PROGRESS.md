@@ -47,7 +47,7 @@
 | **07 Payments/Finance** | Reconciliation, refunds, store credit, E2E-F | FIN-01–03 | Ledger + REF-* + exact money tests |
 | **08 Customer Portal** | Auth portal beyond tracking | PORT-01, CRM | **Done** PORT-02–04; E2E-M/J API |
 | **09 Packing/Shipment** | Pack queues, shipments | Fulfillment statuses | **Done** PACK/SHIP; E2E-I |
-| **10 Communication** | WhatsApp templates + email completeness; RBAC invites polish | notifications/email | WA registry; team invites usable |
+| **10 Communication** | WhatsApp templates + email completeness; RBAC invites polish | notifications/email | **Done** WA registry + Messages; email_jobs preserved |
 
 ### Stage 3 — Experience & Production Readiness
 
@@ -209,7 +209,24 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 10+)
+## 3j. Agent 10 status (Communication / WhatsApp)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000014_whatsapp_templates` | Done |
+| Code registry WA-V01…V08 + WA-C01…C18 | Done |
+| Preview / open / copy + `wa.me` deep-links | Done |
+| Optional `whatsapp_template_sends` log | Done |
+| Messages UI + nav (`notifications.read`) | Done |
+| Callable from vendors / purchasing / packing / shipments / orders | Done |
+| Brevo `email_jobs` preserved | Yes |
+| `docs/agents/10-communication-handoff.md` | Done |
+| Stage 2 complete | Yes |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 11+)
 
 1. Customer portal auth model: separate customer identities (shipped Agent 08).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.

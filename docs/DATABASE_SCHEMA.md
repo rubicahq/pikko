@@ -178,9 +178,14 @@ live_quick_adds / tie into orders
 ### 3.8 WhatsApp (Agent 10)
 
 ```text
-whatsapp_templates (code V01–V08, C01–C18, body, variables)
-whatsapp_sends (optional log; deep-link only in MVP — no WhatsApp Business API required)
+# Catalog is code-defined in services/api/internal/whatsapp (WA-V01…V08, WA-C01…C18)
+whatsapp_template_sends (
+  store_id, template_code, audience, phone_e164?, rendered_body, deep_link,
+  order_id?, customer_id?, vendor_id?, opened_by?, action open|copy|preview, created_at
+)
 ```
+
+Migration `000014_whatsapp_templates`. Deep-link only in MVP — no WhatsApp Business API.
 
 ---
 

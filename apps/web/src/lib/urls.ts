@@ -50,6 +50,12 @@ export const urls = {
     `/stores/${storeId}/customers/${customerId}`,
   storeAnalytics: (storeId: string) => `/stores/${storeId}/analytics`,
   storeNotifications: (storeId: string) => `/stores/${storeId}/notifications`,
+  storeMessages: (storeId: string, query?: Record<string, string>) => {
+    const base = `/stores/${storeId}/messages`;
+    if (!query) return base;
+    const qs = new URLSearchParams(query).toString();
+    return qs ? `${base}?${qs}` : base;
+  },
   storePreorders: (storeId: string) => `/stores/${storeId}/preorders`,
   storePreorder: (storeId: string, batchId: string) => `/stores/${storeId}/preorders/${batchId}`,
   storeCampaigns: (storeId: string) => `/stores/${storeId}/campaigns`,

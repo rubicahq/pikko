@@ -30,6 +30,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/stores"
 	"github.com/rubicahq/pikko/services/api/internal/team"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
+	"github.com/rubicahq/pikko/services/api/internal/whatsapp"
 )
 
 type Deps struct {
@@ -100,6 +101,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 		DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger, Commerce: commerceSvc,
 	}
 	portalH := &PortalHandlers{Portal: portalSvc, Cfg: d.Cfg}
+	waSvc := &whatsapp.Service{DB: d.DB, URLs: urlGen}
+	waH := &WhatsAppHandlers{WA: waSvc}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -326,6 +329,13 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/stores/{storeID}/shipments", storePerm(rbac.PermPackingWrite, commerceH.CreateShipment))
 	mux.Handle("GET /api/v1/stores/{storeID}/shipments/{shipmentID}", storePerm(rbac.PermPackingRead, commerceH.GetShipment))
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}/shipments", storePerm(rbac.PermPackingRead, commerceH.ListOrderShipments))
+
+	// Agent 10: WhatsApp template registry + deep-links (preserve Brevo email_jobs)
+	mux.Handle("GET /api/v1/stores/{storeID}/whatsapp/templates", storePerm(rbac.PermNotificationsRead, waH.ListTemplates))
+	mux.Handle("GET /api/v1/stores/{storeID}/whatsapp/templates/{code}", storePerm(rbac.PermNotificationsRead, waH.GetTemplate))
+	mux.Handle("POST /api/v1/stores/{storeID}/whatsapp/templates/{code}/preview", storePerm(rbac.PermNotificationsRead, waH.Preview))
+	mux.Handle("POST /api/v1/stores/{storeID}/whatsapp/templates/{code}/open", storePerm(rbac.PermNotificationsRead, waH.Open))
+	mux.Handle("GET /api/v1/stores/{storeID}/whatsapp/sends", storePerm(rbac.PermNotificationsRead, waH.ListSends))
 
 	// Phase 4: business rules
 	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesRead, commerceH.ListRules))
