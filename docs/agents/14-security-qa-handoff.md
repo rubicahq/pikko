@@ -4,8 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md` §§29, 32)  
 **Branch:** `cursor/agent-14-security-qa-5c6b`  
 **Prior:** Agent 13 Analytics feature merge `0bf2d8c`; main tip includes handoff PR #34 (`481c0d3`)  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_
+**Feature merge SHA:** `db6c97ffabb59ea529e55304ce183747ce288f7c` (PR #35)  
+**Merged main SHA:** `db6c97ffabb59ea529e55304ce183747ce288f7c`
 
 ---
 
