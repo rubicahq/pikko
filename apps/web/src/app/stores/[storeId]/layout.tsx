@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession, getStore, getStores } from "@/lib/server-api";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { urls } from "@/lib/urls";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 export default async function StoreLayout({
   children,

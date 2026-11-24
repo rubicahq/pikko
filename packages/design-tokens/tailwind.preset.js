@@ -73,6 +73,14 @@ module.exports = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "Inter", "Arial", "sans-serif"],
+        display: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "var(--font-inter)",
+          "Inter",
+          "Arial",
+          "sans-serif",
+        ],
       },
       spacing: {
         // 4px base scale (PRD §13) — Tailwind already uses 4px units

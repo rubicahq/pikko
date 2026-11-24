@@ -2,7 +2,7 @@
 
 ## Overview
 
-Modular monolith (PRD §31). Phase 4 adds preorder batches, business rules (handling fee / minimum / approval with precedence + versioning), and multi-group carts on the Phase 0–3 foundation.
+Modular monolith (PRD §31). Phase 6 adds the public marketing site (SEO, legal, solutions) and production readiness (health/ready probes, access logs, coarse API rate limits, backup scripts, runbook) on the Phase 0–5 foundation.
 
 ```
 pikko/

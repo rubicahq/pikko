@@ -94,14 +94,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		if err := d.DB.Ping(ctx); err != nil {
-			writeError(w, r, http.StatusServiceUnavailable, "unhealthy", "Database unavailable.")
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "time": time.Now().UTC()})
-	})
+	registerHealth(mux, healthDeps{DB: d.DB, Cfg: d.Cfg, Storage: d.Storage})
 
 	// Auth (public)
 	mux.HandleFunc("POST /api/v1/auth/magic-link/request", authH.RequestMagicLink)
@@ -265,8 +258,10 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	}
 
 	var handler http.Handler = mux
-	handler = SecurityHeaders(handler)
+	handler = IPRateLimitMiddleware(d.DB, d.Cfg)(handler)
+	handler = SecurityHeaders(d.Cfg)(handler)
 	handler = CORSMiddleware(d.Cfg)(handler)
+	handler = AccessLogMiddleware(d.Logger)(handler)
 	handler = RequestIDMiddleware(handler)
 	return handler, worker
 }

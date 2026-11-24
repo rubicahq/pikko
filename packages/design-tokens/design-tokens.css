@@ -1,0 +1,5 @@
+/**
+ * Alias entry for Emplicon/Pikko design convention.
+ * Source of truth remains tokens.css (PRD §13).
+ */
+@import "./tokens.css";

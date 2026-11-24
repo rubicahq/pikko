@@ -1,11 +1,11 @@
-# Requirements Matrix (Phase 0–5)
+# Requirements Matrix (Phase 0–6)
 
 Status: `done` | `partial` | `deferred`
 
 | ID | Requirement | Status | Evidence |
 | --- | --- | --- | --- |
 | P0-1 | Monorepo structure | done | `apps/web`, `services/api`, `packages/*`, `database/` |
-| P0-2 | Next.js + TS + Tailwind + Radix/shadcn + Lucide + Inter | done | `apps/web` |
+| P0-2 | Next.js + TS + Tailwind + Radix/shadcn + Lucide + Inter | done | `apps/web` (+ Plus Jakarta Sans display for marketing) |
 | P0-3 | Go API | done | `services/api` |
 | P0-4 | PostgreSQL + migrations | done | `database/migrations` |
 | P0-5 | Env config + `.env.example` | done | root `.env.example` |
@@ -17,35 +17,26 @@ Status: `done` | `partial` | `deferred`
 | P0-11 | Docs kept accurate | done | `docs/*` |
 | P0-12 | Docker web/api + compose | done | Dockerfiles, compose |
 | P1-1–P1-10 | Auth + multi-store | done | Phase 1 |
-| P2-1 | Store identity + logo/favicon/store icon | done | settings + storefront draft assets |
-| P2-2 | Storefront config + 24 themes, draft preview, publish | done | themes + editor + publish API |
-| P2-3 | Catalog categories/products/variants/images/IDR/status | done | catalog service + UI |
-| P2-4 | Public storefront SEO + favicon/logo | done | `/{slug}` pages |
-| P2-5 | Store-scoped queries/cache/storage + authz | done | middleware + isolation tests |
-| P2-6 | Flipbook-ready product link contract | done | `docs/CATALOG_LINK_CONTRACT.md` |
-| P2-7 | AI PDF import + flipbook | done | migrations `000003`, import + flipbook UI |
-| P3-1 | Real cart (store-scoped) | done | `apps/web/src/lib/cart.ts` + cart page |
-| P3-2 | Guest checkout + IDR integer totals | done | checkout preview/submit APIs + UI |
-| P3-3 | Order creation with snapshots + statuses | done | `orders` / `order_items` |
-| P3-4 | Manual bank transfer + merchant accounts | done | `store_payment_methods` + settings UI |
-| P3-5 | Payment evidence (private) + verify/reject | done | evidence upload + merchant actions |
-| P3-6 | Merchant order list/detail + fulfillment | done | `/stores/{id}/orders` |
-| P3-7 | Public tracking token (hash-only, ≥256-bit) | done | `/track/{token}` + `order_tracking_tokens` |
-| P3-8 | Transactional emails + idempotent jobs | done | Brevo adapter + `email_jobs` drain |
-| P3-9 | Stock reservations (finite) | done | `inventory_reservations` on submit |
-| P3-10 | Public rate limits + store-scoped authz | done | `public_rate_limits` + cross-store tests |
-| P4-1 | Preorder batches + product assignment + quotas | done | `000005` + merchant/public preorder APIs/UI |
-| P4-2 | Preorder-aware checkout + cart groups | done | `batch_id` on lines; group checkout |
-| P4-3 | Business rules precedence + versioning | done | `business_rules` / versions / order snapshots |
-| P4-4 | Handling fee / minimum / approval | done | evaluate at preview/submit + UI |
-| P4-5 | Purchasing list + allocations | done | purchasing API + batch detail tab |
-| P4-6 | Extended fulfillment for preorder | done | purchasing → awaiting_arrival → ship/pickup |
-| P4-7 | Emails for approval + existing drain | done | needs-confirmation template + outbox |
-| P4-8 | Batch cover + variant pairing UI | done | Phase 5 leftover: cover upload + variant assign UI |
-| P5-1 | In-app notification center (store-scoped) | done | `notifications` + `/notifications` UI + bell |
-| P5-2 | Email reliability / unavailable allocation email | done | `product_unavailable_customer` via `email_jobs` |
-| P5-3 | Merchant analytics (IDR, Asia/Jakarta, store-scoped) | done | `/analytics` API + UI |
-| P5-4 | CSV product import | done | `source_type=csv` + template + review |
-| P5-5 | Customers dashboard | done | list/detail + notes |
-| P5-6 | AI PDF import | done | prior (not re-done in Phase 5) |
-| — | VPS deploy / Emplicon | deferred | separate after merge |
+| P2-1–P2-7 | Storefront + catalog + import/flipbook | done | Phase 2 |
+| P3-1–P3-10 | Checkout + payments + tracking | done | Phase 3 |
+| P4-1–P4-8 | Preorder + business rules | done | Phase 4–5 |
+| P5-1–P5-6 | Notifications, analytics, CSV, customers | done | Phase 5 |
+| P6-1 | Marketing landing (brand-first) | done | `apps/web/src/app/(marketing)/page.tsx` |
+| P6-2 | Solution pages | done | `/solutions`, `/jastip`, `/social-sellers` |
+| P6-3 | Pricing content (pilot; no invented plans) | done | `/pricing` |
+| P6-4 | FAQ | done | `/faq` |
+| P6-5 | Legal privacy + terms | done | `/privacy`, `/terms` |
+| P6-6 | SEO sitemap + robots + OG + canonicals | done | `sitemap.ts`, `robots.ts`, `opengraph-image.tsx` |
+| P6-7 | Accessibility validation (marketing) | done | landmarks, focus, FAQ keyboard, reduced motion; e2e |
+| P6-8 | Security headers + hardening | done | API middleware + Next middleware/headers + nginx example |
+| P6-9 | Monitoring health endpoints | done | `/livez`, `/healthz`, `/readyz` |
+| P6-10 | Structured request logging | done | `AccessLogMiddleware` |
+| P6-11 | Rate limiting | done | auth limits + `API_RATE_LIMIT_IP_PER_HOUR` |
+| P6-12 | Scheduled DB + storage backup | done | `infrastructure/backup/*` |
+| P6-13 | Backup restore validation script | done | `restore-test.sh` |
+| P6-14 | Operational runbook | done | `docs/RUNBOOK.md` |
+| P6-15 | Light load smoke | done | `infrastructure/ops/load-smoke.sh` |
+| P6-16 | Dependency audit script | done | `infrastructure/ops/dependency-audit.sh` |
+| P6-17 | E2E regression (Phase 6 + prior) | done | Playwright suite |
+| — | VPS deploy / Emplicon | deferred | operator after merge |
+| — | Phase 7 pikko.id GTM | deferred | needs explicit approval |

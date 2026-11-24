@@ -174,12 +174,22 @@ Do **not** `docker compose down -v`, prune volumes, or drop the database without
 
 ## Backup notes
 
+Scheduled script (Phase 6): `infrastructure/backup/backup.sh`  
+Crontab example: `infrastructure/backup/crontab.example`  
+Restore validation (ephemeral container): `infrastructure/backup/restore-test.sh`
+
 ```bash
+# Manual one-shot (legacy)
 sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
   > ~/backups/pikko-$(date -u +%Y%m%dT%H%M%SZ).dump
+
+# Preferred
+BACKUP_DIR=~/backups/pikko ~/pikko/infrastructure/backup/backup.sh
 ```
 
-Volumes: `pikko_postgres_data`, `pikko_api_storage`. Keep dumps outside the compose tree.
+Volumes: `pikko_postgres_data`, `pikko_api_storage`. Keep dumps outside the compose tree. See `docs/RUNBOOK.md`.
+
+Optional env: `API_RATE_LIMIT_IP_PER_HOUR` (default 1200). Health: `/livez`, `/healthz`, `/readyz`.
 
 ## Redeploy / update (main)
 

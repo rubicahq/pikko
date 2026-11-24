@@ -35,6 +35,12 @@ server {
     ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
     client_max_body_size 20m;
+    # Edge hardening (apps also set headers; keep edge conservative)
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     set $pikko_web "pikko-web:3000";
     set $pikko_api "pikko-api:8080";
 
@@ -84,6 +90,10 @@ server {
     ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
     client_max_body_size 20m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     set $pikko_api "pikko-api:8080";
 
     location ^~ /.well-known/acme-challenge/ {
