@@ -2,56 +2,38 @@
 
 ## Overview
 
-Modular monolith (PRD §31). Phase 0/1 delivers foundation + passwordless auth + multi-store onboarding.
+Modular monolith (PRD §31). Phase 2 adds storefront + catalog on the Phase 0/1 foundation.
 
 ```
 pikko/
-  apps/web              Next.js (App Router) + Tailwind + Radix/shadcn-style UI
-  services/api          Go HTTP API (stdlib ServeMux)
+  apps/web              Next.js — marketing, auth, dashboard, public storefront
+  services/api          Go — auth, stores, storefront, catalog, files
   packages/design-tokens
-  packages/ui           Pointer to web UI primitives
-  database/migrations   golang-migrate SQL
-  infrastructure/nginx  Sample reverse proxy
+  database/migrations
   docs/
-  tests/e2e             Playwright (also apps/web/e2e)
 ```
 
 ## Runtime
 
 | Service | Role |
 | --- | --- |
-| `web` | Marketing, auth UI, onboarding, dashboard shell |
-| `api` | Auth, account, stores, onboarding, authorization |
+| `web` | Dashboard + public `/{slug}` storefront |
+| `api` | Auth, account, stores, storefront, catalog, files |
 | `postgres` | System of record |
-| `migrate` | One-shot migration job in Compose |
-| `proxy` (optional) | nginx in front of web + api |
-
-Email delivery uses a Brevo adapter. `EMAIL_MODE=log` (default) writes messages to logs — safe for local/CI. `EMAIL_MODE=brevo` requires `BREVO_API_KEY`.
-
-## URL generation
-
-Centralized in:
-
-- Go: `services/api/internal/urls`
-- Web: `apps/web/src/lib/urls.ts`
-
-Business logic stores slugs/IDs/relative paths only. Hosts come from env (`MARKETING_URL`, `DASHBOARD_URL`, `STOREFRONT_URL`, `API_BASE_URL`).
-
-## Auth model
-
-1. `POST /api/v1/auth/magic-link/request` — hash stored, email sent
-2. `GET /api/v1/auth/magic-link/peek` — validates without consuming
-3. User confirms via UI (`POST .../verify`) — atomic consume + session
-4. Session cookie `pikko_session` (HttpOnly); Bearer also accepted for SSR/tests
+| `migrate` | SQL migrations |
 
 ## Multi-tenancy
 
-Store is the tenant. Protected store routes are always `/api/v1/stores/{store-id}/...` with middleware that checks membership. Dashboard routes mirror that with `/stores/{store-id}/...` so tabs keep independent store context.
+Store is the tenant. Every catalog/storefront/file row carries `store_id`. Routes are `/api/v1/stores/{storeId}/…` with auth + membership middleware. Storage keys: `stores/{storeId}/{purpose}/{uuid}{ext}`.
 
-## Storage
+## Storefront draft vs published
 
-`STORAGE_DRIVER=local` writes under `STORAGE_LOCAL_PATH`. S3 driver stubbed for later.
+`storefront_configs` has `channel` `draft` \| `published`. Editing draft never changes live. Publish copies draft (+ featured/banners) atomically and sets `stores.publication_status=published`.
 
-## Jobs
+## Catalog / flipbook readiness
 
-`email_jobs` table persists delivery attempts. Auth emails send immediately via `SendNow`. A dedicated worker process can be added when async volume requires it (Compose-ready).
+Products expose stable UUIDs, store-scoped slugs, optional SKU, images, and draft/published status. Public `link_ref` is the contract for future flipbook hotspots. See `docs/CATALOG_LINK_CONTRACT.md`.
+
+## URL generation
+
+Centralized in Go `internal/urls` and web `lib/urls.ts`. No hardcoded production domains in business logic.

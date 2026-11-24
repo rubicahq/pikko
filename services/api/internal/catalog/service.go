@@ -116,7 +116,7 @@ func (s *Service) ListCategories(ctx context.Context, storeID uuid.UUID) ([]Cate
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Category
+	out := []Category{}
 	for rows.Next() {
 		var c Category
 		if err := rows.Scan(&c.ID, &c.StoreID, &c.Name, &c.Slug, &c.Description, &c.SortOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {
@@ -286,7 +286,7 @@ func (s *Service) ListProducts(ctx context.Context, storeID uuid.UUID, f Product
 		return nil, 0, err
 	}
 	defer rows.Close()
-	var out []Product
+	out := []Product{}
 	for rows.Next() {
 		var p Product
 		if err := rows.Scan(
@@ -890,7 +890,7 @@ func (s *Service) ListCollections(ctx context.Context, storeID uuid.UUID, public
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Collection
+	out := []Collection{}
 	for rows.Next() {
 		var c Collection
 		if err := rows.Scan(&c.ID, &c.StoreID, &c.Name, &c.Slug, &c.Description, &c.Status, &c.DisplayOrder, &c.CreatedAt, &c.UpdatedAt); err != nil {

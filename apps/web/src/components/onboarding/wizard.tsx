@@ -83,7 +83,11 @@ export function OnboardingWizard({
       const res = await apiFetch<{ slug: string }>(
         `/api/v1/stores/suggest-slug?name=${encodeURIComponent(nextName)}`,
       );
-      setSlug(res.slug);
+      // Re-check: user may have edited the slug while the suggestion request was in flight.
+      setSlugTouched((touched) => {
+        if (!touched) setSlug(res.slug);
+        return touched;
+      });
     } catch {
       // ignore
     }

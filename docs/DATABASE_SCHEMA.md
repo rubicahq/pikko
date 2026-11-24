@@ -1,30 +1,34 @@
-# Database Schema (Phase 0/1)
+# Database Schema (Phase 0–2)
 
-Migration: `database/migrations/000001_phase1_auth_stores.up.sql`
+Migrations:
 
-## Tables
+- `000001_phase1_auth_stores.up.sql`
+- `000002_phase2_storefront_catalog.up.sql`
+
+## Phase 1 tables
+
+`users`, `authentication_tokens`, `sessions`, `user_preferences`, `stores`, `store_memberships`, `store_slug_aliases`, `onboarding_drafts`, `auth_rate_limits`, `email_jobs`, `audit_logs`
+
+## Phase 2 tables
 
 | Table | Purpose |
 | --- | --- |
-| `users` | Verified accounts (email unique normalized) |
-| `authentication_tokens` | Magic-link hashes, expiry, atomic `consumed_at` |
-| `sessions` | Session token hashes, revocation, expiry |
-| `user_preferences` | Language, timezone |
-| `stores` | Store identity, selling model, publication, archive |
-| `store_memberships` | User↔store role (`owner`) |
-| `store_slug_aliases` | Historical slugs (foundation) |
-| `onboarding_drafts` | Resumable two-step onboarding (one row per user) |
-| `auth_rate_limits` | Email/IP hourly buckets |
-| `email_jobs` | Persistent email delivery + idempotency |
-| `audit_logs` | Sensitive store actions |
+| `stored_files` | Store-scoped uploads (`stores/{storeId}/{purpose}/…`) |
+| `storefront_configs` | Draft vs published branding/theme/colors/assets |
+| `storefront_banners` | Banner rows per channel (API scaffolding) |
+| `storefront_featured_products` | Up to 8 featured (draft/published) |
+| `storefront_featured_collections` | Up to 4 featured |
+| `categories` | Store-scoped product categories |
+| `products` | Catalog masters; `status` draft/published/archived; optional `sku`; integer IDR prices |
+| `product_images` | Ordered images → `stored_files` |
+| `product_options` / `product_option_values` | Variant option definitions |
+| `product_variants` / `variant_option_values` | Combinations + price overrides |
+| `collections` / `collection_products` | Merchandising collections |
 
-## Key constraints
+## Flipbook linkage
 
-- `users.email_normalized` UNIQUE
-- `stores.slug` UNIQUE
-- `store_memberships (user_id, store_id)` UNIQUE
-- Token and session raw values are never stored — SHA-256 hashes only
+Hotspots should reference `products.id` (UUID) within the same `store_id`. Only `status='published'` products are exposed on public APIs. See `docs/CATALOG_LINK_CONTRACT.md`.
 
 ## Defaults on store create
 
-Theme `pikko_signature`, currency `IDR`, timezone `Asia/Jakarta`, locale `id-ID`, publication `draft`, checkout `false`. Store + owner membership created in one transaction.
+Theme `pikko_signature`, draft `storefront_configs` row, currency IDR, timezone Asia/Jakarta, locale id-ID, publication draft, checkout false.

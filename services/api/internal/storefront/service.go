@@ -115,19 +115,27 @@ func (s *Service) decorate(c *Config) {
 	c.SurfaceColor = th.SurfaceColor
 	c.BorderColor = th.BorderColor
 	c.ThemeName = th.Name
+	pathFn := fileAPIPath
+	if c.Channel == "published" {
+		pathFn = publicFileAPIPath
+	}
 	if c.LogoFileID != nil {
-		c.LogoURL = fileAPIPath(c.StoreID, *c.LogoFileID)
+		c.LogoURL = pathFn(c.StoreID, *c.LogoFileID)
 	}
 	if c.FaviconFileID != nil {
-		c.FaviconURL = fileAPIPath(c.StoreID, *c.FaviconFileID)
+		c.FaviconURL = pathFn(c.StoreID, *c.FaviconFileID)
 	}
 	if c.StoreIconFileID != nil {
-		c.StoreIconURL = fileAPIPath(c.StoreID, *c.StoreIconFileID)
+		c.StoreIconURL = pathFn(c.StoreID, *c.StoreIconFileID)
 	}
 }
 
 func fileAPIPath(storeID, fileID uuid.UUID) string {
 	return "/api/v1/stores/" + storeID.String() + "/files/" + fileID.String()
+}
+
+func publicFileAPIPath(storeID, fileID uuid.UUID) string {
+	return "/api/v1/public/files/" + storeID.String() + "/" + fileID.String()
 }
 
 type PatchInput struct {

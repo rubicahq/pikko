@@ -35,6 +35,27 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
     cache: "no-store",
   });
 
+  return parseApiResponse<T>(res);
+}
+
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  opts: { token?: string; method?: string } = {},
+): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
+  const res = await fetch(urls.api(path), {
+    method: opts.method || "POST",
+    headers,
+    credentials: "include",
+    body: form,
+    cache: "no-store",
+  });
+  return parseApiResponse<T>(res);
+}
+
+async function parseApiResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   let data: unknown = null;
   if (text) {
@@ -115,3 +136,95 @@ export type Session = {
   user_agent?: string | null;
   current?: boolean;
 };
+
+export type Theme = {
+  id: string;
+  name: string;
+  background_color: string;
+  text_color: string;
+  primary_color: string;
+  button_foreground: string;
+  surface_color: string;
+  border_color: string;
+};
+
+export type StorefrontConfig = {
+  id: string;
+  store_id: string;
+  channel: "draft" | "published";
+  theme_id: string;
+  theme_name?: string;
+  background_color: string;
+  text_color: string;
+  primary_color: string;
+  button_foreground: string;
+  surface_color: string;
+  border_color: string;
+  logo_file_id?: string | null;
+  favicon_file_id?: string | null;
+  store_icon_file_id?: string | null;
+  logo_url?: string;
+  favicon_url?: string;
+  store_icon_url?: string;
+  description?: string | null;
+  contact_email?: string | null;
+  whatsapp?: string | null;
+  social_links?: Record<string, string>;
+  updated_at: string;
+  published_at?: string | null;
+};
+
+export type Category = {
+  id: string;
+  store_id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  sort_order: number;
+};
+
+export type ProductImage = {
+  id: string;
+  file_id: string;
+  url?: string;
+  alt_text?: string | null;
+  display_order: number;
+  is_primary: boolean;
+};
+
+export type Product = {
+  id: string;
+  store_id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  sku?: string | null;
+  brand?: string | null;
+  category_id?: string | null;
+  category_name?: string | null;
+  base_price_idr: number;
+  compare_at_price_idr?: number | null;
+  ready_stock_eligible: boolean;
+  preorder_eligible: boolean;
+  availability: string;
+  inventory_mode: string;
+  stock_quantity?: number | null;
+  status: "draft" | "published" | "archived";
+  images?: ProductImage[];
+  primary_image_url?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StoredFile = {
+  id: string;
+  store_id: string;
+  purpose: string;
+  content_type: string;
+  size_bytes: number;
+  url?: string;
+};
+
+export function formatIDR(amount: number): string {
+  return `Rp${Math.trunc(amount).toLocaleString("id-ID")}`;
+}

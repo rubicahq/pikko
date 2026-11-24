@@ -1,9 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession, getStore } from "@/lib/server-api";
+import { getSession, getSetupChecklist, getStore } from "@/lib/server-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { urls } from "@/lib/urls";
+
+const CHECKLIST_LABELS: { key: string; label: string; href?: (id: string) => string }[] = [
+  { key: "create_store", label: "Create store" },
+  { key: "first_product", label: "Add your first product", href: urls.storeCatalogNew },
+  {
+    key: "customize_storefront",
+    label: "Customize storefront",
+    href: urls.storeStorefront,
+  },
+  { key: "payment_methods", label: "Configure payment methods" },
+  { key: "fulfillment", label: "Configure fulfillment" },
+  { key: "publish_and_share", label: "Publish and share", href: urls.storeStorefront },
+];
 
 export default async function StoreOverviewPage({
   params,
@@ -15,6 +28,7 @@ export default async function StoreOverviewPage({
   if (!session) redirect(urls.auth());
   const store = await getStore(storeId);
   if (!store) redirect(urls.stores());
+  const checklist = await getSetupChecklist(storeId);
 
   return (
     <div className="mx-auto max-w-dashboard">
@@ -41,27 +55,28 @@ export default async function StoreOverviewPage({
       <section className="mt-8 rounded-lg border border-border p-5">
         <h2 className="text-xl font-medium text-foreground">Setup checklist</h2>
         <p className="mt-2 text-sm text-foreground-secondary">
-          Derived from your store state. Catalog, payments, and publication arrive in Phase 2+.
+          Derived from your store state — not manual checkboxes.
         </p>
         <ul className="mt-5 space-y-3 text-sm">
-          <li className="flex items-center gap-2">
-            <span className="text-success">✓</span> Create store
-          </li>
-          <li className="flex items-center gap-2 text-foreground-secondary">
-            <span>○</span> Add your first product
-          </li>
-          <li className="flex items-center gap-2 text-foreground-secondary">
-            <span>○</span> Customize storefront
-          </li>
-          <li className="flex items-center gap-2 text-foreground-secondary">
-            <span>○</span> Configure payment methods
-          </li>
-          <li className="flex items-center gap-2 text-foreground-secondary">
-            <span>○</span> Configure fulfillment
-          </li>
-          <li className="flex items-center gap-2 text-foreground-secondary">
-            <span>○</span> Publish and share
-          </li>
+          {CHECKLIST_LABELS.map((item) => {
+            const done = !!checklist[item.key];
+            return (
+              <li key={item.key} className="flex items-center gap-2">
+                <span className={done ? "text-success" : "text-foreground-secondary"}>
+                  {done ? "✓" : "○"}
+                </span>
+                {item.href && !done ? (
+                  <Link href={item.href(storeId)} className="text-brand-dark hover:underline">
+                    {item.label}
+                  </Link>
+                ) : (
+                  <span className={done ? "text-foreground" : "text-foreground-secondary"}>
+                    {item.label}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
@@ -76,13 +91,16 @@ export default async function StoreOverviewPage({
           <h3 className="text-base font-medium">Quick actions</h3>
           <div className="mt-4 flex flex-wrap gap-2">
             <Button asChild variant="outline" size="sm">
+              <Link href={urls.storeCatalogNew(storeId)}>Add product</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={urls.storeStorefront(storeId)}>Customize storefront</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={urls.storeSettings(storeId)}>Store settings</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
               <Link href={urls.stores()}>Manage stores</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={urls.newStore()}>Create another store</Link>
-            </Button>
-            <Button asChild variant="outline" size="sm">
-              <Link href={urls.accountSettings()}>Account settings</Link>
             </Button>
           </div>
         </div>

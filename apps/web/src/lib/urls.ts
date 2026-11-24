@@ -29,8 +29,17 @@ export const urls = {
   newStore: () => `/stores/new`,
   accountSettings: () => `/account/settings`,
   storeOverview: (storeId: string) => `/stores/${storeId}/overview`,
+  storeStorefront: (storeId: string) => `/stores/${storeId}/storefront`,
+  storeCatalog: (storeId: string) => `/stores/${storeId}/catalog`,
+  storeCatalogNew: (storeId: string) => `/stores/${storeId}/catalog/new`,
+  storeCatalogProduct: (storeId: string, productId: string) =>
+    `/stores/${storeId}/catalog/${productId}`,
+  storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
+  storefrontProduct: (slug: string, productSlug: string) => `/${slug}/products/${productSlug}`,
+  storefrontProductAbsolute: (slug: string, productSlug: string) =>
+    `${storefront()}/${slug}/products/${productSlug}`,
   api: (path: string) => {
     const base = api();
     const p = path.startsWith("/") ? path : `/${path}`;
@@ -38,4 +47,26 @@ export const urls = {
   },
   dashboardAbsolute: (path: string) =>
     `${dashboard()}${path.startsWith("/") ? path : `/${path}`}`,
+  file: (storeId: string, fileId: string) =>
+    urls.api(`/api/v1/stores/${storeId}/files/${fileId}`),
+  publicFile: (storeId: string, fileId: string) =>
+    urls.api(`/api/v1/public/files/${storeId}/${fileId}`),
 };
+
+export const RESERVED_STOREFRONT_SLUGS = new Set([
+  "auth",
+  "account",
+  "stores",
+  "onboarding",
+  "api",
+  "dev",
+  "track",
+  "catalog",
+  "flipbook",
+  "products",
+  "collections",
+  "preorders",
+  "cart",
+  "search",
+  "favicon.ico",
+]);
