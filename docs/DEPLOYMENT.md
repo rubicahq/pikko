@@ -205,6 +205,21 @@ Volumes: `pikko_postgres_data`, `pikko_api_storage`. Keep dumps outside the comp
 
 Optional env: `API_RATE_LIMIT_IP_PER_HOUR` (default 1200). Health: `/livez`, `/healthz`, `/readyz`.
 
+### Session cookie across marketing + app
+
+Production nginx serves `pikko.site` and `app.pikko.site` from the same web/API stack and proxies `/api/` **directly to Go**. Magic-link verify therefore sets the cookie for whichever `Host` confirmed the link (`app.pikko.site` by default). With `AUTH_COOKIE_DOMAIN` empty (host-only), revisiting `pikko.site` looks logged-out.
+
+Set:
+
+```bash
+AUTH_COOKIE_DOMAIN=pikko.site   # or pikko.id after cutover
+AUTH_SESSION_TTL_DAYS=30        # default; meets “≥24h stay signed in”
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=lax
+```
+
+Then recreate `api` (env) and redeploy `web` (marketing `/` and `/auth` redirect signed-in users to `https://app…/stores`). Existing host-only cookies are not upgraded — one fresh magic-link sign-in issues the shared cookie.
+
 ## Redeploy / update (main)
 
 **Preferred:** idempotent script (keeps deploy overlay ports, selective rebuild, optional backup, smoke, rollback):
