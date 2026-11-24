@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPublicBatches, getPublicProducts, getPublicStore } from "@/lib/server-api";
+import { getPublicBatches, getPublicLives, getPublicProducts, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
@@ -44,11 +44,13 @@ export default async function PublicStorePage({ params }: Props) {
   if (!data) notFound();
   const { store } = data;
   const sf = store.storefront;
-  const [{ products }, batches] = await Promise.all([
+  const [{ products }, batches, lives] = await Promise.all([
     getPublicProducts(storeSlug),
     getPublicBatches(storeSlug),
+    getPublicLives(storeSlug),
   ]);
   const openBatches = batches.filter((b) => b.operational_status === "open" || b.operational_status === "scheduled");
+  const openLives = lives.filter((l) => l.operational_status === "open" || l.operational_status === "scheduled");
   const logoSrc = sf.logo_file_id
     ? urls.publicFile(store.id, sf.logo_file_id)
     : sf.logo_url;
@@ -92,6 +94,36 @@ export default async function PublicStorePage({ params }: Props) {
         {sf.description && (
           <p className="max-w-reading text-base opacity-80">{sf.description}</p>
         )}
+
+        {openLives.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-xl font-medium">Live shopping</h2>
+            <ul className="mt-4 grid gap-3 md:grid-cols-2">
+              {openLives.map((l) => (
+                <li key={l.id}>
+                  <Link
+                    href={urls.storefrontLive(storeSlug, l.slug)}
+                    className="block rounded-md border p-4 transition-opacity hover:opacity-90"
+                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                  >
+                    <p className="font-medium">{l.name}</p>
+                    <p className="mt-1 text-sm opacity-70 capitalize">
+                      {l.operational_status.replaceAll("_", " ")}
+                      {l.closes_at
+                        ? ` · closes ${new Intl.DateTimeFormat("id-ID", {
+                            timeZone: "Asia/Jakarta",
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(l.closes_at))} WIB`
+                        : ""}
+                      {l.product_count ? ` · ${l.product_count} items` : ""}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {openBatches.length > 0 ? (
           <section className="mt-10">

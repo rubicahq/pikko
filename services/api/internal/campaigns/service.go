@@ -67,6 +67,7 @@ type CampaignProduct struct {
 	SellingPhase      *string   `json:"selling_phase,omitempty"`
 	Notes             *string   `json:"notes,omitempty"`
 	DisplayOrder      int       `json:"display_order"`
+	Featured          bool      `json:"featured"`
 }
 
 type CreateInput struct {
@@ -114,6 +115,7 @@ type AssignProductInput struct {
 	SellingPhase     *string   `json:"selling_phase,omitempty"`
 	Notes            *string   `json:"notes,omitempty"`
 	DisplayOrder     int       `json:"display_order"`
+	Featured         *bool     `json:"featured,omitempty"`
 }
 
 type Service struct {
@@ -481,11 +483,11 @@ func (s *Service) listProducts(ctx context.Context, storeID, campaignID uuid.UUI
 	rows, err := s.DB.Query(ctx, `
 		SELECT cp.id, cp.campaign_id, cp.product_id, p.name, p.slug, p.base_price_idr,
 		       cp.price_override_idr, cp.quantity_limit, cp.availability, cp.selling_phase,
-		       cp.notes, cp.display_order
+		       cp.notes, cp.display_order, cp.featured
 		FROM campaign_products cp
 		JOIN products p ON p.id = cp.product_id
 		WHERE cp.campaign_id=$1 AND cp.store_id=$2
-		ORDER BY cp.display_order, p.name
+		ORDER BY cp.featured DESC, cp.display_order, p.name
 	`, campaignID, storeID)
 	if err != nil {
 		return nil, err
@@ -497,7 +499,7 @@ func (s *Service) listProducts(ctx context.Context, storeID, campaignID uuid.UUI
 		if err := rows.Scan(
 			&p.ID, &p.CampaignID, &p.ProductID, &p.ProductName, &p.ProductSlug, &p.BasePriceIDR,
 			&p.PriceOverrideIDR, &p.QuantityLimit, &p.Availability, &p.SellingPhase,
-			&p.Notes, &p.DisplayOrder,
+			&p.Notes, &p.DisplayOrder, &p.Featured,
 		); err != nil {
 			return nil, err
 		}
@@ -554,12 +556,17 @@ func (s *Service) AssignProduct(ctx context.Context, storeID, campaignID uuid.UU
 	}
 	defer tx.Rollback(ctx)
 
+	featured := c.CampaignType == TypeLive // new live SKUs default into quick-add panel
+	setFeatured := in.Featured != nil
+	if setFeatured {
+		featured = *in.Featured
+	}
 	var cpID uuid.UUID
 	err = tx.QueryRow(ctx, `
 		INSERT INTO campaign_products (
 			store_id, campaign_id, product_id, price_override_idr, quantity_limit,
-			availability, selling_phase, notes, display_order
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+			availability, selling_phase, notes, display_order, featured
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		ON CONFLICT (campaign_id, product_id) DO UPDATE SET
 			price_override_idr=EXCLUDED.price_override_idr,
 			quantity_limit=EXCLUDED.quantity_limit,
@@ -567,10 +574,11 @@ func (s *Service) AssignProduct(ctx context.Context, storeID, campaignID uuid.UU
 			selling_phase=EXCLUDED.selling_phase,
 			notes=EXCLUDED.notes,
 			display_order=EXCLUDED.display_order,
+			featured=CASE WHEN $11 THEN EXCLUDED.featured ELSE campaign_products.featured END,
 			updated_at=now()
 		RETURNING id
 	`, storeID, campaignID, in.ProductID, in.PriceOverrideIDR, in.QuantityLimit,
-		in.Availability, in.SellingPhase, in.Notes, in.DisplayOrder,
+		in.Availability, in.SellingPhase, in.Notes, in.DisplayOrder, featured, setFeatured,
 	).Scan(&cpID)
 	if err != nil {
 		return nil, err

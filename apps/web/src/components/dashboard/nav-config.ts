@@ -8,6 +8,7 @@ import {
   Package,
   CalendarClock,
   Megaphone,
+  Radio,
   Store,
   SlidersHorizontal,
   Settings,
@@ -54,6 +55,7 @@ export const MERCHANT_NAV: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "orders", label: "Orders", icon: ShoppingBag, implemented: true },
+      { href: "live", label: "Live", icon: Radio, implemented: true },
       { href: "purchasing", label: "Purchasing", icon: ClipboardList, implemented: true },
       { href: "packing", label: "Packing", icon: Boxes, implemented: true },
       { href: "shipments", label: "Shipments", icon: Truck, implemented: true },
@@ -107,6 +109,7 @@ const NAV_PERM: Record<string, string> = {
   messages: "notifications.read",
   analytics: "analytics.read",
   orders: "orders.read",
+  live: "campaign.read",
   customers: "customers.read",
   purchasing: "purchasing.read",
   packing: "packing.read",

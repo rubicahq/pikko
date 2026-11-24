@@ -58,6 +58,10 @@ func (g *Generator) Preorder(storeSlug, batchSlug string) string {
 	return fmt.Sprintf("%s/%s/preorders/%s", g.StorefrontBase, storeSlug, batchSlug)
 }
 
+func (g *Generator) Live(storeSlug, liveSlug string) string {
+	return fmt.Sprintf("%s/%s/live/%s", g.StorefrontBase, storeSlug, liveSlug)
+}
+
 func (g *Generator) Checkout(storeSlug string) string {
 	return fmt.Sprintf("%s/%s/checkout", g.StorefrontBase, storeSlug)
 }

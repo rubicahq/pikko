@@ -146,6 +146,21 @@ Store-scoped routes also enforce granular permissions via `RequirePermission` (c
 
 Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 
+### 2.5c Live shopping (Agent 12)
+
+| Method | Path | Auth / permission |
+| --- | --- | --- |
+| GET | `/stores/{storeID}/live` | `campaign.read` — list live sessions |
+| GET | `/stores/{storeID}/live/{campaignID}` | `campaign.read` — session + SKUs + sold/remaining |
+| GET | `/stores/{storeID}/live/{campaignID}/feed` | `orders.read` — order feed (`?since=` RFC3339) |
+| GET | `/stores/{storeID}/live/{campaignID}/orders/search` | `orders.read` — target order lookup |
+| POST | `/stores/{storeID}/live/{campaignID}/quick-add` | `orders.write` — add to order or create; idempotent |
+| GET | `/public/stores/{slug}/live` | public — discoverable live sessions |
+| GET | `/public/stores/{slug}/live/{liveSlug}` | public — session products (theme storefront) |
+
+Quick-add body: `{ product_id, quantity, idempotency_key, order_id? \| customer_*, variant_id? }`.  
+Source `live_quick_add`; campaign quota + finite stock enforced under row locks. No video.
+
 ### 2.6 Catalog import + flipbook
 
 | Method | Path |
@@ -254,6 +269,8 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | GET | `/public/stores/{slug}/preorders` |
 | GET | `/public/stores/{slug}/preorders/{batchSlug}` |
 | GET | `/public/stores/{slug}/products/{productSlug}/preorders` |
+| GET | `/public/stores/{slug}/live` |
+| GET | `/public/stores/{slug}/live/{liveSlug}` |
 | POST | `/public/stores/{slug}/checkout/preview` |
 | POST | `/public/stores/{slug}/checkout/submit` |
 | GET | `/public/tracking/{token}` |

@@ -72,8 +72,8 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | CAMP-01–04 | Preorder batches | done | `commerce/preorders.go`, UI | phase4 e2e | Preserved; synced into campaigns |
-| CAMP-05 | Unified campaign abstraction | done | `campaigns/`, `/campaigns` UI, migration `000008` | campaigns integration | Live behavior still Agent 12 |
-| LIVE-01–03 | Live shopping | partial | campaign type=`live` + flags | campaigns integration | Quick-add / feed ops → Agent 12 |
+| CAMP-05 | Unified campaign abstraction | done | `campaigns/`, `/campaigns` UI, migration `000008` | campaigns integration | — |
+| LIVE-01–03 | Live shopping (non-video) | done | `commerce/live.go`, `/live` console, public `/live`, `000016` | `TestLiveShoppingQuickAddFeedAndQuota` | No video infra; client cart is local |
 | CAT-01–03,07 | Catalog core + snapshots | done | `catalog/` | phase2 e2e | Collections unchanged |
 | CAT-04 | Brands entity | done | `brands` + `products.brand_id` | campaigns integration | Text `brand` column kept |
 | CAT-05–06 | Vendors link / custom attrs | done (foundation) | `vendors`, `product_vendors`, `attribute_*` | campaigns integration | Purchasing UX → Agent 06 |
@@ -160,7 +160,7 @@
 | E2E-H Consolidated payment | done (API) | Stage 2 |
 | E2E-I Packing | done (API) | Stage 2 |
 | E2E-J Address change | done (API) | Portal request + merchant review |
-| E2E-K Live shopping | missing | Stage 3 |
+| E2E-K Live shopping | done (API) | Concurrent quota + quick-add + public list; UI Playwright deferred |
 | E2E-L Concurrency | partial | Stage 1–3 |
 | E2E-M Portal security | done (API) | Cross-customer + cross-store IDOR |
 | E2E-N Domain migration readiness | done (code) | Cutover owner |

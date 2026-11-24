@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000013`  
+**Baseline migrations:** `000001`–`000016`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -22,8 +22,11 @@
 | 000011 | `payments_finance` | Deposits, payment allocations, financial events/adjustments, refunds, store credit |
 | 000012 | `customer_portal` | Portal tokens/sessions, refund prefs, address change requests |
 | 000013 | `packing_shipment` | packing_tasks/items + shipments/items (Agent 09) |
+| 000014 | `whatsapp_templates` | WhatsApp template send log (Agent 10) |
+| 000015 | `pdf_import_hardening` | Import confidence/review + job metadata (Agent 11) |
+| 000016 | `live_shopping` | Featured SKUs, live_quick_adds, source/revision types (Agent 12) |
 
-Next free version: **`000014_…`** (Agents 10+).
+Next free version: **`000017_…`** (Agents 13+).
 
 ---
 
@@ -104,9 +107,9 @@ Permission overrides deferred (role matrix in Go `internal/rbac` is sufficient)
 ### 3.2 Order item operations & revisions (`000009` — Agent 05) ✅
 
 ```text
-orders: + source (customer|admin|csv_import), created_by_user_id, campaign_id
+orders: + source (customer|admin|csv_import|live_quick_add), created_by_user_id, campaign_id
 order_items: + availability_status, allocated_qty, packed_qty, adjusted_line_total_idr, original_quantity
-order_revisions / order_item_events: append-only change log (who/when/why/before/after)
+order_revisions / order_item_events: append-only change log (who/when/why/before/after; + live_quick_add / live_added)
 admin_order_drafts: spreadsheet entry staging + validation_errors
 ```
 
@@ -117,8 +120,18 @@ brands (store_id, name, slug, …) + products.brand_id
 vendors + product_vendors (foundation; purchasing UX Agent 06)
 attribute_definitions + product_attribute_values
 campaigns (type preorder|live, statuses, live flags, preorder_batch_id)
-campaign_products (price/availability/selling_phase overrides)
+campaign_products (price/availability/selling_phase overrides; + featured in 000016)
 preorder_batches.campaign_id (backfilled)
+```
+
+### 3.2c Live shopping ops (`000016` — Agent 12) ✅
+
+```text
+campaign_products.featured
+orders.source += live_quick_add
+order_revisions.change_type += live_quick_add
+order_item_events.event_type += live_added
+live_quick_adds (idempotent audit: campaign/order/item/actor)
 ```
 
 ### 3.3 Vendors & receiving (`000010` — Agent 06) ✅

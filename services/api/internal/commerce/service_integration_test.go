@@ -54,7 +54,7 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 		         inventory_adjustments, inventory_reservations,
 		         store_credit_ledger, store_credits, refunds, financial_adjustments, financial_events,
 		         payment_allocations, payment_evidence, payments, store_deposit_policies,
-		         order_tracking_tokens, order_status_history, order_item_events, order_revisions, admin_order_drafts, order_items, orders,
+		         order_tracking_tokens, order_status_history, order_item_events, order_revisions, live_quick_adds, admin_order_drafts, order_items, orders,
 		         store_order_counters, customer_addresses, customers,
 		         store_payment_methods, store_fulfillment_settings,
 		         campaign_products, campaigns,
