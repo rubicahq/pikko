@@ -24,9 +24,9 @@ test.describe("Catalog flipbook editor", () => {
     });
 
     await page.getByRole("link", { name: "Catalog" }).click();
-    // Prefer href: store slug often starts with "flipbook-", which substring-matches
-    // getByRole(..., { name: "Flipbook" }) against the storefront URL link.
-    await page.locator('a[href$="/catalog/flipbook"]').click();
+    // exact: true — store slug often starts with "flipbook-", which would
+    // substring-match the storefront URL if name matching were loose.
+    await page.getByRole("link", { name: "Flipbook", exact: true }).click();
     await expect(page).toHaveURL(/\/catalog\/flipbook$/);
     await expect(page.getByRole("heading", { name: "Catalog flipbook" })).toBeVisible();
     await expect(page.getByText("No catalog pages yet", { exact: false })).toBeVisible();
