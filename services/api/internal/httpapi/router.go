@@ -213,6 +213,13 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/stores/{storeID}/campaigns/{campaignID}/products", storePerm(rbac.PermCampaignWrite, campaignH.AssignProduct))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/campaigns/{campaignID}/products/{productID}", storePerm(rbac.PermCampaignWrite, campaignH.RemoveProduct))
 
+	// Live shopping ops (Agent 12 — LIVE-01–03; not video)
+	mux.Handle("GET /api/v1/stores/{storeID}/live", storePerm(rbac.PermCampaignRead, commerceH.ListLiveSessions))
+	mux.Handle("GET /api/v1/stores/{storeID}/live/{campaignID}", storePerm(rbac.PermCampaignRead, commerceH.GetLiveSession))
+	mux.Handle("GET /api/v1/stores/{storeID}/live/{campaignID}/feed", storePerm(rbac.PermOrdersRead, commerceH.LiveOrderFeed))
+	mux.Handle("GET /api/v1/stores/{storeID}/live/{campaignID}/orders/search", storePerm(rbac.PermOrdersRead, commerceH.SearchLiveOrders))
+	mux.Handle("POST /api/v1/stores/{storeID}/live/{campaignID}/quick-add", storePerm(rbac.PermOrdersWrite, commerceH.LiveQuickAdd))
+
 	// Catalog import PDF + CSV (PRD §18)
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogWrite, impH.Start))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogRead, impH.List))
@@ -356,6 +363,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders", commerceH.PublicBatches)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders/{batchSlug}", commerceH.PublicBatch)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products/{productSlug}/preorders", commerceH.PublicProductBatches)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/live", commerceH.PublicLiveCampaigns)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/live/{liveSlug}", commerceH.PublicLiveCampaign)
 
 	// Phase 3: public checkout + tracking
 	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/preview", commerceH.CheckoutPreview)

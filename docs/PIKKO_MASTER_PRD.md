@@ -258,9 +258,9 @@ Target IA:
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| LIVE-01 | Live shopping session (not video stream) — timed window, quick-add SKUs | Partial (campaign shell + flags; Agent 12) |
-| LIVE-02 | Merchant quick-add to customer carts/orders during live | Missing |
-| LIVE-03 | Live order feed / concurrency-safe inventory | Missing |
+| LIVE-01 | Live shopping session (not video stream) — timed window, quick-add SKUs | Done (Agent 12) |
+| LIVE-02 | Merchant quick-add to customer carts/orders during live | Done (Agent 12) |
+| LIVE-03 | Live order feed / concurrency-safe inventory | Done (Agent 12) |
 
 ---
 
@@ -623,7 +623,7 @@ Do not skip acceptance gates.
 | E2E-H | Consolidated payment | 2 | Done (API) |
 | E2E-I | Packing flow | 2 | Done (API) |
 | E2E-J | Address change | 2 | Done (API) |
-| E2E-K | Live shopping session | 3 | Missing |
+| E2E-K | Live shopping session | 3 | Done (API concurrency; Agent 12) |
 | E2E-L | Concurrency (stock/quota) | 1–3 | Partial tests |
 | E2E-M | Portal security (no cross-customer) | 2 | Done (API IDOR) |
 | E2E-N | Domain migration readiness (env-only) | 3 | Code ready; cutover owner |

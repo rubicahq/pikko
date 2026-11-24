@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,12 @@ function suggest(name: string) {
 
 export function CampaignForm({ storeId }: { storeId: string }) {
   const router = useRouter();
+  const search = useSearchParams();
   const now = new Date();
   const later = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const [type, setType] = useState<"preorder" | "live">("preorder");
+  const [type, setType] = useState<"preorder" | "live">(
+    search.get("type") === "live" ? "live" : "preorder",
+  );
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -174,7 +177,7 @@ export function CampaignForm({ storeId }: { storeId: string }) {
             checked={quickAdd}
             onChange={(e) => setQuickAdd(e.target.checked)}
           />
-          Enable live quick-add flag (Agent 12 behavior)
+          Enable merchant quick-add during live
         </label>
       )}
 

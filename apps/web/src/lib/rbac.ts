@@ -44,6 +44,7 @@ const NAV_PERMISSION: Record<string, Permission> = {
   catalog: "catalog.read",
   preorders: "campaign.read",
   campaigns: "campaign.read",
+  live: "campaign.read",
   storefront: "storefront.read",
   "business-rules": "business_rules.read",
   settings: "stores.settings",

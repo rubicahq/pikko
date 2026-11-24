@@ -210,6 +210,8 @@ func NavPermission(href string) (Permission, bool) {
 		return PermCampaignRead, true
 	case "campaigns":
 		return PermCampaignRead, true
+	case "live":
+		return PermCampaignRead, true
 	case "storefront":
 		return PermStorefrontRead, true
 	case "business-rules":

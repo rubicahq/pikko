@@ -19,6 +19,7 @@ type CampaignProduct = {
   quantity_limit?: number | null;
   availability: string;
   selling_phase?: string | null;
+  featured?: boolean;
 };
 
 type Campaign = {
@@ -115,6 +116,30 @@ export function CampaignDetailClient({
     }
   }
 
+  async function toggleFeatured(p: CampaignProduct) {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/v1/stores/${storeId}/campaigns/${campaign.id}/products`, {
+        method: "POST",
+        body: {
+          product_id: p.product_id,
+          price_override_idr: p.price_override_idr ?? null,
+          quantity_limit: p.quantity_limit ?? null,
+          availability: p.availability,
+          selling_phase: p.selling_phase ?? null,
+          display_order: 0,
+          featured: !p.featured,
+        },
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not update featured.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -129,13 +154,20 @@ export function CampaignDetailClient({
             <span className="text-xs text-foreground-muted">{campaign.publication_status}</span>
           </div>
         </div>
-        {campaign.preorder_batch_id ? (
-          <Button asChild variant="outline">
-            <Link href={urls.storePreorder(storeId, campaign.preorder_batch_id)}>
-              Open linked preorder batch
-            </Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {campaign.campaign_type === "live" ? (
+            <Button asChild>
+              <Link href={urls.storeLiveSession(storeId, campaign.id)}>Open live console</Link>
+            </Button>
+          ) : null}
+          {campaign.preorder_batch_id ? (
+            <Button asChild variant="outline">
+              <Link href={urls.storePreorder(storeId, campaign.preorder_batch_id)}>
+                Open linked preorder batch
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {error ? <p className="text-sm text-error">{error}</p> : null}
@@ -156,15 +188,28 @@ export function CampaignDetailClient({
                     {p.quantity_limit != null ? ` · quota ${p.quantity_limit}` : ""}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => remove(p.product_id)}
-                >
-                  Remove
-                </Button>
+                <div className="flex items-center gap-2">
+                  {campaign.campaign_type === "live" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => toggleFeatured(p)}
+                    >
+                      {p.featured ? "Unfeature" : "Feature"}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => remove(p.product_id)}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

@@ -193,3 +193,45 @@ export async function getPublicProductBatches(slug: string, productSlug: string)
   }>(`/api/v1/public/stores/${slug}/products/${productSlug}/preorders`, false);
   return data?.batches || [];
 }
+
+export async function getPublicLives(slug: string) {
+  const data = await serverFetch<{
+    lives: {
+      id: string;
+      name: string;
+      slug: string;
+      operational_status: string;
+      closes_at: string;
+      opens_at: string;
+      product_count: number;
+      description?: string | null;
+    }[];
+  }>(`/api/v1/public/stores/${slug}/live`, false);
+  return data?.lives || [];
+}
+
+export async function getPublicLive(slug: string, liveSlug: string) {
+  return serverFetch<{
+    live: {
+      id: string;
+      name: string;
+      slug: string;
+      description?: string | null;
+      opens_at: string;
+      closes_at: string;
+      operational_status: string;
+      is_accepting_orders: boolean;
+      products?: {
+        product_id: string;
+        product_name: string;
+        product_slug: string;
+        effective_price_idr: number;
+        quantity_limit?: number | null;
+        sold_qty: number;
+        remaining_qty?: number | null;
+        featured: boolean;
+        availability: string;
+      }[];
+    };
+  }>(`/api/v1/public/stores/${slug}/live/${liveSlug}`, false);
+}

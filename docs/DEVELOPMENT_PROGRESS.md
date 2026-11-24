@@ -54,7 +54,7 @@
 | Agent | Scope | Reuses | Exit gate |
 | --- | --- | --- | --- |
 | **11 PDF/AI Catalog** | Reliability, limits, review UX | PDF-01–05 | **Done** — hardened import + E2E-B API; no schema destruction |
-| **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | LIVE-*; E2E-K |
+| **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | **Done** — LIVE-01–03 + E2E-K API |
 | **13 Analytics** | North-star fulfilled items metric | analytics | AN-01 satisfied |
 | **14 Security/QA** | Threat pass, TEST_REPORT, E2E A–N | all e2e | Matrix accurate; critical gaps ticketed |
 | **15 Integration/Deploy** | Runbook validation; smoke; **no auto cutover** | deploy scripts | DEPLOYMENT_RUNBOOK current; owner checklist only for pikko.id |
@@ -242,10 +242,25 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 12+)
+## 3l. Agent 12 status (Live Shopping & Storefront)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000016_live_shopping` | Done (additive) |
+| Live console (quick-add + feed) | Done |
+| Public live listing + session page | Done (theme-respecting) |
+| Quota concurrency safety | Done (`FOR UPDATE` + sold sum) |
+| Nav / RBAC (`campaign.read` + `orders.write` for quick-add) | Done |
+| E2E-K API test | Done |
+| `docs/agents/12-live-shopping-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 13+)
 
 1. Customer portal auth model: separate customer identities (shipped Agent 08).
-2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
+2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live ops shipped Agent 12.
 3. Commercial pricing / counsel legal — owner (unchanged).
 4. pikko.id cutover date — owner only.
 5. Checkout-time store credit apply UX — optional follow-up; admin apply shipped.

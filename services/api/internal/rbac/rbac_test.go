@@ -79,4 +79,8 @@ func TestCampaignPermissions(t *testing.T) {
 	if !ok || perm != rbac.PermCampaignRead {
 		t.Fatalf("nav preorders -> %s ok=%v", perm, ok)
 	}
+	perm, ok = rbac.NavPermission("live")
+	if !ok || perm != rbac.PermCampaignRead {
+		t.Fatalf("nav live -> %s ok=%v", perm, ok)
+	}
 }

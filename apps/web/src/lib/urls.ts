@@ -61,6 +61,8 @@ export const urls = {
   storeCampaigns: (storeId: string) => `/stores/${storeId}/campaigns`,
   storeCampaign: (storeId: string, campaignId: string) => `/stores/${storeId}/campaigns/${campaignId}`,
   storeCampaignNew: (storeId: string) => `/stores/${storeId}/campaigns/new`,
+  storeLive: (storeId: string) => `/stores/${storeId}/live`,
+  storeLiveSession: (storeId: string, campaignId: string) => `/stores/${storeId}/live/${campaignId}`,
   storePurchasing: (storeId: string) => `/stores/${storeId}/purchasing`,
   storeVendors: (storeId: string) => `/stores/${storeId}/vendors`,
   storeReceiving: (storeId: string, receivingId: string) =>
@@ -79,6 +81,9 @@ export const urls = {
   storefrontPreorder: (slug: string, batchSlug: string) => `/${slug}/preorders/${batchSlug}`,
   storefrontPreorderAbsolute: (slug: string, batchSlug: string) =>
     `${storefront()}/${slug}/preorders/${batchSlug}`,
+  storefrontLive: (slug: string, liveSlug: string) => `/${slug}/live/${liveSlug}`,
+  storefrontLiveAbsolute: (slug: string, liveSlug: string) =>
+    `${storefront()}/${slug}/live/${liveSlug}`,
   tracking: (token: string) => `/track/${encodeURIComponent(token)}`,
   trackingAbsolute: (token: string) => `${storefront()}/track/${encodeURIComponent(token)}`,
   api: (path: string) => {
@@ -107,6 +112,7 @@ export const RESERVED_STOREFRONT_SLUGS = new Set([
   "products",
   "collections",
   "preorders",
+  "live",
   "cart",
   "search",
   "favicon.ico",
