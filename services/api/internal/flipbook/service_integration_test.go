@@ -45,8 +45,12 @@ func testPool(t *testing.T) *pgxpool.Pool {
 func reset(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(), `
-		TRUNCATE audit_logs, email_jobs, auth_rate_limits, onboarding_drafts,
+		TRUNCATE audit_logs, email_jobs, auth_rate_limits, public_rate_limits, onboarding_drafts,
 		         outbox_events, job_queue,
+		         inventory_adjustments, inventory_reservations,
+		         payment_evidence, payments, order_tracking_tokens, order_status_history, order_items, orders,
+		         store_order_counters, customer_addresses, customers,
+		         store_payment_methods, store_fulfillment_settings,
 		         catalog_page_hotspots, catalog_pages, catalog_import_items, catalog_import_jobs,
 		         storefront_featured_collections, storefront_featured_products,
 		         storefront_banners, storefront_configs,

@@ -56,4 +56,4 @@ Always scope by `store_id` and authorize membership; resolve checkout only for `
 - Merchant editor: `/stores/{storeId}/catalog/flipbook`
 - Public viewer: `/{storeSlug}/catalog`
 - Product deep link: `/{storeSlug}/products/{productSlug}`
-- Hotspot click loads `GET /api/v1/public/stores/{slug}/catalog/products/{productId}` then offers **Add to cart** via `apps/web/src/lib/cart.ts` (localStorage hook). Full checkout (PRD §20) is not in this release — CTAs also link to the product page.
+- Hotspot click loads `GET /api/v1/public/stores/{slug}/catalog/products/{productId}` then offers **Add to cart** via `apps/web/src/lib/cart.ts` (store-scoped cart). Checkout is Phase 3: `/{storeSlug}/cart` → `/{storeSlug}/checkout` → `/track/{token}`. Prices/stock are always revalidated server-side on checkout preview/submit.

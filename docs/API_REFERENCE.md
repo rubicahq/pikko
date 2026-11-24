@@ -1,4 +1,4 @@
-# API Reference (Phase 0–2 + AI import)
+# API Reference (Phase 0–3)
 
 Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
@@ -28,61 +28,66 @@ Unchanged from Phase 1: magic-link request/peek/verify, session, logout, account
 - `POST /stores/{storeId}/products/{productId}/archive`
 - `GET/POST /stores/{storeId}/collections`
 
-Product write body:
+### Phase 3 commerce (auth + membership)
 
-```json
-{
-  "product": {
-    "name": "Tote",
-    "sku": "TOTE-1",
-    "base_price_idr": 125000,
-    "status": "draft"
-  },
-  "options": [],
-  "variants": [],
-  "image_file_ids": ["…"]
-}
-```
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET/POST | `/stores/{storeId}/payment-methods` | Manual bank transfer accounts |
+| PATCH/DELETE | `/stores/{storeId}/payment-methods/{methodId}` | Update / remove |
+| GET/PATCH | `/stores/{storeId}/fulfillment` | Shipping / free shipping / pickup |
+| GET | `/stores/{storeId}/orders` | Query: `q`, `order_status`, `payment_status`, `fulfillment_status`, `limit`, `offset` |
+| GET/PATCH | `/stores/{storeId}/orders/{orderId}` | Detail + status transitions |
+| POST | `/stores/{storeId}/orders/{orderId}/payments/{paymentId}/verify` | Verify evidence |
+| POST | `/stores/{storeId}/orders/{orderId}/payments/{paymentId}/reject` | Body `{reason}` |
+| GET | `/stores/{storeId}/orders/evidence/{evidenceId}/file` | Private evidence stream |
+| GET | `/stores/{storeId}/customers` | Store-scoped customers |
+
+Checkout enables (`stores.checkout_enabled=true`) only when ≥1 enabled bank account and ≥1 fulfillment method exist.
 
 ## Catalog imports (AI PDF)
 
-Uses mock AI when `AI_API_KEY` is unset.
+Uses mock AI when `AI_API_KEY` is unset. See prior sections for import + flipbook routes.
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| POST | `/stores/{storeID}/catalog-imports` | Multipart `file` (PDF) + `extract_images`. Optional `Idempotency-Key`. Limits: 25 MB, 50 pages, 1 PDF/job. |
-| GET | `/stores/{storeID}/catalog-imports` | Recent jobs |
-| GET | `/stores/{storeID}/catalog-imports/{jobID}` | Job status/progress |
-| GET | `/stores/{storeID}/catalog-imports/{jobID}/items` | Review items |
-| PATCH | `/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}` | Edit/select/flag uncertain |
-| DELETE | `/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}` | Remove item |
-| POST | `/stores/{storeID}/catalog-imports/{jobID}/confirm` | Body `{item_ids?}` → create **draft** products + hotspot candidates |
-| POST | `/stores/{storeID}/catalog-imports/{jobID}/retry` | Re-queue failed job |
-
-Statuses: `pending` → `processing` → `review_required` → `completed` (or `failed`).
-
-## Catalog flipbook
-
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/stores/{storeID}/catalog-pages` | Merchant pages + hotspots |
-| PUT | `/stores/{storeID}/catalog-pages/order` | Body `{page_ids:[…]}` |
-| POST | `/stores/{storeID}/catalog-pages/status` | Body `{status:"published"|"draft", page_ids?}` |
-| POST | `/stores/{storeID}/catalog-pages/{pageID}/hotspots` | Body bbox + `product_id` |
-| PATCH | `/stores/{storeID}/catalog-pages/hotspots/{hotspotID}` | Move/relink hotspot |
-| DELETE | `/stores/{storeID}/catalog-pages/hotspots/{hotspotID}` | Remove hotspot |
-| GET | `/public/stores/{slug}/catalog` | Published pages; hotspots only for published products |
-| GET | `/public/stores/{slug}/catalog/products/{productID}` | Product card + `checkout_hook` |
-
-## Public
+## Public storefront
 
 - `GET /public/stores/{slug}`
 - `GET /public/stores/{slug}/products`
 - `GET /public/stores/{slug}/products/{productSlug}` — includes `product_url` + `link_ref`
 - `GET /public/stores/{slug}/categories`
+- `GET /public/stores/{slug}/catalog` / `…/catalog/products/{productID}`
 - `GET /public/files/{storeId}/{fileId}` — published stores only
 
-All public product payloads omit `cost_price_idr`.
+### Phase 3 public checkout + tracking
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/public/stores/{slug}/checkout/preview` | Body `{items, fulfillment_method?}` — rate limited |
+| POST | `/public/stores/{slug}/checkout/submit` | Guest checkout; `idempotency_key` required; returns `tracking_token` once |
+| GET | `/public/tracking/{token}` | Order tracking (noindex); hash lookup only |
+| POST | `/public/tracking/{token}/evidence` | Multipart `file` (image/PDF ≤8 MB) |
+| GET | `/public/tracking/{token}/evidence/{evidenceId}/file` | Authorized evidence download |
+
+Submit body (essentials):
+
+```json
+{
+  "items": [{ "product_id": "…", "quantity": 1 }],
+  "customer_name": "Budi",
+  "customer_email": "budi@example.com",
+  "fulfillment_method": "shipping",
+  "shipping_address": {
+    "recipient_name": "Budi",
+    "line1": "Jl. …",
+    "city": "Jakarta",
+    "country": "ID"
+  },
+  "payment_method_id": "…",
+  "idempotency_key": "…",
+  "client_expected_total_idr": 215000
+}
+```
+
+All money fields are integer IDR. `price_changed` (409) when client total ≠ server total.
 
 ## Health
 

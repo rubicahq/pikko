@@ -8,9 +8,14 @@ import (
 
 type Handler func(ctx context.Context, job *Job) error
 
+type EmailDrainer interface {
+	DrainPending(ctx context.Context, limit int) (int, error)
+}
+
 type Worker struct {
 	Queue    *Queue
 	Outbox   *Outbox
+	Email    EmailDrainer
 	Logger   *slog.Logger
 	WorkerID string
 	Types    []string
@@ -40,6 +45,9 @@ func (w *Worker) Run(ctx context.Context) {
 func (w *Worker) tick(ctx context.Context) {
 	if w.Outbox != nil {
 		_, _ = w.Outbox.MarkPublished(ctx, 50)
+	}
+	if w.Email != nil {
+		_, _ = w.Email.DrainPending(ctx, 20)
 	}
 	job, err := w.Queue.ClaimNext(ctx, w.WorkerID, w.Types)
 	if err != nil {

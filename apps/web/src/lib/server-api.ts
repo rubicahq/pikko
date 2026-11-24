@@ -120,6 +120,7 @@ export async function getPublicStore(slug: string) {
       name: string;
       slug: string;
       currency: string;
+      checkout_enabled: boolean;
       storefront: StorefrontConfig;
     };
     storefront_url: string;

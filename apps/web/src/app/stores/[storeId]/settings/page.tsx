@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession, getStore, getStorefront } from "@/lib/server-api";
 import { StoreSettingsForm } from "@/components/settings/store-settings-form";
+import { CommerceSettings } from "@/components/settings/commerce-settings";
 import { urls } from "@/lib/urls";
 
 export default async function StoreSettingsPage({
@@ -17,5 +18,12 @@ export default async function StoreSettingsPage({
   ]);
   if (!store || !storefront) redirect(urls.stores());
 
-  return <StoreSettingsForm store={store} storefront={storefront} />;
+  return (
+    <div>
+      <StoreSettingsForm store={store} storefront={storefront} />
+      <div className="mx-auto max-w-reading">
+        <CommerceSettings storeId={storeId} />
+      </div>
+    </div>
+  );
 }

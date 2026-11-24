@@ -23,6 +23,10 @@ var PurposeLimits = map[string]UploadLimits{
 	"catalog_pdf":  {MaxBytes: 25 << 20, AllowedMIME: []string{"application/pdf"}},
 	"catalog_page": {MaxBytes: 8 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 	"import_crop":  {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
+	"payment_evidence": {
+		MaxBytes: 8 << 20,
+		AllowedMIME: []string{"image/png", "image/jpeg", "image/webp", "application/pdf"},
+	},
 }
 
 func ValidateUpload(purpose string, size int64, contentType string, head []byte) (string, error) {
@@ -43,11 +47,14 @@ func ValidateUpload(purpose string, size int64, contentType string, head []byte)
 		ct = "image/jpeg"
 	}
 	// PDF magic (%PDF-) may sniff as application/octet-stream on some platforms
-	if purpose == "catalog_pdf" {
+	if purpose == "catalog_pdf" || purpose == "payment_evidence" {
 		if bytes.HasPrefix(bytes.TrimSpace(head), []byte("%PDF-")) {
 			return "application/pdf", nil
 		}
-		return "", fmt.Errorf("unsupported file type")
+		if purpose == "catalog_pdf" {
+			return "", fmt.Errorf("unsupported file type")
+		}
+		// payment_evidence may also be an image — fall through to MIME checks
 	}
 	if strings.HasPrefix(detected, "image/") && !mimeAllowed(detected, limits.AllowedMIME) && detected != "text/xml; charset=utf-8" {
 		// Prefer sniffed type when clearly an image mismatch
