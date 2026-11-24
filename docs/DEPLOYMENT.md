@@ -181,17 +181,51 @@ sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
 
 Volumes: `pikko_postgres_data`, `pikko_api_storage`. Keep dumps outside the compose tree.
 
-## Redeploy / update
+## Redeploy / update (main)
 
 ```bash
 cd ~/pikko
-git pull
+# Keep .env (secrets). Tag current images first for rollback.
+sudo docker tag pikko-api:latest pikko-api:pre-$(date -u +%Y%m%dT%H%M%SZ)
+sudo docker tag pikko-web:latest pikko-web:pre-$(date -u +%Y%m%dT%H%M%SZ)
+
+mkdir -p ~/backups
+sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
+  > ~/backups/pikko-$(date -u +%Y%m%dT%H%M%SZ).dump
+
+git fetch origin main && git checkout main && git pull origin main
+
+# Ensure AI/import env keys exist in .env (values stay server-only):
+#   AI_API_KEY, AI_BASE_URL, AI_MODEL=gemini/gemini-3.5-flash
+#   IMPORT_MAX_PDF_BYTES, IMPORT_MAX_PAGES, IMPORT_MAX_ITEMS
+#   STORAGE_DRIVER=local (volume pikko_api_storage)
+
 sudo docker compose -p pikko \
   -f docker-compose.yml -f docker-compose.deploy.yml \
   --profile proxy up -d --build
+# migrate one-shot runs before api; confirm: schema_migrations.version == latest
+
 sudo docker network connect emplicon_emplicon pikko-web || true
 sudo docker network connect emplicon_emplicon pikko-api || true
 ```
+
+### Storage volume ownership
+
+`pikko-api` runs as distroless `nonroot` (UID/GID **65532**). After the first volume create, if uploads return `upload_failed`, fix ownership **without deleting the volume**:
+
+```bash
+sudo chown -R 65532:65532 /var/lib/docker/volumes/pikko_api_storage/_data
+```
+
+### Smoke checklist (post-deploy)
+
+- `https://pikko.site`, `app.`, `shop.` → 200; `https://api.pikko.site/healthz` → 200
+- Magic-link request OK (or expected 429 cooldown)
+- Create store → upload logo/favicon → product → publish → `https://shop.pikko.site/{slug}`
+- PDF import job reaches `review_required` / completed; public flipbook `/ {slug}/catalog`
+- Cleanup test users/stores afterward
+
+Note: `GET /api/v1/auth/session` currently reads the session **cookie** only; Bearer works on other authenticated routes via middleware.
 
 ## Local without Docker
 
