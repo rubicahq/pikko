@@ -12,23 +12,31 @@ STORAGE_VOLUME="${BACKUP_STORAGE_VOLUME:-pikko_api_storage}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="${BACKUP_DIR}/${STAMP}"
 
+# Prefer unprivileged docker; fall back to sudo (VPS ubuntu often lacks docker group).
+if docker info >/dev/null 2>&1; then
+  DOCKER=(docker)
+else
+  DOCKER=(sudo docker)
+fi
+
 mkdir -p "$DEST"
 umask 077
 
 echo "[pikko-backup] starting ${STAMP}"
 
-if ! docker inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
+if ! "${DOCKER[@]}" inspect "$POSTGRES_CONTAINER" >/dev/null 2>&1; then
   echo "[pikko-backup] ERROR: container ${POSTGRES_CONTAINER} not found" >&2
   exit 1
 fi
 
-docker exec "$POSTGRES_CONTAINER" \
+"${DOCKER[@]}" exec "$POSTGRES_CONTAINER" \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc \
   > "${DEST}/postgres.dump"
 
 # Local object storage volume (Compose volume). Skip quietly if absent.
-VOL_PATH="$(docker volume inspect -f '{{ .Mountpoint }}' "$STORAGE_VOLUME" 2>/dev/null || true)"
-if [[ -n "${VOL_PATH}" && -d "${VOL_PATH}" ]]; then
+# Mountpoints under /var/lib/docker are often root-only — use sudo for -d/tar.
+VOL_PATH="$("${DOCKER[@]}" volume inspect -f '{{ .Mountpoint }}' "$STORAGE_VOLUME" 2>/dev/null || true)"
+if [[ -n "${VOL_PATH}" ]] && sudo test -d "${VOL_PATH}"; then
   sudo tar -C "$(dirname "$VOL_PATH")" -czf "${DEST}/storage.tgz" "$(basename "$VOL_PATH")"
   echo "[pikko-backup] storage archived from ${VOL_PATH}"
 else

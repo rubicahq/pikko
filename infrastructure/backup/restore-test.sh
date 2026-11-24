@@ -13,13 +13,19 @@ NAME="pikko-restore-test-$$"
 PASS="restore-test-$$"
 PORT=55432
 
+if docker info >/dev/null 2>&1; then
+  DOCKER=(docker)
+else
+  DOCKER=(sudo docker)
+fi
+
 cleanup() {
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  "${DOCKER[@]}" rm -f "$NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 echo "[restore-test] starting ephemeral postgres ${NAME}"
-docker run -d --name "$NAME" \
+"${DOCKER[@]}" run -d --name "$NAME" \
   -e POSTGRES_PASSWORD="$PASS" \
   -e POSTGRES_USER=pikko \
   -e POSTGRES_DB=pikko \
@@ -27,16 +33,16 @@ docker run -d --name "$NAME" \
   postgres:16-alpine >/dev/null
 
 for i in $(seq 1 30); do
-  if docker exec "$NAME" pg_isready -U pikko -d pikko >/dev/null 2>&1; then
+  if "${DOCKER[@]}" exec "$NAME" pg_isready -U pikko -d pikko >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
 
-docker exec -i "$NAME" pg_restore -U pikko -d pikko --clean --if-exists < "$DUMP" \
+"${DOCKER[@]}" exec -i "$NAME" pg_restore -U pikko -d pikko --clean --if-exists < "$DUMP" \
   || echo "[restore-test] pg_restore reported warnings (common with --clean on empty DB)"
 
-COUNT="$(docker exec "$NAME" psql -U pikko -d pikko -Atc "SELECT count(*) FROM schema_migrations;")"
+COUNT="$("${DOCKER[@]}" exec "$NAME" psql -U pikko -d pikko -Atc "SELECT count(*) FROM schema_migrations;")"
 echo "[restore-test] schema_migrations rows=${COUNT}"
 if [[ -z "$COUNT" || "$COUNT" -lt 1 ]]; then
   echo "[restore-test] FAIL: migrations table empty or missing" >&2
