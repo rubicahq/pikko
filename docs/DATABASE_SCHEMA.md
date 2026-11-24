@@ -96,12 +96,13 @@ ALTER store_memberships: widen role CHECK to
 Permission overrides deferred (role matrix in Go `internal/rbac` is sufficient)
 ```
 
-### 3.2 Order item operations & revisions (Agent 05)
+### 3.2 Order item operations & revisions (`000009` — Agent 05) ✅
 
 ```text
-order_items: + availability_status, allocated_qty, packed_qty, adjusted_line_total_idr
-order_item_events / order_revisions: append-only change log (who/when/why/before/after)
-admin_order_drafts (optional): spreadsheet entry staging
+orders: + source (customer|admin|csv_import), created_by_user_id, campaign_id
+order_items: + availability_status, allocated_qty, packed_qty, adjusted_line_total_idr, original_quantity
+order_revisions / order_item_events: append-only change log (who/when/why/before/after)
+admin_order_drafts: spreadsheet entry staging + validation_errors
 ```
 
 ### 3.2b Campaigns & catalog foundations (`000008` — Agent 04) ✅

@@ -86,10 +86,10 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | ORD-01–04,11 | Checkout, bank transfer, tracking, dimensions | done | `commerce/*` | phase3/4 e2e | — |
-| ORD-05 | Item-level operations | partial | allocations | phase4 | No general item ops API |
-| ORD-06–07 | Admin / spreadsheet entry | missing | — | — | Agent 05 |
-| ORD-08 | Order CSV | missing | catalog CSV only | — | Agent 05 |
-| ORD-09 | Full revisions | partial | `order_status_history` | — | Agent 05 |
+| ORD-05 | Item-level operations | partial | qty adjust + item events + availability cols; allocations | commerce admin tests | Split/unavailable full finance → later |
+| ORD-06–07 | Admin / spreadsheet entry | done | `admin_orders.go`, order-entry UI | commerce admin tests | Draft autosave + keyboard grid |
+| ORD-08 | Order CSV | done | `order_csv.go`, import UI | commerce admin tests | Template + preview match + import |
+| ORD-09 | Full revisions | done | `order_revisions` + status history | commerce admin tests | Non-destructive append-only |
 | ORD-10 | Deposit/final payments | missing | — | — | Agent 07 |
 | PUR-01–03 | Purchasing + allocate | done | `purchasing.go` | phase4 integration | UI depth varies |
 | PUR-04–06 | Multi-vendor / receiving | missing | — | — | Agent 06 |

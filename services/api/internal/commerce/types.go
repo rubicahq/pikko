@@ -1,6 +1,7 @@
 package commerce
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -159,17 +160,22 @@ type CheckoutPreview struct {
 }
 
 type OrderItem struct {
-	ID           uuid.UUID  `json:"id"`
-	ProductID    *uuid.UUID `json:"product_id,omitempty"`
-	VariantID    *uuid.UUID `json:"variant_id,omitempty"`
-	BatchID      *uuid.UUID `json:"batch_id,omitempty"`
-	ProductName  string     `json:"product_name"`
-	ProductSlug  *string    `json:"product_slug,omitempty"`
-	SKU          *string    `json:"sku,omitempty"`
-	VariantLabel *string    `json:"variant_label,omitempty"`
-	UnitPriceIDR int64      `json:"unit_price_idr"`
-	Quantity     int        `json:"quantity"`
-	LineTotalIDR int64      `json:"line_total_idr"`
+	ID                   uuid.UUID  `json:"id"`
+	ProductID            *uuid.UUID `json:"product_id,omitempty"`
+	VariantID            *uuid.UUID `json:"variant_id,omitempty"`
+	BatchID              *uuid.UUID `json:"batch_id,omitempty"`
+	ProductName          string     `json:"product_name"`
+	ProductSlug          *string    `json:"product_slug,omitempty"`
+	SKU                  *string    `json:"sku,omitempty"`
+	VariantLabel         *string    `json:"variant_label,omitempty"`
+	UnitPriceIDR         int64      `json:"unit_price_idr"`
+	Quantity             int        `json:"quantity"`
+	OriginalQuantity     int        `json:"original_quantity"`
+	LineTotalIDR         int64      `json:"line_total_idr"`
+	AvailabilityStatus   string     `json:"availability_status"`
+	AllocatedQty         int        `json:"allocated_qty"`
+	PackedQty            int        `json:"packed_qty"`
+	AdjustedLineTotalIDR *int64     `json:"adjusted_line_total_idr,omitempty"`
 }
 
 type Order struct {
@@ -211,9 +217,65 @@ type Order struct {
 	BatchNameSnapshot   *string     `json:"batch_name_snapshot,omitempty"`
 	BatchSlugSnapshot   *string     `json:"batch_slug_snapshot,omitempty"`
 	RequiresApproval    bool        `json:"requires_approval"`
+	Source              string      `json:"source"`
+	CreatedByUserID     *uuid.UUID  `json:"created_by_user_id,omitempty"`
+	CampaignID          *uuid.UUID  `json:"campaign_id,omitempty"`
 	Items               []OrderItem `json:"items,omitempty"`
 	TrackingURL         string      `json:"tracking_url,omitempty"`
 	TrackingToken       string      `json:"tracking_token,omitempty"` // only on create response
+}
+
+const (
+	OrderSourceCustomer  = "customer"
+	OrderSourceAdmin     = "admin"
+	OrderSourceCSVImport = "csv_import"
+
+	ItemAvailabilityAvailable            = "available"
+	ItemAvailabilityPartiallyUnavailable = "partially_unavailable"
+	ItemAvailabilityUnavailable          = "unavailable"
+)
+
+type OrderRevision struct {
+	ID             uuid.UUID       `json:"id"`
+	StoreID        uuid.UUID       `json:"store_id"`
+	OrderID        uuid.UUID       `json:"order_id"`
+	RevisionNumber int             `json:"revision_number"`
+	ChangeType     string          `json:"change_type"`
+	Summary        string          `json:"summary"`
+	BeforeSnapshot json.RawMessage `json:"before_snapshot,omitempty"`
+	AfterSnapshot  json.RawMessage `json:"after_snapshot,omitempty"`
+	ActorUserID    *uuid.UUID      `json:"actor_user_id,omitempty"`
+	Reason         *string         `json:"reason,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type OrderItemEvent struct {
+	ID               uuid.UUID       `json:"id"`
+	StoreID          uuid.UUID       `json:"store_id"`
+	OrderID          uuid.UUID       `json:"order_id"`
+	OrderItemID      uuid.UUID       `json:"order_item_id"`
+	RevisionID       *uuid.UUID      `json:"revision_id,omitempty"`
+	EventType        string          `json:"event_type"`
+	FromQuantity     *int            `json:"from_quantity,omitempty"`
+	ToQuantity       *int            `json:"to_quantity,omitempty"`
+	FromAvailability *string         `json:"from_availability,omitempty"`
+	ToAvailability   *string         `json:"to_availability,omitempty"`
+	Meta             json.RawMessage `json:"meta,omitempty"`
+	ActorUserID      *uuid.UUID      `json:"actor_user_id,omitempty"`
+	Reason           *string         `json:"reason,omitempty"`
+	CreatedAt        time.Time       `json:"created_at"`
+}
+
+type AdminOrderDraft struct {
+	ID               uuid.UUID       `json:"id"`
+	StoreID          uuid.UUID       `json:"store_id"`
+	CreatedByUserID  uuid.UUID       `json:"created_by_user_id"`
+	Title            string          `json:"title"`
+	Payload          json.RawMessage `json:"payload"`
+	LastValidatedAt  *time.Time      `json:"last_validated_at,omitempty"`
+	ValidationErrors json.RawMessage `json:"validation_errors"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type Payment struct {

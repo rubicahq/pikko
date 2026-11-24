@@ -4,6 +4,7 @@ import { getSession, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { OrderActions } from "@/components/orders/order-actions";
+import { OrderItemsAndRevisions } from "@/components/orders/order-revisions-panel";
 import { Badge } from "@/components/ui/badge";
 
 export default async function OrderDetailPage({
@@ -34,11 +35,18 @@ export default async function OrderDetailPage({
       handling_fee_idr?: number;
       shipping_line1?: string | null;
       shipping_city?: string | null;
+      source?: string;
+      campaign_id?: string | null;
       items?: {
+        id: string;
         product_name: string;
         quantity: number;
+        original_quantity: number;
         unit_price_idr: number;
         line_total_idr: number;
+        availability_status: string;
+        allocated_qty: number;
+        packed_qty: number;
         sku?: string | null;
       }[];
       created_at: string;
@@ -66,6 +74,8 @@ export default async function OrderDetailPage({
           <h1 className="text-[30px] font-medium text-foreground">{o.order_number}</h1>
           <p className="mt-1 text-sm text-foreground-secondary">
             {new Date(o.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} (Asia/Jakarta)
+            {o.source ? ` · ${o.source.replaceAll("_", " ")}` : ""}
+            {o.campaign_id ? ` · campaign ${o.campaign_id.slice(0, 8)}…` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -101,6 +111,12 @@ export default async function OrderDetailPage({
                 <dd className="whitespace-pre-wrap">{o.customer_notes}</dd>
               </div>
             ) : null}
+            {o.internal_notes ? (
+              <div>
+                <dt className="text-foreground-secondary">Internal</dt>
+                <dd className="whitespace-pre-wrap">{o.internal_notes}</dd>
+              </div>
+            ) : null}
           </dl>
         </section>
 
@@ -113,49 +129,39 @@ export default async function OrderDetailPage({
               {o.shipping_city ? `, ${o.shipping_city}` : ""}
             </p>
           ) : null}
+          <div className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
+            <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{formatIDR(o.subtotal_idr)}</span>
+            </div>
+            {(o.handling_fee_idr ?? 0) > 0 ? (
+              <div className="flex justify-between">
+                <span>Handling fee</span>
+                <span className="tabular-nums">{formatIDR(o.handling_fee_idr || 0)}</span>
+              </div>
+            ) : null}
+            {(o.shipping_fee_idr ?? 0) > 0 ? (
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="tabular-nums">{formatIDR(o.shipping_fee_idr)}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between pt-1 text-sm font-medium">
+              <span>Total</span>
+              <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
+            </div>
+          </div>
         </section>
       </div>
 
-      <section className="mt-6 rounded-[10px] border border-border p-5">
-        <h2 className="text-base font-medium">Items</h2>
-        <ul className="mt-3 space-y-2 text-sm">
-          {(o.items || []).map((it, i) => (
-            <li key={i} className="flex justify-between gap-3">
-              <span>
-                {it.product_name} × {it.quantity}
-                <span className="text-foreground-muted">
-                  {" "}
-                  · {formatIDR(it.unit_price_idr)}
-                  {it.sku ? ` · ${it.sku}` : ""}
-                </span>
-              </span>
-              <span className="tabular-nums">{formatIDR(it.line_total_idr)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
-          <div className="flex justify-between">
-            <span>Subtotal</span>
-            <span className="tabular-nums">{formatIDR(o.subtotal_idr)}</span>
-          </div>
-          {(o.handling_fee_idr ?? 0) > 0 ? (
-            <div className="flex justify-between">
-              <span>Handling fee</span>
-              <span className="tabular-nums">{formatIDR(o.handling_fee_idr || 0)}</span>
-            </div>
-          ) : null}
-          {(o.shipping_fee_idr ?? 0) > 0 ? (
-            <div className="flex justify-between">
-              <span>Shipping</span>
-              <span className="tabular-nums">{formatIDR(o.shipping_fee_idr)}</span>
-            </div>
-          ) : null}
-          <div className="flex justify-between pt-1 text-sm font-medium">
-            <span>Total</span>
-            <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
-          </div>
-        </div>
-      </section>
+      <div className="mt-6">
+        <OrderItemsAndRevisions
+          storeId={storeId}
+          orderId={o.id}
+          items={o.items || []}
+          canWrite
+        />
+      </div>
 
       {p ? (
         <section className="mt-6 rounded-[10px] border border-border p-5">

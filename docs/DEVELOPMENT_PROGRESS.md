@@ -125,7 +125,24 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 05)
+## 3e. Agent 05 status (Order Management)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000009_order_management` | Done |
+| Admin create + spreadsheet drafts + bulk validate | Done |
+| CSV order import (template/preview/match/import) | Done |
+| Item qty records + revisions / item-events | Done |
+| Campaign association on checkout + admin orders | Done |
+| RBAC `orders.*` on new routes | Done |
+| UI: `/orders/new`, `/orders/import`, detail revisions | Done |
+| `docs/agents/05-order-management-handoff.md` | Done |
+| Guest checkout / payments / tracking preserved | Yes |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 06)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.

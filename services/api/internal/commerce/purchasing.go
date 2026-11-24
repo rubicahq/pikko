@@ -218,7 +218,7 @@ func (s *Service) ListBatchOrders(ctx context.Context, storeID, batchID uuid.UUI
 		       payment_deadline_at, confirmed_at, completed_at, cancelled_at,
 		       created_at, updated_at,
 		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot,
-		       requires_approval
+		       requires_approval, source, created_by_user_id, campaign_id
 		FROM orders WHERE store_id=$1 AND preorder_batch_id=$2
 		ORDER BY created_at DESC
 		LIMIT $3 OFFSET $4

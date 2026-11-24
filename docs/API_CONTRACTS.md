@@ -171,10 +171,22 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | PATCH/DELETE | `/stores/{storeID}/payment-methods/{methodID}` |
 | GET/PATCH | `/stores/{storeID}/fulfillment` |
 | GET | `/stores/{storeID}/orders` |
+| POST | `/stores/{storeID}/orders` (admin create; `orders.write`) |
 | GET/PATCH | `/stores/{storeID}/orders/{orderID}` |
+| GET | `/stores/{storeID}/orders/{orderID}/revisions` |
+| GET | `/stores/{storeID}/orders/{orderID}/item-events` |
+| PATCH | `/stores/{storeID}/orders/{orderID}/items/{itemID}` (qty adjust → revision) |
 | POST | `/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify` |
 | POST | `/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject` |
 | GET | `/stores/{storeID}/orders/evidence/{evidenceID}/file` |
+| POST | `/stores/{storeID}/order-entry/validate` |
+| GET | `/stores/{storeID}/order-entry/catalog-suggest` |
+| GET/POST | `/stores/{storeID}/order-entry/drafts` |
+| GET/PUT/DELETE | `/stores/{storeID}/order-entry/drafts/{draftID}` |
+| POST | `/stores/{storeID}/order-entry/drafts/{draftID}/validate` |
+| GET | `/stores/{storeID}/order-entry/csv-template` |
+| POST | `/stores/{storeID}/order-entry/csv-preview` |
+| POST | `/stores/{storeID}/order-entry/csv-import` |
 | GET | `/stores/{storeID}/customers` |
 | GET/PATCH | `/stores/{storeID}/customers/{customerID}` |
 
@@ -232,8 +244,8 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 
 | Missing capability | Suggested contract owner |
 | --- | --- |
-| Admin create/edit order | Agent 05 `POST /stores/{id}/orders` |
-| Order item patch / revision list | Agent 05 |
+| Admin create/edit order | **Shipped Agent 05** — `POST /orders` + `/order-entry/*` |
+| Order item patch / revision list | **Shipped Agent 05** — revisions + item-events + qty PATCH |
 | Refunds + store credit | Agent 07 `/finance/*` |
 | Customer portal auth + orders | Agent 08 `/portal/*` |
 | Packing + shipments | Agent 09 |
