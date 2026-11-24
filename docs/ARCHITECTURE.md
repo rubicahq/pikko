@@ -2,12 +2,12 @@
 
 ## Overview
 
-Modular monolith (PRD §31). Phase 2 adds storefront + catalog on the Phase 0/1 foundation. AI PDF import and flipbook build on Phase 2 products.
+Modular monolith (PRD §31). Phase 3 adds checkout, orders, manual bank transfer, tracking, and transactional emails on the Phase 0–2 + import/flipbook foundation.
 
 ```
 pikko/
-  apps/web              Next.js — marketing, auth, dashboard, public storefront
-  services/api          Go — auth, stores, storefront, catalog, files, imports, flipbook
+  apps/web              Next.js — marketing, auth, dashboard, storefront, checkout, tracking
+  services/api          Go — auth, stores, storefront, catalog, commerce, files, imports, flipbook
   packages/design-tokens
   database/migrations
   docs/
@@ -17,8 +17,8 @@ pikko/
 
 | Service | Role |
 | --- | --- |
-| `web` | Dashboard + public `/{slug}` storefront |
-| `api` | Auth, account, stores, storefront, catalog, files, import worker |
+| `web` | Dashboard + public `/{slug}` storefront + cart/checkout + `/track/{token}` |
+| `api` | Auth, account, stores, storefront, catalog, commerce, files, workers |
 | `postgres` | System of record |
 | `migrate` | SQL migrations |
 
@@ -34,9 +34,18 @@ Store is the tenant. Every catalog/storefront/file row carries `store_id`. Route
 
 Products expose stable UUIDs, store-scoped slugs, optional SKU, images, and draft/published status. Public `link_ref` is the contract for flipbook hotspots. See `docs/CATALOG_LINK_CONTRACT.md`.
 
+## Commerce (Phase 3)
+
+- Cart lines are client-persisted (store-scoped); checkout preview/submit revalidate prices and stock on the server.
+- Orders store immutable line snapshots; statuses: order / payment / fulfillment (separate dimensions).
+- Manual bank transfer only in MVP; evidence files use purpose `payment_evidence` (private).
+- Tracking tokens are ≥256-bit; only SHA-256 hashes are stored.
+- `stores.checkout_enabled` flips on when payment methods + fulfillment are configured.
+- Money is integer IDR with deterministic half-up helpers for future percentage fees.
+
 ## Jobs
 
-`email_jobs` table persists delivery attempts. Auth emails send immediately via `SendNow`.
+`email_jobs` table persists delivery attempts. Auth emails send immediately via `SendNow`. Transactional commerce emails are enqueued with idempotency keys and drained by the in-process worker (`DrainPending`).
 
 Catalog PDF import uses a PostgreSQL `job_queue` + `outbox_events` with idempotency keys. The API process runs an in-process worker that claims jobs (`FOR UPDATE SKIP LOCKED`), renders PDF pages, calls the AI extractor adapter, and writes review items. Outbox rows are marked published by the same worker loop.
 

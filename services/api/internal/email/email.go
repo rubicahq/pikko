@@ -162,6 +162,70 @@ func (s *Service) SendNow(ctx context.Context, msg Message) error {
 	return err
 }
 
+// DrainPending sends up to limit pending email_jobs (idempotent; PRD §28).
+func (s *Service) DrainPending(ctx context.Context, limit int) (int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := s.DB.Query(ctx, `
+		SELECT id, template_key, to_email, from_email, subject, body_html, body_text, idempotency_key
+		FROM email_jobs
+		WHERE status IN ('pending', 'failed') AND attempts < 8
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	type job struct {
+		ID             uuid.UUID
+		TemplateKey    string
+		To, From       string
+		Subject        string
+		HTML, Text     string
+		IdempotencyKey string
+	}
+	var jobs []job
+	for rows.Next() {
+		var j job
+		if err := rows.Scan(&j.ID, &j.TemplateKey, &j.To, &j.From, &j.Subject, &j.HTML, &j.Text, &j.IdempotencyKey); err != nil {
+			return 0, err
+		}
+		jobs = append(jobs, j)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	sent := 0
+	for _, j := range jobs {
+		ct, err := s.DB.Exec(ctx, `
+			UPDATE email_jobs SET status='sending', updated_at=now()
+			WHERE id=$1 AND status IN ('pending','failed')
+		`, j.ID)
+		if err != nil || ct.RowsAffected() == 0 {
+			continue
+		}
+		providerID, sendErr := s.Sender.Send(ctx, Message{
+			TemplateKey: j.TemplateKey, To: j.To, From: j.From,
+			Subject: j.Subject, HTML: j.HTML, Text: j.Text, IdempotencyKey: j.IdempotencyKey,
+		})
+		if sendErr != nil {
+			_, _ = s.DB.Exec(ctx, `
+				UPDATE email_jobs SET status='failed', attempts=attempts+1, last_error=$2, updated_at=now()
+				WHERE id=$1
+			`, j.ID, sendErr.Error())
+			continue
+		}
+		_, _ = s.DB.Exec(ctx, `
+			UPDATE email_jobs SET status='sent', attempts=attempts+1, provider_message_id=$2, sent_at=now(), updated_at=now()
+			WHERE id=$1
+		`, j.ID, providerID)
+		sent++
+	}
+	return sent, nil
+}
+
 func NewSender(mode, apiKey string, logger *slog.Logger) Sender {
 	switch strings.ToLower(mode) {
 	case "brevo":

@@ -11,6 +11,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/ai"
 	"github.com/rubicahq/pikko/services/api/internal/auth"
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
+	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/files"
@@ -75,6 +76,11 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	impH := &ImportHandlers{Imports: importSvc}
 	flipSvc := &flipbook.Service{DB: d.DB}
 	flipH := &FlipbookHandlers{Flipbook: flipSvc, Catalog: catalogSvc, URLs: urlGen}
+	commerceSvc := &commerce.Service{
+		DB: d.DB, Cfg: d.Cfg, Files: filesSvc, Storage: d.Storage,
+		Email: mailSvc, Outbox: outbox, URLs: urlGen, Logger: d.Logger,
+	}
+	commerceH := &CommerceHandlers{Commerce: commerceSvc, URLs: urlGen, Cfg: d.Cfg}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -169,6 +175,21 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.UpdateHotspot))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.DeleteHotspot))
 
+	// Phase 3: merchant commerce settings + orders
+	mux.Handle("GET /api/v1/stores/{storeID}/payment-methods", storeAuthed(commerceH.ListPaymentMethods))
+	mux.Handle("POST /api/v1/stores/{storeID}/payment-methods", storeAuthed(commerceH.CreatePaymentMethod))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/payment-methods/{methodID}", storeAuthed(commerceH.UpdatePaymentMethod))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/payment-methods/{methodID}", storeAuthed(commerceH.DeletePaymentMethod))
+	mux.Handle("GET /api/v1/stores/{storeID}/fulfillment", storeAuthed(commerceH.GetFulfillment))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/fulfillment", storeAuthed(commerceH.PatchFulfillment))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders", storeAuthed(commerceH.ListOrders))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}", storeAuthed(commerceH.GetOrder))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/orders/{orderID}", storeAuthed(commerceH.PatchOrder))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify", storeAuthed(commerceH.VerifyPayment))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject", storeAuthed(commerceH.RejectPayment))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders/evidence/{evidenceID}/file", storeAuthed(commerceH.MerchantEvidenceFile))
+	mux.Handle("GET /api/v1/stores/{storeID}/customers", storeAuthed(commerceH.ListCustomers))
+
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products", p2.PublicProducts)
@@ -178,8 +199,15 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog/products/{productID}", flipH.PublicHotspotProduct)
 	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
 
+	// Phase 3: public checkout + tracking
+	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/preview", commerceH.CheckoutPreview)
+	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/submit", commerceH.CheckoutSubmit)
+	mux.HandleFunc("GET /api/v1/public/tracking/{token}", commerceH.TrackingGet)
+	mux.HandleFunc("POST /api/v1/public/tracking/{token}/evidence", commerceH.TrackingEvidenceUpload)
+	mux.HandleFunc("GET /api/v1/public/tracking/{token}/evidence/{evidenceID}/file", commerceH.TrackingEvidenceFile)
+
 	worker := &jobs.Worker{
-		Queue: queue, Outbox: outbox, Logger: d.Logger, WorkerID: "api-" + uuidLike(),
+		Queue: queue, Outbox: outbox, Email: mailSvc, Logger: d.Logger, WorkerID: "api-" + uuidLike(),
 		Types: []string{jobs.TypeCatalogPDFImport},
 		Handlers: map[string]jobs.Handler{
 			jobs.TypeCatalogPDFImport: importSvc.ProcessJob,

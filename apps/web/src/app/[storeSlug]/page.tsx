@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getPublicProducts, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
+import { CartBadge } from "@/components/storefront/cart-badge";
 
 type Props = { params: Promise<{ storeSlug: string }> };
 
@@ -65,15 +66,21 @@ export default async function PublicStorePage({ params }: Props) {
             <h1 className="text-2xl font-medium">{store.name}</h1>
           )}
         </div>
-        {sf.whatsapp && (
-          <a
-            className="text-sm underline-offset-2 hover:underline"
-            href={`https://wa.me/${sf.whatsapp.replace(/\D/g, "")}`}
-            style={{ color: sf.primary_color }}
-          >
-            Contact
-          </a>
-        )}
+        <div className="flex items-center gap-4">
+          <Link href={`/${storeSlug}/catalog`} className="text-sm opacity-80 hover:opacity-100">
+            Catalog
+          </Link>
+          <CartBadge storeSlug={storeSlug} color={sf.text_color} />
+          {sf.whatsapp ? (
+            <a
+              className="text-sm underline-offset-2 hover:underline"
+              href={`https://wa.me/${sf.whatsapp.replace(/\D/g, "")}`}
+              style={{ color: sf.primary_color }}
+            >
+              Contact
+            </a>
+          ) : null}
+        </div>
       </header>
 
       <main className="mx-auto max-w-dashboard px-4 pb-16 md:px-8">

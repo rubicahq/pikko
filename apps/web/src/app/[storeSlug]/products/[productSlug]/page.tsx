@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { getPublicProduct, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
+import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
+import { CartBadge } from "@/components/storefront/cart-badge";
 
 type Props = {
   params: Promise<{ storeSlug: string; productSlug: string }>;
@@ -52,10 +54,11 @@ export default async function PublicProductPage({ params }: Props) {
 
   return (
     <div className="min-h-screen" style={{ background: sf.background_color, color: sf.text_color }}>
-      <header className="mx-auto max-w-dashboard px-4 py-6 md:px-8">
+      <header className="mx-auto flex max-w-dashboard items-center justify-between px-4 py-6 md:px-8">
         <Link href={urls.storefrontPath(storeSlug)} className="text-sm opacity-70 hover:opacity-100">
           ← {store.name}
         </Link>
+        <CartBadge storeSlug={storeSlug} color={sf.text_color} />
       </header>
       <main className="mx-auto grid max-w-dashboard gap-8 px-4 pb-16 md:grid-cols-2 md:px-8">
         <div
@@ -72,10 +75,30 @@ export default async function PublicProductPage({ params }: Props) {
           {p.sku && <p className="mt-2 text-sm opacity-60">SKU {p.sku}</p>}
           <p className="mt-4 text-xl tabular-nums">{formatIDR(p.base_price_idr)}</p>
           {p.description && <p className="mt-6 text-base opacity-80 whitespace-pre-wrap">{p.description}</p>}
-          <p className="mt-8 text-sm opacity-70">
-            Checkout arrives in a later phase. This product is ready for flipbook hotspot linking via
-            id <code className="text-xs">{p.id}</code>.
-          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <AddToCartButton
+              storeSlug={storeSlug}
+              productId={p.id}
+              productSlug={p.slug}
+              name={p.name}
+              priceIdr={p.base_price_idr}
+              primaryColor={sf.primary_color}
+              buttonFg={sf.button_foreground || "#FCFCFD"}
+              disabled={p.availability === "unavailable" || !store.checkout_enabled}
+            />
+            <Link
+              href={`/${storeSlug}/cart`}
+              className="text-sm underline-offset-2 hover:underline"
+              style={{ color: sf.primary_color }}
+            >
+              View cart
+            </Link>
+          </div>
+          {!store.checkout_enabled ? (
+            <p className="mt-4 text-sm opacity-70">
+              Browsing is open. Checkout opens once the merchant finishes payment and fulfillment setup.
+            </p>
+          ) : null}
         </div>
       </main>
     </div>

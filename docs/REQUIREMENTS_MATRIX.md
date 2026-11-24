@@ -1,4 +1,4 @@
-# Requirements Matrix (Phase 0–2)
+# Requirements Matrix (Phase 0–3)
 
 Status: `done` | `partial` | `deferred`
 
@@ -16,12 +16,23 @@ Status: `done` | `partial` | `deferred`
 | P0-10 | Central URL generation | done | Go + web `urls` |
 | P0-11 | Docs kept accurate | done | `docs/*` |
 | P0-12 | Docker web/api + compose | done | Dockerfiles, compose |
-| P1-1–P1-10 | Auth + multi-store | done | Phase 1 PR |
+| P1-1–P1-10 | Auth + multi-store | done | Phase 1 |
 | P2-1 | Store identity + logo/favicon/store icon | done | settings + storefront draft assets |
-| P2-2 | Storefront config + 24 themes, draft preview, publish | done | themes package + editor + publish API |
+| P2-2 | Storefront config + 24 themes, draft preview, publish | done | themes + editor + publish API |
 | P2-3 | Catalog categories/products/variants/images/IDR/status | done | catalog service + UI |
 | P2-4 | Public storefront SEO + favicon/logo | done | `/{slug}` pages |
 | P2-5 | Store-scoped queries/cache/storage + authz | done | middleware + isolation tests |
-| P2-6 | Flipbook-ready product link contract | done | `docs/CATALOG_LINK_CONTRACT.md`, `link_ref` |
-| — | Flipbook UI / AI PDF import | deferred | follow-on workers |
-| — | Checkout / orders / payments | deferred | Phase 3+ |
+| P2-6 | Flipbook-ready product link contract | done | `docs/CATALOG_LINK_CONTRACT.md` |
+| P2-7 | AI PDF import + flipbook | done | migrations `000003`, import + flipbook UI |
+| P3-1 | Real cart (store-scoped) | done | `apps/web/src/lib/cart.ts` + cart page |
+| P3-2 | Guest checkout + IDR integer totals | done | checkout preview/submit APIs + UI |
+| P3-3 | Order creation with snapshots + statuses | done | `orders` / `order_items` |
+| P3-4 | Manual bank transfer + merchant accounts | done | `store_payment_methods` + settings UI |
+| P3-5 | Payment evidence (private) + verify/reject | done | evidence upload + merchant actions |
+| P3-6 | Merchant order list/detail + fulfillment | done | `/stores/{id}/orders` |
+| P3-7 | Public tracking token (hash-only, ≥256-bit) | done | `/track/{token}` + `order_tracking_tokens` |
+| P3-8 | Transactional emails + idempotent jobs | done | Brevo adapter + `email_jobs` drain |
+| P3-9 | Stock reservations (finite) | done | `inventory_reservations` on submit |
+| P3-10 | Public rate limits + store-scoped authz | done | `public_rate_limits` + cross-store tests |
+| — | Preorder / handling fees / approval | deferred | Phase 4 |
+| — | VPS deploy / Emplicon | deferred | separate after merge |

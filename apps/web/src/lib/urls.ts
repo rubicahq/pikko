@@ -39,12 +39,18 @@ export const urls = {
     `/stores/${storeId}/catalog/import/${jobId}`,
   catalogFlipbook: (storeId: string) => `/stores/${storeId}/catalog/flipbook`,
   storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
+  storeOrders: (storeId: string) => `/stores/${storeId}/orders`,
+  storeOrder: (storeId: string, orderId: string) => `/stores/${storeId}/orders/${orderId}`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
+  storefrontCart: (slug: string) => `/${slug}/cart`,
+  storefrontCheckout: (slug: string) => `/${slug}/checkout`,
   storefrontCatalog: (slug: string) => `${storefront()}/${slug}/catalog`,
   storefrontProduct: (slug: string, productSlug: string) => `/${slug}/products/${productSlug}`,
   storefrontProductAbsolute: (slug: string, productSlug: string) =>
     `${storefront()}/${slug}/products/${productSlug}`,
+  tracking: (token: string) => `/track/${encodeURIComponent(token)}`,
+  trackingAbsolute: (token: string) => `${storefront()}/track/${encodeURIComponent(token)}`,
   api: (path: string) => {
     const base = api();
     const p = path.startsWith("/") ? path : `/${path}`;
