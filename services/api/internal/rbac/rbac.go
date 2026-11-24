@@ -28,6 +28,9 @@ const (
 	PermCatalogRead  Permission = "catalog.read"
 	PermCatalogWrite Permission = "catalog.write"
 
+	PermCampaignRead  Permission = "campaign.read"
+	PermCampaignWrite Permission = "campaign.write"
+
 	PermStorefrontRead  Permission = "storefront.read"
 	PermStorefrontWrite Permission = "storefront.write"
 
@@ -59,6 +62,7 @@ var allPermissions = []Permission{
 	PermStoresRead, PermStoresWrite, PermStoresArchive, PermStoresSettings,
 	PermTeamRead, PermTeamInvite, PermTeamManage,
 	PermCatalogRead, PermCatalogWrite,
+	PermCampaignRead, PermCampaignWrite,
 	PermStorefrontRead, PermStorefrontWrite,
 	PermOrdersRead, PermOrdersWrite, PermOrdersPayments,
 	PermCustomersRead, PermCustomersWrite,
@@ -76,6 +80,7 @@ var roleMatrix = map[string][]Permission{
 		PermStoresRead, PermStoresWrite, PermStoresSettings,
 		PermTeamRead, PermTeamInvite, PermTeamManage,
 		PermCatalogRead, PermCatalogWrite,
+		PermCampaignRead, PermCampaignWrite,
 		PermStorefrontRead, PermStorefrontWrite,
 		PermOrdersRead, PermOrdersWrite, PermOrdersPayments,
 		PermCustomersRead, PermCustomersWrite,
@@ -88,6 +93,7 @@ var roleMatrix = map[string][]Permission{
 	RoleCS: {
 		PermStoresRead,
 		PermCatalogRead,
+		PermCampaignRead,
 		PermOrdersRead, PermOrdersWrite, PermOrdersPayments,
 		PermCustomersRead, PermCustomersWrite,
 		PermAnalyticsRead,
@@ -96,12 +102,14 @@ var roleMatrix = map[string][]Permission{
 	RoleCatalog: {
 		PermStoresRead,
 		PermCatalogRead, PermCatalogWrite,
+		PermCampaignRead, PermCampaignWrite,
 		PermStorefrontRead, PermStorefrontWrite,
 		PermNotificationsRead,
 	},
 	RolePurchasing: {
 		PermStoresRead,
 		PermCatalogRead,
+		PermCampaignRead,
 		PermOrdersRead,
 		PermPurchasingRead, PermPurchasingWrite,
 		PermNotificationsRead,
@@ -196,7 +204,9 @@ func NavPermission(href string) (Permission, bool) {
 	case "catalog":
 		return PermCatalogRead, true
 	case "preorders":
-		return PermCatalogRead, true
+		return PermCampaignRead, true
+	case "campaigns":
+		return PermCampaignRead, true
 	case "storefront":
 		return PermStorefrontRead, true
 	case "business-rules":

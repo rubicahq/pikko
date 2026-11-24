@@ -109,10 +109,26 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 04)
+## 3d. Agent 04 status (Campaign & Catalog)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000008_campaign_catalog` | Done |
+| `internal/campaigns` + HTTP `/campaigns` | Done (preorder links batch; live shell + flags) |
+| Brands / vendors / custom attributes foundations | Done |
+| Campaign-product overrides (price/availability/phase) | Done |
+| Nav Campaigns + RBAC `campaign.*` | Done |
+| Preorder APIs/UI preserved + synced | Yes |
+| `docs/agents/04-campaign-catalog-handoff.md` | Done |
+| Live shopping ops (quick-add feed) | Deferred Agent 12 |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 05)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
-2. Campaign table vs facade over `preorder_batches` + `live_sessions` (Agent 04).
+2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
 3. Commercial pricing / counsel legal — owner (unchanged).
 4. pikko.id cutover date — owner only.
 

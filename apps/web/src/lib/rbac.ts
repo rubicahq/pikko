@@ -10,6 +10,8 @@ export type Permission =
   | "team.manage"
   | "catalog.read"
   | "catalog.write"
+  | "campaign.read"
+  | "campaign.write"
   | "storefront.read"
   | "storefront.write"
   | "orders.read"
@@ -40,7 +42,8 @@ const NAV_PERMISSION: Record<string, Permission> = {
   shipments: "packing.read",
   finance: "finance.read",
   catalog: "catalog.read",
-  preorders: "catalog.read",
+  preorders: "campaign.read",
+  campaigns: "campaign.read",
   storefront: "storefront.read",
   "business-rules": "business_rules.read",
   settings: "stores.settings",

@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000007`  
+**Baseline migrations:** `000001`–`000008`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -16,8 +16,9 @@
 | 000005 | `phase4_preorder_rules` | Preorder batches, purchasing, allocations, business rules |
 | 000006 | `phase5_merchant_efficiency` | Notifications, analytics_events, CSV import columns |
 | 000007 | `team_rbac` | Widen membership roles; `team_invites` |
+| 000008 | `campaign_catalog` | Campaigns + brands/vendors/attrs; link preorder batches |
 
-Next free version: **`000008_…`** (Agents 04+).
+Next free version: **`000009_…`** (Agents 05+).
 
 ---
 
@@ -103,11 +104,21 @@ order_item_events / order_revisions: append-only change log (who/when/why/before
 admin_order_drafts (optional): spreadsheet entry staging
 ```
 
+### 3.2b Campaigns & catalog foundations (`000008` — Agent 04) ✅
+
+```text
+brands (store_id, name, slug, …) + products.brand_id
+vendors + product_vendors (foundation; purchasing UX Agent 06)
+attribute_definitions + product_attribute_values
+campaigns (type preorder|live, statuses, live flags, preorder_batch_id)
+campaign_products (price/availability/selling_phase overrides)
+preorder_batches.campaign_id (backfilled)
+```
+
 ### 3.3 Vendors & receiving (Agent 06)
 
 ```text
-vendors (store_id, name, contacts, notes)
-product_vendors (product_id, vendor_id, preference)
+vendors / product_vendors already from 000008 — extend with:
 purchase_orders / purchase_order_lines (optional MVP-lite: purchasing_records + vendor_id)
 receiving_records / receiving_lines → link purchasing + inventory adjustments
 ```

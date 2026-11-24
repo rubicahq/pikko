@@ -53,13 +53,16 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 		         payment_evidence, payments, order_tracking_tokens, order_status_history, order_items, orders,
 		         store_order_counters, customer_addresses, customers,
 		         store_payment_methods, store_fulfillment_settings,
+		         campaign_products, campaigns,
 		         preorder_batch_variants, preorder_batch_products, preorder_batches,
 		         catalog_page_hotspots, catalog_pages, catalog_import_items, catalog_import_jobs,
 		         storefront_featured_collections, storefront_featured_products,
 		         storefront_banners, storefront_configs,
+		         product_attribute_values, attribute_definitions,
+		         product_vendors, vendors,
 		         collection_products, collections,
 		         variant_option_values, product_variants, product_option_values, product_options,
-		         product_images, products, categories, stored_files,
+		         product_images, products, brands, categories, stored_files,
 		         store_slug_aliases, store_memberships, stores, user_preferences,
 		         sessions, authentication_tokens, users CASCADE
 	`)

@@ -12,6 +12,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/ai"
 	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/auth"
+	"github.com/rubicahq/pikko/services/api/internal/campaigns"
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
@@ -90,7 +91,9 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 		Email: mailSvc, Outbox: outbox, URLs: urlGen, Logger: d.Logger,
 		Notifier: notifSvc,
 	}
-	commerceH := &CommerceHandlers{Commerce: commerceSvc, URLs: urlGen, Cfg: d.Cfg}
+	campaignSvc := &campaigns.Service{DB: d.DB}
+	campaignH := &CampaignHandlers{Campaigns: campaignSvc}
+	commerceH := &CommerceHandlers{Commerce: commerceSvc, Campaigns: campaignSvc, URLs: urlGen, Cfg: d.Cfg}
 	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
@@ -177,6 +180,31 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/collections", storePerm(rbac.PermCatalogRead, p2.ListCollections))
 	mux.Handle("POST /api/v1/stores/{storeID}/collections", storePerm(rbac.PermCatalogWrite, p2.CreateCollection))
 
+	// Brands / vendors / custom attributes (Agent 04 catalog foundations)
+	mux.Handle("GET /api/v1/stores/{storeID}/brands", storePerm(rbac.PermCatalogRead, p2.ListBrands))
+	mux.Handle("POST /api/v1/stores/{storeID}/brands", storePerm(rbac.PermCatalogWrite, p2.CreateBrand))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/brands/{brandID}", storePerm(rbac.PermCatalogWrite, p2.UpdateBrand))
+	mux.Handle("GET /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermCatalogRead, p2.ListVendors))
+	mux.Handle("POST /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermCatalogWrite, p2.CreateVendor))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/vendors/{vendorID}", storePerm(rbac.PermCatalogWrite, p2.UpdateVendor))
+	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}/vendors", storePerm(rbac.PermCatalogRead, p2.ListProductVendors))
+	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/vendors", storePerm(rbac.PermCatalogWrite, p2.LinkProductVendor))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/products/{productID}/vendors/{vendorID}", storePerm(rbac.PermCatalogWrite, p2.UnlinkProductVendor))
+	mux.Handle("GET /api/v1/stores/{storeID}/attributes", storePerm(rbac.PermCatalogRead, p2.ListAttributeDefinitions))
+	mux.Handle("POST /api/v1/stores/{storeID}/attributes", storePerm(rbac.PermCatalogWrite, p2.CreateAttributeDefinition))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/attributes/{attributeID}", storePerm(rbac.PermCatalogWrite, p2.UpdateAttributeDefinition))
+	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}/attributes", storePerm(rbac.PermCatalogRead, p2.ListProductAttributes))
+	mux.Handle("PUT /api/v1/stores/{storeID}/products/{productID}/attributes", storePerm(rbac.PermCatalogWrite, p2.SetProductAttribute))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/products/{productID}/attributes/{attributeID}", storePerm(rbac.PermCatalogWrite, p2.DeleteProductAttribute))
+
+	// Campaigns (Agent 04 — CAMP-05 unification)
+	mux.Handle("GET /api/v1/stores/{storeID}/campaigns", storePerm(rbac.PermCampaignRead, campaignH.List))
+	mux.Handle("POST /api/v1/stores/{storeID}/campaigns", storePerm(rbac.PermCampaignWrite, campaignH.Create))
+	mux.Handle("GET /api/v1/stores/{storeID}/campaigns/{campaignID}", storePerm(rbac.PermCampaignRead, campaignH.Get))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/campaigns/{campaignID}", storePerm(rbac.PermCampaignWrite, campaignH.Patch))
+	mux.Handle("POST /api/v1/stores/{storeID}/campaigns/{campaignID}/products", storePerm(rbac.PermCampaignWrite, campaignH.AssignProduct))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/campaigns/{campaignID}/products/{productID}", storePerm(rbac.PermCampaignWrite, campaignH.RemoveProduct))
+
 	// Catalog import PDF + CSV (PRD §18)
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogWrite, impH.Start))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogRead, impH.List))
@@ -222,16 +250,16 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PATCH /api/v1/stores/{storeID}/notification-preferences", storePerm(rbac.PermNotificationsWrite, p5.PatchNotificationPreferences))
 	mux.Handle("GET /api/v1/stores/{storeID}/analytics", storePerm(rbac.PermAnalyticsRead, p5.AnalyticsOverview))
 
-	// Phase 4: preorder batches
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCatalogRead, commerceH.ListBatches))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCatalogWrite, commerceH.CreateBatch))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCatalogRead, commerceH.GetBatch))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCatalogWrite, commerceH.PatchBatch))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storePerm(rbac.PermCatalogWrite, commerceH.AssignBatchProduct))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storePerm(rbac.PermCatalogWrite, commerceH.RemoveBatchProduct))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCatalogRead, p5.ListBatchVariants))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCatalogWrite, p5.AssignBatchVariant))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants/{variantID}", storePerm(rbac.PermCatalogWrite, p5.RemoveBatchVariant))
+	// Phase 4: preorder batches (kept; gated by campaign.* — still synced into campaigns)
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCampaignRead, commerceH.ListBatches))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCampaignWrite, commerceH.CreateBatch))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCampaignRead, commerceH.GetBatch))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCampaignWrite, commerceH.PatchBatch))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storePerm(rbac.PermCampaignWrite, commerceH.AssignBatchProduct))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storePerm(rbac.PermCampaignWrite, commerceH.RemoveBatchProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCampaignRead, p5.ListBatchVariants))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCampaignWrite, p5.AssignBatchVariant))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants/{variantID}", storePerm(rbac.PermCampaignWrite, p5.RemoveBatchVariant))
 	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storePerm(rbac.PermPurchasingRead, commerceH.BatchPurchasing))
 	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storePerm(rbac.PermPurchasingWrite, commerceH.UpdateBatchPurchasing))
 	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storePerm(rbac.PermPurchasingWrite, commerceH.AllocateBatchItem))

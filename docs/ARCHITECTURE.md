@@ -54,8 +54,8 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 | Module | Introduced by | Notes |
 | --- | --- | --- |
 | `team` | Agent 03 (done) / 10 polish | RBAC roles, invites |
-| `campaigns` | Agent 04 | Unify preorder + live under campaign facade (or keep preorders + add live) |
-| `vendors` | Agent 06 | Vendor master data |
+| `campaigns` | Agent 04 (done) | Unify preorder + live under `campaigns`; legacy `/preorders` kept + synced |
+| `vendors` | Agent 04 foundation / 06 expand | Vendor master + product links in catalog; purchasing Agent 06 |
 | `receiving` | Agent 06 | Goods receipt |
 | `finance` | Agent 07 | Ledger, refunds, store credit, reconciliation |
 | `portal` | Agent 08 | Customer-authenticated portal |

@@ -11,15 +11,17 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/rubicahq/pikko/services/api/internal/campaigns"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
 
 type CommerceHandlers struct {
-	Commerce *commerce.Service
-	URLs     *urls.Generator
-	Cfg      *config.Config
+	Commerce  *commerce.Service
+	Campaigns *campaigns.Service
+	URLs      *urls.Generator
+	Cfg       *config.Config
 }
 
 func (h *CommerceHandlers) mapErr(w http.ResponseWriter, r *http.Request, err error) {
