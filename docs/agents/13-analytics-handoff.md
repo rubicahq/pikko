@@ -4,8 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-13-analytics-8f4b`  
 **Prior:** Agent 12 feature merge `b2a9307` (Live Shopping); main tip includes handoff PR #32  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_
+**Feature merge SHA:** `0bf2d8cbb62e2def5e2e7a6f805098d7ec04a437` (PR #33)  
+**Merged main SHA:** `0bf2d8cbb62e2def5e2e7a6f805098d7ec04a437`
 
 ---
 
