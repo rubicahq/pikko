@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { addToCart } from "@/lib/cart";
 import { cn } from "@/lib/utils";
@@ -41,14 +42,6 @@ type ProductCard = {
   variants?: { id: string; effective_price_idr: number; options?: Record<string, string> }[];
   primary_image_url?: string;
 };
-
-function formatIDR(n: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
 
 export function FlipbookViewer({
   storeSlug,

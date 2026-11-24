@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiFetch, apiUpload, formatIDR } from "@/lib/api";
+import { ApiError, apiFetch, apiUpload, formatIDR, maskIDRInput, parseIDRInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -172,7 +172,7 @@ export function BatchVariantPairing({
           method: "POST",
           body: {
             variant_id: variantId,
-            price_override_idr: priceOverride ? Number(priceOverride) : undefined,
+            price_override_idr: parseIDRInput(priceOverride) ?? undefined,
             quantity_limit: qtyLimit ? Number(qtyLimit) : undefined,
             availability: "available",
           },
@@ -245,7 +245,12 @@ export function BatchVariantPairing({
               </div>
               <div className="space-y-1">
                 <Label>Batch price</Label>
-                <Input value={priceOverride} onChange={(e) => setPriceOverride(e.target.value)} />
+                <Input
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={priceOverride}
+                  onChange={(e) => setPriceOverride(maskIDRInput(e.target.value))}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Quota</Label>

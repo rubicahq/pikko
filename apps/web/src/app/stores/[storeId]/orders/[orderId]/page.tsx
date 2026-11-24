@@ -31,6 +31,7 @@ export default async function OrderDetailPage({
       total_idr: number;
       subtotal_idr: number;
       shipping_fee_idr: number;
+      handling_fee_idr?: number;
       shipping_line1?: string | null;
       shipping_city?: string | null;
       items?: {
@@ -122,15 +123,37 @@ export default async function OrderDetailPage({
             <li key={i} className="flex justify-between gap-3">
               <span>
                 {it.product_name} × {it.quantity}
-                {it.sku ? <span className="text-foreground-muted"> · {it.sku}</span> : null}
+                <span className="text-foreground-muted">
+                  {" "}
+                  · {formatIDR(it.unit_price_idr)}
+                  {it.sku ? ` · ${it.sku}` : ""}
+                </span>
               </span>
               <span className="tabular-nums">{formatIDR(it.line_total_idr)}</span>
             </li>
           ))}
         </ul>
-        <div className="mt-4 flex justify-between border-t border-border pt-3 text-sm font-medium">
-          <span>Total</span>
-          <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
+        <div className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{formatIDR(o.subtotal_idr)}</span>
+          </div>
+          {(o.handling_fee_idr ?? 0) > 0 ? (
+            <div className="flex justify-between">
+              <span>Handling fee</span>
+              <span className="tabular-nums">{formatIDR(o.handling_fee_idr || 0)}</span>
+            </div>
+          ) : null}
+          {(o.shipping_fee_idr ?? 0) > 0 ? (
+            <div className="flex justify-between">
+              <span>Shipping</span>
+              <span className="tabular-nums">{formatIDR(o.shipping_fee_idr)}</span>
+            </div>
+          ) : null}
+          <div className="flex justify-between pt-1 text-sm font-medium">
+            <span>Total</span>
+            <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
+          </div>
         </div>
       </section>
 

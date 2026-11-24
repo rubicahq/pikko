@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2 } from "lucide-react";
+import { parseIDRInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { IdrInput } from "@/components/ui/idr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -236,22 +238,17 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
                   </div>
                   <div>
                     <Label>Price (IDR)</Label>
-                    <Input
-                      type="number"
-                      value={it.price_idr ?? ""}
+                    <IdrInput
+                      value={it.price_idr}
                       disabled={job.status !== "review_required"}
-                      onChange={(e) =>
+                      onValueChange={(n) =>
                         setItems((prev) =>
-                          prev.map((x) =>
-                            x.id === it.id
-                              ? { ...x, price_idr: e.target.value === "" ? null : Number(e.target.value) }
-                              : x,
-                          ),
+                          prev.map((x) => (x.id === it.id ? { ...x, price_idr: n } : x)),
                         )
                       }
                       onBlur={(e) =>
                         patchItem(it.id, {
-                          price_idr: e.target.value === "" ? null : Number(e.target.value),
+                          price_idr: parseIDRInput(e.target.value),
                         })
                       }
                     />

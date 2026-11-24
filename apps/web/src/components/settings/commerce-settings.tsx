@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { IdrInput } from "@/components/ui/idr-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -174,13 +175,11 @@ export function CommerceSettings({ storeId }: { storeId: string }) {
         {fulfillment.shipping_enabled ? (
           <div className="space-y-2">
             <Label htmlFor="ship-fee">Shipping fee (IDR)</Label>
-            <Input
+            <IdrInput
               id="ship-fee"
-              type="number"
-              min={0}
               value={fulfillment.shipping_fee_idr}
-              onChange={(e) =>
-                setFulfillment((f) => ({ ...f, shipping_fee_idr: Number(e.target.value) || 0 }))
+              onValueChange={(n) =>
+                setFulfillment((f) => ({ ...f, shipping_fee_idr: n ?? 0 }))
               }
             />
           </div>
