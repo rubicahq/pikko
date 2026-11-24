@@ -59,6 +59,9 @@ export const urls = {
   storeVendors: (storeId: string) => `/stores/${storeId}/vendors`,
   storeReceiving: (storeId: string, receivingId: string) =>
     `/stores/${storeId}/purchasing/receiving/${receivingId}`,
+  storePacking: (storeId: string) => `/stores/${storeId}/packing`,
+  storeShipments: (storeId: string) => `/stores/${storeId}/shipments`,
+  storeFinance: (storeId: string) => `/stores/${storeId}/finance`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
   storefrontCart: (slug: string) => `/${slug}/cart`,

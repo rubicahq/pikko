@@ -61,6 +61,14 @@ type Detail = {
     status: string;
     created_at: string;
   }[];
+  shipments?: {
+    id: string;
+    carrier: string;
+    tracking_number: string;
+    status: string;
+    shipped_at?: string | null;
+    items?: { product_name?: string; quantity: number }[];
+  }[];
   can_request_address_change: boolean;
   pending_address_change?: { status: string; line1: string; city: string } | null;
 };
@@ -256,6 +264,33 @@ export default function PortalOrderDetailPage() {
               </ul>
             )}
           </section>
+
+          {(detail.shipments || []).length > 0 ? (
+            <section className="mt-6 rounded-xl border border-border bg-background p-5">
+              <h2 className="text-card font-semibold text-foreground">Shipments</h2>
+              <ul className="mt-3 space-y-3 text-sm">
+                {detail.shipments!.map((sh) => (
+                  <li key={sh.id} className="border-b border-border-subtle pb-3 last:border-0">
+                    <div className="flex justify-between gap-3">
+                      <span className="font-medium">
+                        {sh.carrier} · {sh.tracking_number}
+                      </span>
+                      <span className="capitalize text-foreground-secondary">
+                        {sh.status.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {(sh.items || []).length > 0 ? (
+                      <p className="mt-1 text-foreground-muted">
+                        {sh.items!
+                          .map((it) => `${it.product_name || "Item"} × ${it.quantity}`)
+                          .join(", ")}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
 
           {(detail.adjustments || []).length > 0 ? (
             <section className="mt-6 rounded-xl border border-border bg-background p-5">

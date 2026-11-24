@@ -92,6 +92,7 @@ func (s *Service) GetOrderDetail(ctx context.Context, storeID, customerID, order
 	// Strip signed URLs / merchant-only paths if any; evidence ids stay for transparency.
 	refunds, _ := s.Commerce.ListOrderRefunds(ctx, storeID, orderID)
 	adjustments, _ := s.Commerce.ListOrderAdjustments(ctx, storeID, orderID)
+	shipments, _ := s.Commerce.ListOrderShipments(ctx, storeID, orderID)
 
 	pending, _ := s.getPendingAddressChange(ctx, storeID, customerID, orderID)
 	canChange := s.canRequestAddressChange(o, pending)
@@ -102,6 +103,7 @@ func (s *Service) GetOrderDetail(ctx context.Context, storeID, customerID, order
 		Payments:                payments,
 		Adjustments:             adjustments,
 		Refunds:                 refunds,
+		Shipments:               shipments,
 		AddressChange:           pending,
 		CanRequestAddressChange: canChange,
 	}, nil

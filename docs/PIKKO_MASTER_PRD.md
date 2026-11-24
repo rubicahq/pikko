@@ -412,7 +412,7 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | --- | --- | --- |
 | RCV-01 | Record goods received against purchasing | Done (foundation) |
 | RCV-02 | Partial receiving; discrepancy notes | Done |
-| RCV-03 | Trigger availability → packing eligibility | Partial (status nudge; packing Agent 09) |
+| RCV-03 | Trigger availability → packing eligibility | Done (status nudge + packing queue gate) |
 
 ---
 
@@ -420,9 +420,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| PACK-01 | Packing queue by order / customer consolidation | Missing |
-| PACK-02 | Pack checklist per order items available | Missing |
-| PACK-03 | Mark packed → ready to ship/pickup | Missing (manual fulfillment status only) |
+| PACK-01 | Packing queue by order / customer consolidation | Done |
+| PACK-02 | Pack checklist per order items available | Done |
+| PACK-03 | Mark packed → ready to ship/pickup | Done |
 
 ---
 
@@ -430,9 +430,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| SHIP-01 | Create shipment; carrier; tracking number | Missing |
-| SHIP-02 | Customer notification with tracking | Partial (email on some status; no carrier tracking entity) |
-| SHIP-03 | Multi-parcel / partial ship | Missing |
+| SHIP-01 | Create shipment; carrier; tracking number | Done |
+| SHIP-02 | Customer notification with tracking | Done (`order_shipped_customer` via email_jobs) |
+| SHIP-03 | Multi-parcel / partial ship | Done |
 
 ---
 
@@ -621,7 +621,7 @@ Do not skip acceptance gates.
 | E2E-F | Financial reconciliation (300k/250k/110k → 190k payable, 60k refund) | 2 | Done (API) |
 | E2E-G | Store credit apply | 2 | Done (API, flag) |
 | E2E-H | Consolidated payment | 2 | Done (API) |
-| E2E-I | Packing flow | 2 | Missing |
+| E2E-I | Packing flow | 2 | Done (API) |
 | E2E-J | Address change | 2 | Done (API) |
 | E2E-K | Live shopping session | 3 | Missing |
 | E2E-L | Concurrency (stock/quota) | 1–3 | Partial tests |

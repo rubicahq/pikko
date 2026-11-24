@@ -335,5 +335,6 @@ type TrackingView struct {
 	WhatsApp          *string        `json:"whatsapp,omitempty"`
 	Order             Order          `json:"order"`
 	Payment           *Payment       `json:"payment,omitempty"`
+	Shipments         []Shipment     `json:"shipments,omitempty"`
 	CanSubmitEvidence bool           `json:"can_submit_evidence"`
 }

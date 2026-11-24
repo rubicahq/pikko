@@ -120,9 +120,9 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | VEN-01–03 | Vendors | done | vendors UI + purchasing splits by vendor | catalog + purchasing tests | — |
-| RCV-01–03 | Receiving | done (foundation) | `receiving_records` / lines + UI | allocation test | Full packing gate → Agent 09 |
-| PACK-01–03 | Packing | missing | fulfillment status manual | — | Agent 09 |
-| SHIP-01–03 | Shipments | missing/partial | emails only | — | Agent 09 |
+| RCV-01–03 | Receiving | done (foundation) | `receiving_records` / lines + UI | allocation test | Packing reads available/allocated qty |
+| PACK-01–03 | Packing | done | `packing_tasks` + `/packing` UI | packing_shipment_test | — |
+| SHIP-01–03 | Shipments | done | `shipments` + email + portal/track | packing_shipment_test | — |
 | WA-* | WhatsApp templates | missing | email templates exist | — | Agent 10 |
 | RBAC-01–03 | Team RBAC | done | `rbac/`, `team/`, permission middleware, invites | team tests + e2e | Agent 10 may polish WA copy |
 | RBAC-04 | Audit membership | done | invite/member audit_logs actions | team integration | — |
@@ -156,7 +156,7 @@
 | E2E-F Reconciliation math | done (API) | Stage 2 |
 | E2E-G Store credit | done (API, feature-flagged) | Stage 2 |
 | E2E-H Consolidated payment | done (API) | Stage 2 |
-| E2E-I Packing | missing | Stage 2 |
+| E2E-I Packing | done (API) | Stage 2 |
 | E2E-J Address change | done (API) | Portal request + merchant review |
 | E2E-K Live shopping | missing | Stage 3 |
 | E2E-L Concurrency | partial | Stage 1–3 |

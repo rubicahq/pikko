@@ -42,6 +42,13 @@ type Tracking = {
     amount_idr: number;
     evidence?: { id: string; submitted_at: string; signed_url?: string }[];
   } | null;
+  shipments?: {
+    id: string;
+    carrier: string;
+    tracking_number: string;
+    status: string;
+    items?: { product_name?: string; quantity: number }[];
+  }[];
 };
 
 export default function TrackingPage() {
@@ -165,6 +172,26 @@ export default function TrackingPage() {
             </div>
           </div>
         </section>
+
+        {(tracking.shipments || []).length > 0 ? (
+          <section className="mt-6 rounded-[10px] border border-border bg-background p-5">
+            <h2 className="text-base font-medium">Shipments</h2>
+            <ul className="mt-3 space-y-3 text-sm">
+              {tracking.shipments!.map((sh) => (
+                <li key={sh.id}>
+                  <div className="flex justify-between gap-3">
+                    <span className="font-medium">
+                      {sh.carrier} · {sh.tracking_number}
+                    </span>
+                    <span className="capitalize text-foreground-secondary">
+                      {sh.status.replaceAll("_", " ")}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {p ? (
           <section className="mt-6 rounded-[10px] border border-border bg-background p-5">
