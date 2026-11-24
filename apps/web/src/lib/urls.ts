@@ -34,9 +34,14 @@ export const urls = {
   storeCatalogNew: (storeId: string) => `/stores/${storeId}/catalog/new`,
   storeCatalogProduct: (storeId: string, productId: string) =>
     `/stores/${storeId}/catalog/${productId}`,
+  catalogImport: (storeId: string) => `/stores/${storeId}/catalog/import`,
+  catalogImportJob: (storeId: string, jobId: string) =>
+    `/stores/${storeId}/catalog/import/${jobId}`,
+  catalogFlipbook: (storeId: string) => `/stores/${storeId}/catalog/flipbook`,
   storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
+  storefrontCatalog: (slug: string) => `${storefront()}/${slug}/catalog`,
   storefrontProduct: (slug: string, productSlug: string) => `/${slug}/products/${productSlug}`,
   storefrontProductAbsolute: (slug: string, productSlug: string) =>
     `${storefront()}/${slug}/products/${productSlug}`,

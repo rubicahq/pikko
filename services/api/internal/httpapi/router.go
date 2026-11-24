@@ -8,11 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rubicahq/pikko/services/api/internal/account"
+	"github.com/rubicahq/pikko/services/api/internal/ai"
 	"github.com/rubicahq/pikko/services/api/internal/auth"
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/files"
+	"github.com/rubicahq/pikko/services/api/internal/imports"
+	"github.com/rubicahq/pikko/services/api/internal/jobs"
+	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
@@ -24,9 +28,13 @@ type Deps struct {
 	DB      *pgxpool.Pool
 	Logger  *slog.Logger
 	Storage storage.ObjectStore
+	// Optional overrides for tests
+	AI       ai.CatalogExtractor
+	Renderer pdfutil.Renderer
 }
 
-func NewRouter(d Deps) http.Handler {
+// NewRouter builds the HTTP handler and an optional background job worker.
+func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	urlGen := urls.New(d.Cfg.MarketingURL, d.Cfg.DashboardURL, d.Cfg.StorefrontURL, d.Cfg.APIBaseURL)
 	mailSender := email.NewSender(d.Cfg.EmailMode, d.Cfg.BrevoAPIKey, d.Logger)
 	mailSvc := &email.Service{DB: d.DB, Sender: mailSender, Logger: d.Logger}
@@ -36,11 +44,34 @@ func NewRouter(d Deps) http.Handler {
 	storefrontSvc := &storefront.Service{DB: d.DB}
 	catalogSvc := &catalog.Service{DB: d.DB}
 	filesSvc := &files.Service{DB: d.DB, Storage: d.Storage}
+	queue := &jobs.Queue{DB: d.DB}
+	outbox := &jobs.Outbox{DB: d.DB}
+	extractor := d.AI
+	if extractor == nil {
+		extractor = ai.NewExtractor(d.Cfg.AIAPIKey, d.Cfg.AIBaseURL, d.Cfg.AIModel)
+	}
+	renderer := d.Renderer
+	if renderer == nil {
+		renderer = pdfutil.NewRenderer()
+	}
+	importSvc := &imports.Service{
+		DB: d.DB, Files: filesSvc, Catalog: catalogSvc, Queue: queue, Outbox: outbox,
+		AI: extractor, Renderer: renderer, Storage: d.Storage, Logger: d.Logger,
+		Limits: imports.Limits{
+			MaxPDFBytes: d.Cfg.ImportMaxPDFBytes,
+			MaxPages:    d.Cfg.ImportMaxPages,
+			MaxItems:    d.Cfg.ImportMaxItems,
+		},
+	}
+	if importSvc.Limits.MaxPDFBytes == 0 {
+		importSvc.Limits = imports.DefaultLimits()
+	}
 
 	authH := &AuthHandlers{Auth: authSvc, Cfg: d.Cfg}
 	accountH := &AccountHandlers{Account: accountSvc}
 	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg}
 	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen}
+	impH := &ImportHandlers{Imports: importSvc}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -117,6 +148,16 @@ func NewRouter(d Deps) http.Handler {
 	mux.Handle("GET /api/v1/stores/{storeID}/collections", storeAuthed(p2.ListCollections))
 	mux.Handle("POST /api/v1/stores/{storeID}/collections", storeAuthed(p2.CreateCollection))
 
+	// AI catalog PDF import (PRD §18)
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.Start))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.List))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}", storeAuthed(impH.Get))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}/items", storeAuthed(impH.ListItems))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storeAuthed(impH.PatchItem))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storeAuthed(impH.DeleteItem))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/confirm", storeAuthed(impH.Confirm))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/retry", storeAuthed(impH.Retry))
+
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products", p2.PublicProducts)
@@ -124,9 +165,22 @@ func NewRouter(d Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/categories", p2.PublicCategories)
 	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
 
+	worker := &jobs.Worker{
+		Queue: queue, Outbox: outbox, Logger: d.Logger, WorkerID: "api-" + uuidLike(),
+		Types: []string{jobs.TypeCatalogPDFImport},
+		Handlers: map[string]jobs.Handler{
+			jobs.TypeCatalogPDFImport: importSvc.ProcessJob,
+		},
+		Interval: 400 * time.Millisecond,
+	}
+
 	var handler http.Handler = mux
 	handler = SecurityHeaders(handler)
 	handler = CORSMiddleware(d.Cfg)(handler)
 	handler = RequestIDMiddleware(handler)
-	return handler
+	return handler, worker
+}
+
+func uuidLike() string {
+	return time.Now().UTC().Format("150405.000")
 }

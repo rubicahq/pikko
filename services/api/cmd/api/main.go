@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := httpapi.NewRouter(httpapi.Deps{
+	router, worker := httpapi.NewRouter(httpapi.Deps{
 		Cfg:     cfg,
 		DB:      pool,
 		Logger:  logger,
@@ -55,13 +55,17 @@ func main() {
 		Addr:              cfg.APIAddr,
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		ReadTimeout:       120 * time.Second,
+		WriteTimeout:      120 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
 
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	go worker.Run(workerCtx)
+
 	go func() {
-		logger.Info("api_listening", "addr", cfg.APIAddr, "env", cfg.AppEnv, "email_mode", cfg.EmailMode)
+		logger.Info("api_listening", "addr", cfg.APIAddr, "env", cfg.AppEnv, "email_mode", cfg.EmailMode, "ai_configured", cfg.AIAPIKey != "")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("server_error", "error", err)
 			os.Exit(1)
@@ -72,6 +76,7 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
 
+	workerCancel()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)

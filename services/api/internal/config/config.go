@@ -48,6 +48,15 @@ type Config struct {
 
 	APIAddr     string
 	CORSOrigins []string
+
+	// AI (SumoPod OpenAI-compatible). Keys must never be logged or committed.
+	AIAPIKey  string
+	AIBaseURL string
+	AIModel   string
+
+	ImportMaxPDFBytes int64
+	ImportMaxPages    int
+	ImportMaxItems    int
 }
 
 func Load() (*Config, error) {
@@ -116,6 +125,23 @@ func Load() (*Config, error) {
 	allow := getenv("AUTH_REDIRECT_ALLOWLIST", "localhost,127.0.0.1,pikko.site")
 	c.RedirectAllowlist = splitCSV(allow)
 	c.CORSOrigins = splitCSV(getenv("API_CORS_ORIGINS", "http://localhost:3000"))
+
+	c.AIAPIKey = os.Getenv("AI_API_KEY")
+	c.AIBaseURL = getenv("AI_BASE_URL", "")
+	c.AIModel = getenv("AI_MODEL", "gemini/gemini-3.5-flash")
+
+	c.ImportMaxPDFBytes = int64(25 << 20)
+	if n, err := getenvInt("IMPORT_MAX_PDF_BYTES", 25<<20); err == nil {
+		c.ImportMaxPDFBytes = int64(n)
+	}
+	c.ImportMaxPages, err = getenvInt("IMPORT_MAX_PAGES", 50)
+	if err != nil {
+		return nil, err
+	}
+	c.ImportMaxItems, err = getenvInt("IMPORT_MAX_ITEMS", 500)
+	if err != nil {
+		return nil, err
+	}
 
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")

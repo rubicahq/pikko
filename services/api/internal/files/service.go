@@ -59,11 +59,15 @@ func (s *Service) Upload(ctx context.Context, storeID, userID uuid.UUID, purpose
 	if filename != "" {
 		orig = &filename
 	}
+	var createdBy any
+	if userID != uuid.Nil {
+		createdBy = userID
+	}
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO stored_files (store_id, purpose, storage_key, content_type, size_bytes, original_filename, created_by)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		RETURNING id, store_id, purpose, storage_key, content_type, size_bytes, original_filename, created_at
-	`, storeID, purpose, key, ct, size, orig, userID).Scan(
+	`, storeID, purpose, key, ct, size, orig, createdBy).Scan(
 		&f.ID, &f.StoreID, &f.Purpose, &f.StorageKey, &f.ContentType, &f.SizeBytes, &f.OriginalFilename, &f.CreatedAt,
 	)
 	if err != nil {

@@ -1,4 +1,4 @@
-# API Reference (Phase 0–2)
+# API Reference (Phase 0–2 + AI import)
 
 Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
@@ -44,6 +44,36 @@ Product write body:
 }
 ```
 
+## Catalog imports (AI PDF)
+
+Uses mock AI when `AI_API_KEY` is unset.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/stores/{storeID}/catalog-imports` | Multipart `file` (PDF) + `extract_images`. Optional `Idempotency-Key`. Limits: 25 MB, 50 pages, 1 PDF/job. |
+| GET | `/stores/{storeID}/catalog-imports` | Recent jobs |
+| GET | `/stores/{storeID}/catalog-imports/{jobID}` | Job status/progress |
+| GET | `/stores/{storeID}/catalog-imports/{jobID}/items` | Review items |
+| PATCH | `/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}` | Edit/select/flag uncertain |
+| DELETE | `/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}` | Remove item |
+| POST | `/stores/{storeID}/catalog-imports/{jobID}/confirm` | Body `{item_ids?}` → create **draft** products + hotspot candidates |
+| POST | `/stores/{storeID}/catalog-imports/{jobID}/retry` | Re-queue failed job |
+
+Statuses: `pending` → `processing` → `review_required` → `completed` (or `failed`).
+
+## Catalog flipbook
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/stores/{storeID}/catalog-pages` | Merchant pages + hotspots |
+| PUT | `/stores/{storeID}/catalog-pages/order` | Body `{page_ids:[…]}` |
+| POST | `/stores/{storeID}/catalog-pages/status` | Body `{status:"published"|"draft", page_ids?}` |
+| POST | `/stores/{storeID}/catalog-pages/{pageID}/hotspots` | Body bbox + `product_id` |
+| PATCH | `/stores/{storeID}/catalog-pages/hotspots/{hotspotID}` | Move/relink hotspot |
+| DELETE | `/stores/{storeID}/catalog-pages/hotspots/{hotspotID}` | Remove hotspot |
+| GET | `/public/stores/{slug}/catalog` | Published pages; hotspots only for published products |
+| GET | `/public/stores/{slug}/catalog/products/{productID}` | Product card + `checkout_hook` |
+
 ## Public
 
 - `GET /public/stores/{slug}`
@@ -53,3 +83,7 @@ Product write body:
 - `GET /public/files/{storeId}/{fileId}` — published stores only
 
 All public product payloads omit `cost_price_idr`.
+
+## Health
+
+`GET /healthz` — DB ping.

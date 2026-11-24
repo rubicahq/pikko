@@ -41,6 +41,8 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(), `
 		TRUNCATE audit_logs, email_jobs, auth_rate_limits, onboarding_drafts,
+		         outbox_events, job_queue,
+		         catalog_page_hotspots, catalog_pages, catalog_import_items, catalog_import_jobs,
 		         storefront_featured_collections, storefront_featured_products,
 		         storefront_banners, storefront_configs,
 		         collection_products, collections,
@@ -118,7 +120,7 @@ func TestCreateStoreAndCrossStoreDenied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	router := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: local})
+	router, _ := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: local})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+stB.ID.String(), nil)
 	req.AddCookie(&http.Cookie{Name: c.CookieName, Value: tokenA})
