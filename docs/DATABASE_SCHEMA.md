@@ -80,7 +80,7 @@ Money on products/variants: integer IDR. Status: draft/published/archived.
 
 ### 2.6 Merchant efficiency
 
-`notifications`, `notification_preferences`, `analytics_events`.
+`notifications`, `notification_preferences`, `analytics_events` (Agent 13 deepens sink + aggregates orders/packing/live/finance for overview; no new migration).
 
 ### 2.7 Conventions
 

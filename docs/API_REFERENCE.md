@@ -75,7 +75,8 @@ Rule precedence per type: batch → selling model → store. Checkout cart lines
 | POST | `/stores/{storeId}/notifications/{id}/read` | Mark one read |
 | POST | `/stores/{storeId}/notifications/read-all` | Mark all read |
 | GET/PATCH | `/stores/{storeId}/notification-preferences` | Optional operational prefs |
-| GET | `/stores/{storeId}/analytics` | `?from=&to=&tz=` (default Asia/Jakarta) |
+| GET | `/stores/{storeId}/analytics` | `?from=&to=&tz=` (default Asia/Jakarta); north-star fulfilled items + AN-02 blocks |
+| POST | `/stores/{storeId}/analytics/events` | Body `{ event_name, properties? }` → `analytics_events` |
 
 ## Catalog imports (AI PDF + CSV)
 

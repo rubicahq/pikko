@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/validate"
 )
 
@@ -810,6 +811,12 @@ func (s *Service) LiveQuickAdd(ctx context.Context, storeID, campaignID, actorID
 			order.TrackingURL = res.TrackingURL
 		}
 	}
+	analytics.Emit(ctx, s.DB, storeID, "live.quick_add", &actorID, map[string]any{
+		"campaign_id": campaignID.String(),
+		"order_id":    orderID.String(),
+		"quantity":    in.Quantity,
+		"created_order": createdOrder,
+	})
 	return res, nil
 }
 
