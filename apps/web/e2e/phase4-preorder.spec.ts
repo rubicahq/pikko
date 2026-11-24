@@ -44,7 +44,7 @@ test.describe("Phase 4 preorder and business rules", () => {
     await expect(page.getByText(/Fulfillment settings saved/)).toBeVisible();
 
     await page.getByRole("link", { name: "Catalog" }).click();
-    await page.getByRole("link", { name: "Add product" }).click();
+    await page.getByRole("link", { name: "Add product" }).first().click();
     await page.getByLabel("Name").fill("Tokyo Sneaker");
     await page.getByLabel("Price (IDR)").fill("250000");
     await page.getByLabel("Status").selectOption("published");

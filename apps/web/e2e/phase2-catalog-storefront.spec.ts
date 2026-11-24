@@ -47,7 +47,7 @@ test.describe("Phase 2 catalog and storefront", () => {
 
     await page.getByRole("link", { name: "Catalog" }).click();
     await expect(page.getByRole("heading", { name: "Catalog" })).toBeVisible();
-    await page.getByRole("link", { name: "Add product" }).click();
+    await page.getByRole("link", { name: "Add product" }).first().click();
     await page.getByLabel("Name").fill("Canvas Tote");
     await page.getByLabel("SKU (optional)").fill("TOTE-22");
     await page.getByLabel("Price (IDR)").fill("175000");

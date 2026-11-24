@@ -87,10 +87,27 @@ Source: `services/api/internal/httpapi/router.go`.
 | POST | `/onboarding/identity` | required |
 | POST | `/onboarding/selling-model` | required |
 | POST | `/onboarding/complete` | required |
-| GET/PATCH | `/stores/{storeID}` | store member |
-| POST | `/stores/{storeID}/archive` | store member |
+| GET/PATCH | `/stores/{storeID}` | store member (+ permissions on mutate) |
+| POST | `/stores/{storeID}/archive` | owner (`stores.archive`) |
 
-### 2.4 Storefront / files / catalog
+### 2.4 Team RBAC (Agent 03)
+
+| Method | Path | Auth / permission |
+| --- | --- | --- |
+| GET | `/team/invites/peek?token=` | public |
+| POST | `/team/invites/accept` | public (sets session cookie) |
+| GET | `/stores/{storeID}/team/me` | `stores.read` |
+| GET | `/stores/{storeID}/team/members` | `team.read` |
+| GET | `/stores/{storeID}/team/invites` | `team.read` |
+| POST | `/stores/{storeID}/team/invites` | `team.invite` |
+| POST | `/stores/{storeID}/team/invites/{inviteID}/resend` | `team.invite` |
+| POST | `/stores/{storeID}/team/invites/{inviteID}/cancel` | `team.manage` |
+| POST | `/stores/{storeID}/team/members/{membershipID}/revoke` | `team.manage` |
+| PATCH | `/stores/{storeID}/team/members/{membershipID}` | `team.manage` |
+
+Store-scoped routes also enforce granular permissions via `RequirePermission` (catalog, orders, purchasing, etc.).
+
+### 2.5 Storefront / files / catalog
 
 | Method | Path |
 | --- | --- |
@@ -109,7 +126,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | POST | `/stores/{storeID}/products/{productID}/archive` |
 | GET/POST | `/stores/{storeID}/collections` |
 
-### 2.5 Catalog import + flipbook
+### 2.6 Catalog import + flipbook
 
 | Method | Path |
 | --- | --- |
@@ -126,7 +143,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | POST | `/stores/{storeID}/catalog-pages/{pageID}/hotspots` |
 | PATCH/DELETE | `/stores/{storeID}/catalog-pages/hotspots/{hotspotID}` |
 
-### 2.6 Commerce settings, orders, customers
+### 2.7 Commerce settings, orders, customers
 
 | Method | Path |
 | --- | --- |
@@ -141,7 +158,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | GET | `/stores/{storeID}/customers` |
 | GET/PATCH | `/stores/{storeID}/customers/{customerID}` |
 
-### 2.7 Notifications + analytics
+### 2.8 Notifications + analytics
 
 | Method | Path |
 | --- | --- |
@@ -152,7 +169,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | GET/PATCH | `/stores/{storeID}/notification-preferences` |
 | GET | `/stores/{storeID}/analytics` |
 
-### 2.8 Preorders + purchasing + rules
+### 2.9 Preorders + purchasing + rules
 
 | Method | Path |
 | --- | --- |
@@ -169,7 +186,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | PATCH/DELETE | `/stores/{storeID}/business-rules/{ruleID}` |
 | POST | `/stores/{storeID}/business-rules/preview` |
 
-### 2.9 Public storefront / checkout / tracking
+### 2.10 Public storefront / checkout / tracking
 
 | Method | Path |
 | --- | --- |
@@ -200,7 +217,7 @@ Source: `services/api/internal/httpapi/router.go`.
 | Refunds + store credit | Agent 07 `/finance/*` |
 | Customer portal auth + orders | Agent 08 `/portal/*` |
 | Packing + shipments | Agent 09 |
-| Team invite/RBAC | Agent 03/10 |
+| Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |
 | Vendors / receiving | Agent 06 |
 | Live sessions | Agent 12 |
 | WhatsApp template resolve | Agent 10 |

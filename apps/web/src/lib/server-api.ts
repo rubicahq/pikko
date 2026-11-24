@@ -43,8 +43,14 @@ export async function getStores(includeArchived = false): Promise<Store[]> {
 }
 
 export async function getStore(storeId: string): Promise<Store | null> {
-  const data = await serverFetch<{ store: Store }>(`/api/v1/stores/${storeId}`);
-  return data?.store || null;
+  const data = await serverFetch<{ store: Store; permissions?: string[] }>(
+    `/api/v1/stores/${storeId}`,
+  );
+  if (!data?.store) return null;
+  return {
+    ...data.store,
+    permissions: data.permissions ?? data.store.permissions,
+  };
 }
 
 export async function getAccount(): Promise<Account | null> {

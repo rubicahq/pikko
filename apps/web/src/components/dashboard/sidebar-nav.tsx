@@ -9,13 +9,15 @@ export function SidebarNav({
   storeId,
   onNavigate,
   groups,
+  permissions,
 }: {
   storeId?: string;
   onNavigate?: () => void;
   groups?: NavGroup[];
+  permissions?: string[] | null;
 }) {
   const pathname = usePathname();
-  const sections = liveNavGroups(groups);
+  const sections = liveNavGroups(groups, permissions);
 
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Store">

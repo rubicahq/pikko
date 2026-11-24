@@ -9,6 +9,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/auth"
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
 )
 
@@ -119,20 +120,41 @@ func (m *StoreAuthMiddleware) Require(next http.Handler) http.Handler {
 			return
 		}
 		userID := UserID(r)
-		if err := m.Stores.AssertMember(r.Context(), userID, storeID); err != nil {
+		st, err := m.Stores.GetAuthorized(r.Context(), userID, storeID)
+		if err != nil {
 			// Indistinguishable not-found vs forbidden for cross-store probes
 			writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
 			return
 		}
 		ctx := context.WithValue(r.Context(), ctxKeyStoreID, storeID)
+		ctx = context.WithValue(ctx, ctxKeyMembershipRole, st.Role)
 		_ = m.Stores.TouchLastAccessed(r.Context(), userID, storeID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
+// RequirePermission ensures the active membership grants perm (after membership check).
+func (m *StoreAuthMiddleware) RequirePermission(perm rbac.Permission) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return m.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			role := MembershipRole(r)
+			if !rbac.HasPermission(role, perm) {
+				writeError(w, r, http.StatusForbidden, "forbidden", "You do not have permission for this action.")
+				return
+			}
+			next.ServeHTTP(w, r)
+		}))
+	}
+}
+
 func StoreID(r *http.Request) uuid.UUID {
 	id, _ := r.Context().Value(ctxKeyStoreID).(uuid.UUID)
 	return id
+}
+
+func MembershipRole(r *http.Request) string {
+	role, _ := r.Context().Value(ctxKeyMembershipRole).(string)
+	return role
 }
 
 func ClientIP(r *http.Request) string {

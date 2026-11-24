@@ -70,6 +70,10 @@ func (g *Generator) MagicLink(token string) string {
 	return g.AuthConfirm(token)
 }
 
+func (g *Generator) TeamInvite(token string) string {
+	return g.Dashboard + "/invites/accept?token=" + url.QueryEscape(token)
+}
+
 func (g *Generator) APICallback(path string) string {
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path

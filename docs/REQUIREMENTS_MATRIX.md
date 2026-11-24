@@ -1,7 +1,7 @@
 # Requirements Matrix — PRD v3.0
 
 **Statuses:** `done` | `partial` | `missing` | `owner` | `deferred`  
-**Baseline:** `main` @ Agent 01 merge `f029fc4` (+ Agent 02 design system), migrations `000001`–`000006`  
+**Baseline:** `main` @ Agent 02 merge `54181f5` (+ Agent 03 RBAC), migrations `000001`–`000007`  
 **Prior v4 matrix:** superseded for new work; phase IDs mapped below where relevant.
 
 ---
@@ -53,7 +53,7 @@
 | AUTH-01–08 | Magic link auth suite | done | `auth/`, auth handlers | integration + Playwright | — |
 | ONB-01–04 | First-store onboarding | done | `stores/`, onboarding UI | auth-onboarding e2e | — |
 | STORE-01–05 | Multi-store tenancy | done | stores + middleware | multi-store e2e | — |
-| STORE-06 | Team roles beyond owner | missing | membership CHECK owner-only | — | Additive migration |
+| STORE-06 | Team roles beyond owner | done | `000007`, `rbac/`, `team/`, Team UI | team integration + team-rbac e2e | Owner remains superset; archive owner-only |
 
 ---
 
@@ -63,7 +63,7 @@
 | --- | --- | --- | --- | --- | --- |
 | NAV-01 | Store-scoped nav | done | `app-shell`, `sidebar`, store switcher | multi-store e2e | Ops modules appear when implemented flags flip |
 | NAV-02 | Workspace/Operations/Configuration | done | `nav-config.ts`, `sidebar-nav.tsx` | design-system e2e | Unimplemented items hidden (`implemented:false`) |
-| NAV-03 | Role-aware nav | missing | — | — | Needs RBAC (Agent 03+) |
+| NAV-03 | Role-aware nav | done | `nav-config.ts` + `lib/rbac.ts` filters by permissions | team-rbac e2e | Server still authoritative |
 
 ---
 
@@ -124,8 +124,8 @@
 | PACK-01–03 | Packing | missing | fulfillment status manual | — | Agent 09 |
 | SHIP-01–03 | Shipments | missing/partial | emails only | — | Agent 09 |
 | WA-* | WhatsApp templates | missing | email templates exist | — | Agent 10 |
-| RBAC-01–03 | Team RBAC | missing | owner-only CHECK | — | Agent 03/10 |
-| RBAC-04 | Audit membership | partial | `audit_logs` | — | Expand usage |
+| RBAC-01–03 | Team RBAC | done | `rbac/`, `team/`, permission middleware, invites | team tests + e2e | Agent 10 may polish WA copy |
+| RBAC-04 | Audit membership | done | invite/member audit_logs actions | team integration | — |
 
 ---
 
@@ -173,6 +173,6 @@ Auth, multi-store, storefront, catalog, AI PDF/flipbook/CSV, checkout, bank tran
 
 | Stage | Top missing |
 | --- | --- |
-| 1 | RBAC roles, campaign unification, admin order entry, item revisions |
+| 1 | Campaign unification, admin order entry, item revisions (RBAC done by Agent 03) |
 | 2 | Vendors/receiving, finance ledger/refunds/credit, portal, packing/shipments, WhatsApp |
 | 3 | Live shopping, analytics north-star depth, full E2E A–N, security/QA pass, deploy hardening (still no auto pikko.id) |

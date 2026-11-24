@@ -9,6 +9,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/account"
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 	"github.com/rubicahq/pikko/services/api/internal/validate"
@@ -64,6 +65,7 @@ func (h *StoreHandlers) List(w http.ResponseWriter, r *http.Request) {
 	}
 	for i := range list {
 		h.decorate(&list[i])
+		list[i].Permissions = permissionStrings(list[i].Role)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"stores": list})
 }
@@ -90,7 +92,21 @@ func (h *StoreHandlers) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.decorate(st)
-	writeJSON(w, http.StatusOK, map[string]any{"store": st})
+	perms := permissionStrings(st.Role)
+	st.Permissions = perms
+	writeJSON(w, http.StatusOK, map[string]any{
+		"store":       st,
+		"permissions": perms,
+	})
+}
+
+func permissionStrings(role string) []string {
+	perms := rbac.PermissionsFor(role)
+	out := make([]string, len(perms))
+	for i, p := range perms {
+		out[i] = string(p)
+	}
+	return out
 }
 
 func (h *StoreHandlers) Patch(w http.ResponseWriter, r *http.Request) {
