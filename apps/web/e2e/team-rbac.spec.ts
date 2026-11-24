@@ -50,6 +50,9 @@ test("invite staff, accept magic link, isolate Store B", async ({ page, browser 
   const token = inviteJSON.invite?.dev_token as string;
   expect(token).toBeTruthy();
 
+  // Invite was created via API (not the form), so reload to pick up pending invites.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Team", exact: true })).toBeVisible();
   await expect(page.getByText(staffEmail)).toBeVisible({ timeout: 10000 });
 
   const staffContext = await browser.newContext();
