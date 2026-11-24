@@ -12,9 +12,11 @@ test.describe("Catalog flipbook editor", () => {
       timeout: 15000,
     });
     await page.getByLabel("Store name").fill("Flipbook Store");
-    await page.getByLabel("Store URL").fill(`flipbook-${Date.now()}`);
-    await page.locator("#category").selectOption("other");
-    await page.getByRole("button", { name: "Continue." }).click();
+    const slug = `flipbook-${Date.now()}`;
+    await page.getByLabel("Store URL").click();
+    await page.getByLabel("Store URL").fill(slug);
+    await expect(page.getByLabel("Store URL")).toHaveValue(slug);
+    await page.locator("#category").selectOption("other");    await page.getByRole("button", { name: "Continue." }).click();
     await page.getByRole("button", { name: /Ready Stock/ }).click();
     await page.getByRole("button", { name: "Create my store." }).click();
     await expect(page.getByRole("heading", { name: "Flipbook Store" })).toBeVisible({
