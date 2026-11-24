@@ -242,12 +242,16 @@ func (s *Service) RejectPayment(ctx context.Context, storeID, orderID, paymentID
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(ctx, `
+	ct, err := tx.Exec(ctx, `
 		UPDATE payments SET status='rejected', rejected_at=now(), rejected_by=$3, reject_reason=$4, updated_at=now()
 		WHERE id=$1 AND store_id=$2 AND status IN ('awaiting_verification','pending')
 	`, paymentID, storeID, actorID, reason)
 	if err != nil {
 		return nil, err
+	}
+	if ct.RowsAffected() == 0 {
+		// Concurrent verify won — do not force order back to unpaid (FIN-07 / SEC money).
+		return nil, ErrAlreadyVerified
 	}
 	_, err = tx.Exec(ctx, `
 		UPDATE orders SET payment_status='unpaid', updated_at=now() WHERE id=$1 AND store_id=$2

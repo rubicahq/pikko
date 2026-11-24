@@ -325,3 +325,17 @@ func multipartWriter(t *testing.T, body *bytes.Buffer, png []byte) string {
 	body.WriteString("\r\n--" + boundary + "--\r\n")
 	return "multipart/form-data; boundary=" + boundary
 }
+
+func multipartWriterWithPurpose(t *testing.T, body *bytes.Buffer, png []byte, purpose string) string {
+	t.Helper()
+	boundary := "----pikkoboundary"
+	body.WriteString("--" + boundary + "\r\n")
+	body.WriteString(`Content-Disposition: form-data; name="purpose"` + "\r\n\r\n")
+	body.WriteString(purpose + "\r\n")
+	body.WriteString("--" + boundary + "\r\n")
+	body.WriteString(`Content-Disposition: form-data; name="file"; filename="proof.png"` + "\r\n")
+	body.WriteString("Content-Type: image/png\r\n\r\n")
+	body.Write(png)
+	body.WriteString("\r\n--" + boundary + "--\r\n")
+	return "multipart/form-data; boundary=" + boundary
+}

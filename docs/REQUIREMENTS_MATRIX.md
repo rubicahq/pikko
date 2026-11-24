@@ -141,7 +141,7 @@
 | DASH-02,04 | Rich ops tasks / widgets | done (MVP) | overview + analytics ops rows | analytics test | — |
 | RULE-01–05 | Business rules | done | `rules.go` | rules_test + e2e | — |
 | AN-01–04 | Analytics | done | `analytics/` + analytics/overview UI | `TestAnalyticsNorthStarAndEmptyStates` | No fabricated metrics |
-| SEC-01–05,07–08 | Tenant + tokens + headers + limits | done | middleware, auth | security_test | Continuous |
+| SEC-01–05,07–08 | Tenant + tokens + headers + limits | done (hardened) | middleware, PublicFile allowlist, ClientIP, CookieSecure | security_test + hardening API | Agent 14 pass |
 | SEC-06 | PDPA retention policy | partial | privacy page | — | Owner/counsel |
 
 ---
@@ -150,18 +150,18 @@
 
 | ID | Status | Notes |
 | --- | --- | --- |
-| E2E-A Multi-store | done | Playwright |
-| E2E-B PDF→checkout | done (API) | PDF→confirm→publish→public hotspot product; Playwright deferred |
-| E2E-C Admin entry | partial (API+UI; Playwright deferred) | Stage 1 |
+| E2E-A Multi-store | done | Playwright + Stage 3 smoke |
+| E2E-B PDF→checkout | done (API) | PDF→confirm→publish→public hotspot; UI deferred |
+| E2E-C Admin entry | done (API) | `TestAdminOrderCreateRevisionAndCSV`; Playwright deferred |
 | E2E-D Purchasing | done (API + workspace) | Stage 2 |
-| E2E-E Partial availability | partial | Stage 2 |
-| E2E-F Reconciliation math | done (API) | Stage 2 |
-| E2E-G Store credit | done (API, feature-flagged) | Stage 2 |
+| E2E-E Partial availability | done (API) | Unavailable mark + partial receiving in allocation test |
+| E2E-F Reconciliation math | done (API) | Stage 2 + Agent 14 re-run |
+| E2E-G Store credit | done (API, feature-flagged) | Cap vs remaining due hardened |
 | E2E-H Consolidated payment | done (API) | Stage 2 |
 | E2E-I Packing | done (API) | Stage 2 |
 | E2E-J Address change | done (API) | Portal request + merchant review |
-| E2E-K Live shopping | done (API) | Concurrent quota + quick-add + public list; UI Playwright deferred |
-| E2E-L Concurrency | partial | Stage 1–3 |
+| E2E-K Live shopping | done (API) | Concurrent quota + quick-add; UI deferred |
+| E2E-L Concurrency | done (API) | Stock/quota/allocation/refund version tests |
 | E2E-M Portal security | done (API) | Cross-customer + cross-store IDOR |
 | E2E-N Domain migration readiness | done (code) | Cutover owner |
 
@@ -177,4 +177,4 @@ Auth, multi-store, storefront, catalog, AI PDF/flipbook/CSV, checkout, bank tran
 | --- | --- |
 | 1 | Campaign unification, admin order entry, item revisions (RBAC done by Agent 03) |
 | 2 | Packing/shipments, WhatsApp (portal + finance done) |
-| 3 | Live shopping, analytics north-star depth, full E2E A–N, security/QA pass, deploy hardening (still no auto pikko.id) |
+| 3 | Deploy hardening / runbook (Agent 15); still no auto pikko.id. Security/QA + E2E A–N + analytics done. |

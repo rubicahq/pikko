@@ -34,7 +34,13 @@ func IPRateLimitMiddleware(db *pgxpool.Pool, cfg *config.Config) func(http.Handl
 			}
 			ok, err := allowIPRate(r.Context(), db, "api_ip:"+ip, max)
 			if err != nil {
-				// Fail open on DB blips for general API ceiling; auth path still protected.
+				// Production: fail closed so rate limits cannot be bypassed by DB blips (SEC-07).
+				// Non-production keeps fail-open for local/dev resilience; auth magic-link
+				// still has its own tighter email/IP limits.
+				if cfg != nil && (cfg.AppEnv == "production" || cfg.AppEnv == "staging") {
+					writeError(w, r, http.StatusServiceUnavailable, "unavailable", "Temporarily unavailable. Try again shortly.")
+					return
+				}
 				next.ServeHTTP(w, r)
 				return
 			}

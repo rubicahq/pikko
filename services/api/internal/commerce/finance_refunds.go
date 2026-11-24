@@ -48,18 +48,6 @@ func (s *Service) CreateRefund(ctx context.Context, storeID, actorID uuid.UUID, 
 		return nil, err
 	}
 
-	fin, err := s.GetOrderFinance(ctx, storeID, in.OrderID)
-	if err != nil {
-		return nil, err
-	}
-	outstandingEntitled := fin.RefundEntitledIDR - fin.RefundedIDR
-	if outstandingEntitled < 0 {
-		outstandingEntitled = 0
-	}
-	if in.AmountIDR > outstandingEntitled {
-		return nil, ErrInvalidInput
-	}
-
 	o, err := s.GetOrder(ctx, storeID, in.OrderID)
 	if err != nil {
 		return nil, err
@@ -70,6 +58,53 @@ func (s *Service) CreateRefund(ctx context.Context, storeID, actorID uuid.UUID, 
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+
+	// Lock order so concurrent CreateRefund cannot over-allocate entitlement.
+	var lockedID uuid.UUID
+	err = tx.QueryRow(ctx, `
+		SELECT id FROM orders WHERE id=$1 AND store_id=$2 FOR UPDATE
+	`, in.OrderID, storeID).Scan(&lockedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	fin, err := s.GetOrderFinance(ctx, storeID, in.OrderID)
+	if err != nil {
+		return nil, err
+	}
+	var reserved int64
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount_idr),0) FROM refunds
+		WHERE order_id=$1 AND store_id=$2 AND status IN ('pending','processing','completed')
+	`, in.OrderID, storeID).Scan(&reserved)
+	if err != nil {
+		return nil, err
+	}
+	outstandingEntitled := fin.RefundEntitledIDR - reserved
+	if outstandingEntitled < 0 {
+		outstandingEntitled = 0
+	}
+	if in.AmountIDR > outstandingEntitled {
+		return nil, ErrInvalidInput
+	}
+
+	if in.EvidenceFileID != nil {
+		var purpose string
+		err = tx.QueryRow(ctx, `
+			SELECT purpose FROM stored_files WHERE id=$1 AND store_id=$2
+		`, *in.EvidenceFileID, storeID).Scan(&purpose)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrInvalidInput
+		}
+		if err != nil {
+			return nil, err
+		}
+		if purpose != "payment_evidence" && purpose != "refund_evidence" {
+			return nil, ErrInvalidInput
+		}
+	}
 
 	var refundID uuid.UUID
 	err = tx.QueryRow(ctx, `
@@ -211,6 +246,19 @@ func (s *Service) ProcessRefund(ctx context.Context, storeID, refundID, actorID 
 		eventType = "refund_failed"
 	}
 	if in.Status == RefundCompleted {
+		fin, err := s.recomputeSettlementTx(ctx, tx, storeID, r.OrderID)
+		if err != nil {
+			return nil, err
+		}
+		var completedOthers int64
+		_ = tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(amount_idr),0) FROM refunds
+			WHERE order_id=$1 AND store_id=$2 AND status='completed' AND id<>$3
+		`, r.OrderID, storeID, refundID).Scan(&completedOthers)
+		if completedOthers+r.AmountIDR > fin.RefundEntitledIDR || completedOthers+r.AmountIDR > fin.PaidIDR {
+			return nil, ErrInvalidInput
+		}
+
 		evID, err := s.insertFinancialEventTx(ctx, tx, storeID, r.CustomerID, oid, nil, &refundID,
 			eventType, "debit", r.AmountIDR, "refund_issued:"+refundID.String(),
 			map[string]any{"method": r.Method}, &actorID)
@@ -233,7 +281,7 @@ func (s *Service) ProcessRefund(ctx context.Context, storeID, refundID, actorID 
 			WHERE order_id=$1 AND store_id=$2 AND status='completed'
 		`, r.OrderID, storeID).Scan(&refunded)
 
-		fin, err := s.recomputeSettlementTx(ctx, tx, storeID, r.OrderID)
+		fin, err = s.recomputeSettlementTx(ctx, tx, storeID, r.OrderID)
 		if err != nil {
 			return nil, err
 		}

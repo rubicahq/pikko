@@ -23,6 +23,9 @@ Coverage highlights:
 ```bash
 # API on :8080, web on :3000, DATABASE_URL set, migrations applied
 cd apps/web && npx playwright test
+
+# Stage 3 consolidated critical smoke only (Agent 14):
+cd apps/web && npx playwright test e2e/stage3-critical-smoke.spec.ts
 ```
 
 Suites:
@@ -35,8 +38,11 @@ Suites:
 - Phase 3: bank/fulfillment setup → cart → checkout → evidence → merchant verify
 - Phase 4: preorder batch → cart group → checkout → merchant confirm
 - Phase 5: notifications / analytics / CSV / customers smoke
-- Phase 6: marketing pages, FAQ keyboard, robots/sitemap, security headers
+- Phase 6: marketing pages, FAQ keyboard, robots/sitemap, security headers (+ CSP)
 - Phase 7: domain-agnostic sitemap/canonicals + support mailto from env
+- Stage 3 critical smoke: CSP headers, auth page, multi-store (E2E-A)
+
+See `docs/TEST_REPORT.md` for E2E A–N status and security gate evidence.
 
 ## Ops scripts
 

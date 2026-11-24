@@ -52,5 +52,6 @@ test.describe("Phase 6 marketing and SEO", () => {
     const headers = res.headers();
     expect(headers["x-content-type-options"]).toBe("nosniff");
     expect(headers["x-frame-options"]?.toLowerCase()).toBe("deny");
+    expect(headers["content-security-policy"] || "").toContain("frame-ancestors");
   });
 });
