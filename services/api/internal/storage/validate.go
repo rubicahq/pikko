@@ -27,6 +27,7 @@ var PurposeLimits = map[string]UploadLimits{
 		MaxBytes: 8 << 20,
 		AllowedMIME: []string{"image/png", "image/jpeg", "image/webp", "application/pdf"},
 	},
+	"preorder_cover": {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 }
 
 func ValidateUpload(purpose string, size int64, contentType string, head []byte) (string, error) {

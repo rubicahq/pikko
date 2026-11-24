@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPublicProducts, getPublicStore } from "@/lib/server-api";
+import { getPublicBatches, getPublicProducts, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
@@ -44,7 +44,11 @@ export default async function PublicStorePage({ params }: Props) {
   if (!data) notFound();
   const { store } = data;
   const sf = store.storefront;
-  const { products } = await getPublicProducts(storeSlug);
+  const [{ products }, batches] = await Promise.all([
+    getPublicProducts(storeSlug),
+    getPublicBatches(storeSlug),
+  ]);
+  const openBatches = batches.filter((b) => b.operational_status === "open" || b.operational_status === "scheduled");
   const logoSrc = sf.logo_file_id
     ? urls.publicFile(store.id, sf.logo_file_id)
     : sf.logo_url;
@@ -89,6 +93,35 @@ export default async function PublicStorePage({ params }: Props) {
           <p className="max-w-reading text-base opacity-80">{sf.description}</p>
         )}
 
+        {openBatches.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-xl font-medium">Active preorders</h2>
+            <ul className="mt-4 grid gap-3 md:grid-cols-2">
+              {openBatches.map((b) => (
+                <li key={b.id}>
+                  <Link
+                    href={`/${storeSlug}/preorders/${b.slug}`}
+                    className="block rounded-md border p-4 transition-opacity hover:opacity-90"
+                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                  >
+                    <p className="font-medium">{b.name}</p>
+                    <p className="mt-1 text-sm opacity-70 capitalize">
+                      {b.operational_status.replaceAll("_", " ")}
+                      {b.closes_at
+                        ? ` · closes ${new Intl.DateTimeFormat("id-ID", {
+                            timeZone: "Asia/Jakarta",
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          }).format(new Date(b.closes_at))} WIB`
+                        : ""}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         <section className="mt-10">
           <h2 className="text-xl font-medium">Products</h2>
           {products.length === 0 ? (
@@ -116,6 +149,9 @@ export default async function PublicStorePage({ params }: Props) {
                       ) : null}
                     </div>
                     <p className="mt-3 text-sm font-medium">{p.name}</p>
+                    {p.preorder_eligible ? (
+                      <p className="mt-1 text-xs opacity-70">Preorder</p>
+                    ) : null}
                     <p className="mt-1 text-sm tabular-nums opacity-80">
                       {formatIDR(p.base_price_idr)}
                     </p>

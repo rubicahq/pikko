@@ -24,6 +24,8 @@ export function ProductForm({
   const [price, setPrice] = useState(String(product?.base_price_idr ?? ""));
   const [categoryId, setCategoryID] = useState(product?.category_id || "");
   const [status, setStatus] = useState(product?.status || "draft");
+  const [readyStock, setReadyStock] = useState(product?.ready_stock_eligible ?? true);
+  const [preorder, setPreorder] = useState(product?.preorder_eligible ?? false);
   const [imageIds, setImageIds] = useState<string[]>(
     product?.images?.map((i) => i.file_id) || [],
   );
@@ -63,8 +65,8 @@ export function ProductForm({
         base_price_idr: base,
         category_id: categoryId || null,
         status,
-        ready_stock_eligible: true,
-        preorder_eligible: false,
+        ready_stock_eligible: readyStock,
+        preorder_eligible: preorder,
       },
       options: [],
       variants: [],
@@ -164,6 +166,26 @@ export function ProductForm({
           <option value="published">Published</option>
           <option value="archived">Archived</option>
         </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Selling model</Label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={readyStock}
+            onChange={(e) => setReadyStock(e.target.checked)}
+          />
+          Ready stock eligible
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={preorder}
+            onChange={(e) => setPreorder(e.target.checked)}
+          />
+          Preorder eligible
+        </label>
       </div>
 
       <div className="space-y-3">

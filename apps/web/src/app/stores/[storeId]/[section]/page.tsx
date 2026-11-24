@@ -2,13 +2,15 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/server-api";
 import { urls } from "@/lib/urls";
 
-const LATER = new Set(["preorders", "customers", "business-rules"]);
+const LATER = new Set(["customers"]);
 
 const PHASE2_REDIRECT: Record<string, (storeId: string) => string> = {
   storefront: urls.storeStorefront,
   catalog: urls.storeCatalog,
   settings: urls.storeSettings,
   orders: (storeId) => `/stores/${storeId}/orders`,
+  preorders: (storeId) => `/stores/${storeId}/preorders`,
+  "business-rules": (storeId) => `/stores/${storeId}/business-rules`,
 };
 
 export default async function StoreSectionPlaceholder({

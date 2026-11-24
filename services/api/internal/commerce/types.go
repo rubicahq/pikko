@@ -21,6 +21,8 @@ var (
 	ErrAlreadyVerified   = errors.New("already verified")
 )
 
+// Additional Phase 4 errors are defined in rules.go.
+
 const (
 	OrderPendingConfirmation = "pending_confirmation"
 	OrderConfirmed           = "confirmed"
@@ -35,6 +37,8 @@ const (
 	PaymentPartiallyRefunded    = "partially_refunded"
 
 	FulfillmentUnfulfilled    = "unfulfilled"
+	FulfillmentPurchasing     = "purchasing"
+	FulfillmentAwaitingArrival = "awaiting_arrival"
 	FulfillmentReadyToShip    = "ready_to_ship"
 	FulfillmentReadyForPickup = "ready_for_pickup"
 	FulfillmentShipped        = "shipped"
@@ -86,6 +90,8 @@ type CartLineInput struct {
 	ProductID uuid.UUID  `json:"product_id"`
 	VariantID *uuid.UUID `json:"variant_id,omitempty"`
 	Quantity  int        `json:"quantity"`
+	// BatchID set for preorder cart group; omit/null for ready-stock (PRD §20/§22).
+	BatchID *uuid.UUID `json:"batch_id,omitempty"`
 }
 
 type CheckoutAddress struct {
@@ -116,6 +122,7 @@ type CheckoutSubmitInput struct {
 type PricedLine struct {
 	ProductID     uuid.UUID  `json:"product_id"`
 	VariantID     *uuid.UUID `json:"variant_id,omitempty"`
+	BatchID       *uuid.UUID `json:"batch_id,omitempty"`
 	ProductName   string     `json:"product_name"`
 	ProductSlug   string     `json:"product_slug"`
 	SKU           *string    `json:"sku,omitempty"`
@@ -128,25 +135,34 @@ type PricedLine struct {
 }
 
 type CheckoutPreview struct {
-	StoreID           uuid.UUID    `json:"store_id"`
-	StoreSlug         string       `json:"store_slug"`
-	StoreName         string       `json:"store_name"`
-	Currency          string       `json:"currency"`
-	Lines             []PricedLine `json:"lines"`
-	SubtotalIDR       int64        `json:"subtotal_idr"`
-	ShippingFeeIDR    int64        `json:"shipping_fee_idr"`
-	HandlingFeeIDR    int64        `json:"handling_fee_idr"`
-	TotalIDR          int64        `json:"total_idr"`
-	FulfillmentMethod string       `json:"fulfillment_method,omitempty"`
-	CheckoutEnabled   bool         `json:"checkout_enabled"`
-	PaymentMethods    []PaymentMethod      `json:"payment_methods,omitempty"`
-	Fulfillment       *FulfillmentSettings `json:"fulfillment,omitempty"`
+	StoreID            uuid.UUID              `json:"store_id"`
+	StoreSlug          string                 `json:"store_slug"`
+	StoreName          string                 `json:"store_name"`
+	Currency           string                 `json:"currency"`
+	SellingModel       string                 `json:"selling_model"`
+	BatchID            *uuid.UUID             `json:"batch_id,omitempty"`
+	BatchName          string                 `json:"batch_name,omitempty"`
+	BatchSlug          string                 `json:"batch_slug,omitempty"`
+	Lines              []PricedLine           `json:"lines"`
+	SubtotalIDR        int64                  `json:"subtotal_idr"`
+	ShippingFeeIDR     int64                  `json:"shipping_fee_idr"`
+	HandlingFeeIDR     int64                  `json:"handling_fee_idr"`
+	TotalIDR           int64                  `json:"total_idr"`
+	RequiresApproval   bool                   `json:"requires_approval"`
+	MinimumOK          bool                   `json:"minimum_ok"`
+	MinimumMessage     string                 `json:"minimum_message,omitempty"`
+	AppliedRules       []AppliedRule          `json:"applied_rules,omitempty"`
+	FulfillmentMethod  string                 `json:"fulfillment_method,omitempty"`
+	CheckoutEnabled    bool                   `json:"checkout_enabled"`
+	PaymentMethods     []PaymentMethod        `json:"payment_methods,omitempty"`
+	Fulfillment        *FulfillmentSettings   `json:"fulfillment,omitempty"`
 }
 
 type OrderItem struct {
 	ID           uuid.UUID  `json:"id"`
 	ProductID    *uuid.UUID `json:"product_id,omitempty"`
 	VariantID    *uuid.UUID `json:"variant_id,omitempty"`
+	BatchID      *uuid.UUID `json:"batch_id,omitempty"`
 	ProductName  string     `json:"product_name"`
 	ProductSlug  *string    `json:"product_slug,omitempty"`
 	SKU          *string    `json:"sku,omitempty"`
@@ -191,6 +207,10 @@ type Order struct {
 	CancelledAt         *time.Time  `json:"cancelled_at,omitempty"`
 	CreatedAt           time.Time   `json:"created_at"`
 	UpdatedAt           time.Time   `json:"updated_at"`
+	PreorderBatchID     *uuid.UUID  `json:"preorder_batch_id,omitempty"`
+	BatchNameSnapshot   *string     `json:"batch_name_snapshot,omitempty"`
+	BatchSlugSnapshot   *string     `json:"batch_slug_snapshot,omitempty"`
+	RequiresApproval    bool        `json:"requires_approval"`
 	Items               []OrderItem `json:"items,omitempty"`
 	TrackingURL         string      `json:"tracking_url,omitempty"`
 	TrackingToken       string      `json:"tracking_token,omitempty"` // only on create response

@@ -49,6 +49,9 @@ export const urls = {
   storefrontProduct: (slug: string, productSlug: string) => `/${slug}/products/${productSlug}`,
   storefrontProductAbsolute: (slug: string, productSlug: string) =>
     `${storefront()}/${slug}/products/${productSlug}`,
+  storefrontPreorder: (slug: string, batchSlug: string) => `/${slug}/preorders/${batchSlug}`,
+  storefrontPreorderAbsolute: (slug: string, batchSlug: string) =>
+    `${storefront()}/${slug}/preorders/${batchSlug}`,
   tracking: (token: string) => `/track/${encodeURIComponent(token)}`,
   trackingAbsolute: (token: string) => `${storefront()}/track/${encodeURIComponent(token)}`,
   api: (path: string) => {

@@ -17,7 +17,8 @@ var (
 )
 
 const (
-	TypeCatalogPDFImport = "catalog_pdf_import"
+	TypeCatalogPDFImport  = "catalog_pdf_import"
+	TypePreorderBatchSync = "preorder_batch_sync"
 )
 
 type Job struct {

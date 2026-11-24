@@ -32,8 +32,14 @@ func (h *CommerceHandlers) mapErr(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, r, http.StatusConflict, "checkout_disabled", "Checkout is not available for this store yet.")
 	case errors.Is(err, commerce.ErrPriceChanged):
 		writeError(w, r, http.StatusConflict, "price_changed", "Prices changed. Please review the updated total.")
-	case errors.Is(err, commerce.ErrInsufficientStock):
+	case errors.Is(err, commerce.ErrInsufficientStock), errors.Is(err, commerce.ErrQuotaExceeded):
 		writeError(w, r, http.StatusConflict, "insufficient_stock", "One or more items are unavailable.")
+	case errors.Is(err, commerce.ErrBatchClosed), errors.Is(err, commerce.ErrBatchNotOpen):
+		writeError(w, r, http.StatusConflict, "batch_closed", "This preorder batch is not accepting orders.")
+	case errors.Is(err, commerce.ErrMinimumNotMet):
+		writeError(w, r, http.StatusConflict, "minimum_not_met", "Order does not meet the minimum requirement.")
+	case errors.Is(err, commerce.ErrIncompatibleCart):
+		writeError(w, r, http.StatusBadRequest, "incompatible_cart", "Ready-stock and preorder items must be checked out separately.")
 	case errors.Is(err, commerce.ErrInvalidTransition):
 		writeError(w, r, http.StatusConflict, "invalid_transition", "This status change is not allowed.")
 	case errors.Is(err, commerce.ErrAlreadyVerified):
