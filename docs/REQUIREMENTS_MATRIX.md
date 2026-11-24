@@ -150,7 +150,7 @@
 | --- | --- | --- |
 | E2E-A Multi-store | done | Playwright |
 | E2E-B PDF→checkout | partial | Pieces exist |
-| E2E-C Admin entry | missing | Stage 1 |
+| E2E-C Admin entry | partial (API+UI; Playwright deferred) | Stage 1 |
 | E2E-D Purchasing | partial | Stage 2 |
 | E2E-E Partial availability | partial | Stage 2 |
 | E2E-F Reconciliation math | missing | Stage 2 |
