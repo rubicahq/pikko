@@ -191,5 +191,6 @@ This architecture documents support for:
 - Historical revisions — **status history + `order_revisions` / `order_item_events` (Agent 05/06)**
 - Receiving foundation — **`receiving_records` / lines (Agent 06)**
 - Financial reconciliation — **ledger/refund/credit/deposit shipped (Agent 07); bank verify preserved**
+- Packing / shipments — **queues, checklist, multi-parcel + tracking email (Agent 09)**
 
 No application feature code in Agent 01 scope.

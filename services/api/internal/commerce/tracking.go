@@ -69,6 +69,7 @@ func (s *Service) buildTrackingView(ctx context.Context, storeID, orderID uuid.U
 	// Never expose internal notes on tracking
 	o.InternalNotes = nil
 	pay, _ := s.GetLatestPayment(ctx, storeID, orderID)
+	shipments, _ := s.ListOrderShipments(ctx, storeID, orderID)
 	canSubmit := o.OrderStatus != OrderCancelled && o.PaymentStatus != PaymentPaid
 	primaryColor := "#FF3D00"
 	if primary != nil {
@@ -77,7 +78,7 @@ func (s *Service) buildTrackingView(ctx context.Context, storeID, orderID uuid.U
 	return &TrackingView{
 		StoreName: storeName, StoreSlug: storeSlug, PrimaryColor: primaryColor,
 		ContactEmail: contactEmail, WhatsApp: whatsapp,
-		Order: *o, Payment: pay, CanSubmitEvidence: canSubmit,
+		Order: *o, Payment: pay, Shipments: shipments, CanSubmitEvidence: canSubmit,
 	}, nil
 }
 

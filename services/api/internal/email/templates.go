@@ -154,6 +154,29 @@ func ProductUnavailableContent(storeName, orderNumber, productName, trackingURL 
 	return subject, html, text
 }
 
+func ShipmentCreatedContent(storeName, orderNumber, carrier, trackingNumber, totalFormatted, trackingURL string) (subject, html, text string) {
+	subject = fmt.Sprintf("Your order shipped — %s", orderNumber)
+	text = fmt.Sprintf(
+		"Your order %s at %s (%s) has shipped.\n\nCarrier: %s\nTracking: %s\n\nTrack your order:\n%s\n",
+		orderNumber, storeName, totalFormatted, carrier, trackingNumber, trackingURL,
+	)
+	html = fmt.Sprintf(`<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#FFFFFF;font-family:Inter,Arial,sans-serif;color:#15191E;">
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="600" style="max-width:600px;width:100%%;border:1px solid #E1E3E8;border-radius:12px;">
+<tr><td style="padding:32px;">
+<p style="margin:0 0 8px;font-size:14px;color:#60646C;">%s</p>
+<h1 style="margin:0 0 16px;font-size:24px;font-weight:500;">Your order is on the way.</h1>
+<p style="margin:0 0 8px;font-size:16px;color:#60646C;">Order <strong>%s</strong> · %s</p>
+<p style="margin:0 0 8px;font-size:16px;color:#60646C;">Carrier <strong>%s</strong></p>
+<p style="margin:0 0 24px;font-size:16px;color:#60646C;">Tracking <strong>%s</strong></p>
+<p style="margin:0;"><a href="%s" style="display:inline-block;background:#C83200;color:#FCFCFD;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:500;font-size:14px;">Track order</a></p>
+</td></tr></table>
+</td></tr></table>
+</body></html>`, storeName, orderNumber, totalFormatted, carrier, trackingNumber, trackingURL)
+	return subject, html, text
+}
+
 func PaymentRejectedContent(storeName, orderNumber, reason, trackingURL string) (subject, html, text string) {
 	subject = fmt.Sprintf("Payment evidence needs attention — %s", orderNumber)
 	text = fmt.Sprintf(

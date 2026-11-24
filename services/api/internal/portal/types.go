@@ -74,6 +74,7 @@ type OrderDetail struct {
 	Payments     []commerce.Payment               `json:"payments"`
 	Adjustments  []commerce.FinancialAdjustment   `json:"adjustments"`
 	Refunds      []commerce.Refund                `json:"refunds"`
+	Shipments    []commerce.Shipment              `json:"shipments,omitempty"`
 	AddressChange *AddressChangeRequest           `json:"pending_address_change,omitempty"`
 	CanRequestAddressChange bool                  `json:"can_request_address_change"`
 }

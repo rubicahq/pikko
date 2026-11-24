@@ -46,7 +46,7 @@
 | **06 Purchasing** | Vendors, multi-vendor, receiving handoff | PUR-01–03 | VEN/RCV + extended purchasing |
 | **07 Payments/Finance** | Reconciliation, refunds, store credit, E2E-F | FIN-01–03 | Ledger + REF-* + exact money tests |
 | **08 Customer Portal** | Auth portal beyond tracking | PORT-01, CRM | **Done** PORT-02–04; E2E-M/J API |
-| **09 Packing/Shipment** | Pack queues, shipments | Fulfillment statuses | PACK/SHIP; E2E-I |
+| **09 Packing/Shipment** | Pack queues, shipments | Fulfillment statuses | **Done** PACK/SHIP; E2E-I |
 | **10 Communication** | WhatsApp templates + email completeness; RBAC invites polish | notifications/email | WA registry; team invites usable |
 
 ### Stage 3 — Experience & Production Readiness
@@ -178,9 +178,40 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 08+)
+## 3h. Agent 08 status (Customer Portal)
 
-1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
+| Deliverable | Status |
+| --- | --- |
+| Migration `000012_customer_portal` | Done |
+| Portal magic-link auth + session cookie | Done |
+| Dashboard / orders / refund prefs / addresses | Done |
+| E2E-M IDOR API tests | Done |
+| Guest tracking preserved | Yes |
+| `docs/agents/08-customer-portal-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 3i. Agent 09 status (Packing & Shipment)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000013_packing_shipment` | Done |
+| Packing queue by order / customer | Done |
+| Pack checklist + mark packed → ready_* | Done |
+| Shipments carrier/tracking + multi-parcel | Done |
+| Customer email via email_jobs + outbox | Done |
+| Portal + guest tracking show shipments | Done |
+| Nav Packing/Shipments + packing.* RBAC | Done |
+| E2E-I API tests | Done |
+| `docs/agents/09-packing-shipment-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 10+)
+
+1. Customer portal auth model: separate customer identities (shipped Agent 08).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
 3. Commercial pricing / counsel legal — owner (unchanged).
 4. pikko.id cutover date — owner only.

@@ -317,6 +317,16 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/receiving/{receivingID}", storePerm(rbac.PermPurchasingRead, commerceH.GetReceiving))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/receiving/{receivingID}/lines/{lineID}", storePerm(rbac.PermPurchasingWrite, commerceH.UpdateReceivingLine))
 
+	// Agent 09: packing + shipments
+	mux.Handle("GET /api/v1/stores/{storeID}/packing", storePerm(rbac.PermPackingRead, commerceH.PackingQueue))
+	mux.Handle("GET /api/v1/stores/{storeID}/packing/{orderID}", storePerm(rbac.PermPackingRead, commerceH.PackingChecklist))
+	mux.Handle("PUT /api/v1/stores/{storeID}/packing/{orderID}/checklist", storePerm(rbac.PermPackingWrite, commerceH.UpdatePackingChecklist))
+	mux.Handle("POST /api/v1/stores/{storeID}/packing/{orderID}/complete", storePerm(rbac.PermPackingWrite, commerceH.CompletePacking))
+	mux.Handle("GET /api/v1/stores/{storeID}/shipments", storePerm(rbac.PermPackingRead, commerceH.ListShipments))
+	mux.Handle("POST /api/v1/stores/{storeID}/shipments", storePerm(rbac.PermPackingWrite, commerceH.CreateShipment))
+	mux.Handle("GET /api/v1/stores/{storeID}/shipments/{shipmentID}", storePerm(rbac.PermPackingRead, commerceH.GetShipment))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}/shipments", storePerm(rbac.PermPackingRead, commerceH.ListOrderShipments))
+
 	// Phase 4: business rules
 	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesRead, commerceH.ListRules))
 	mux.Handle("POST /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesWrite, commerceH.CreateRule))

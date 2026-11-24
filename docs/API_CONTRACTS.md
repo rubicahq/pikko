@@ -259,6 +259,21 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | POST | `/public/tracking/{token}/evidence` |
 | GET | `/public/tracking/{token}/evidence/{evidenceID}/file` |
 
+### 2.10b Packing & shipments (Agent 09)
+
+| Method | Path | Auth / permission |
+| --- | --- | --- |
+| GET | `/stores/{storeID}/packing` | `packing.read` — query `group_by=order\|customer`, `status=eligible\|in_progress\|packed` |
+| GET | `/stores/{storeID}/packing/{orderID}` | `packing.read` — checklist |
+| PUT | `/stores/{storeID}/packing/{orderID}/checklist` | `packing.write` — body `{ items: [{ order_item_id, qty_packed }] }` |
+| POST | `/stores/{storeID}/packing/{orderID}/complete` | `packing.write` — marks packed → `ready_to_ship` / `ready_for_pickup` |
+| GET | `/stores/{storeID}/shipments` | `packing.read` — optional `order_id` |
+| POST | `/stores/{storeID}/shipments` | `packing.write` — carrier + tracking + items (partial/multi-parcel) |
+| GET | `/stores/{storeID}/shipments/{shipmentID}` | `packing.read` |
+| GET | `/stores/{storeID}/orders/{orderID}/shipments` | `packing.read` |
+
+Public tracking and portal order detail include `shipments` when present (additive). Shipment create enqueues `order_shipped_customer` via `email_jobs` and `shipment.created` outbox event.
+
 ### 2.11 Customer portal (Agent 08)
 
 Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from merchant auth. Tokens hashed (SHA-256); raw ≥256-bit.
@@ -292,7 +307,7 @@ Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from mer
 | Order item patch / revision list | **Shipped Agent 05** — revisions + item-events + qty PATCH |
 | Refunds + store credit | **Shipped Agent 07** — `/finance/*` + deposit/refund/credit |
 | Customer portal auth + orders | **Shipped Agent 08** — `/portal/{storeSlug}/*` + merchant address-change review |
-| Packing + shipments | Agent 09 |
+| Packing + shipments | **Shipped Agent 09** — `/packing/*` + `/shipments` |
 | Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |
 | Vendors / receiving | **Shipped Agent 06** — vendors RBAC + `/purchasing/*` + `/receiving/*` |
 | Live sessions | Agent 12 |

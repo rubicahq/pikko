@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000011`  
+**Baseline migrations:** `000001`–`000013`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -20,8 +20,10 @@
 | 000009 | `order_management` | Order source/campaign, item availability cols, revisions, drafts |
 | 000010 | `purchasing_allocation` | Vendor splits on purchasing records, version, receiving foundation |
 | 000011 | `payments_finance` | Deposits, payment allocations, financial events/adjustments, refunds, store credit |
+| 000012 | `customer_portal` | Portal tokens/sessions, refund prefs, address change requests |
+| 000013 | `packing_shipment` | packing_tasks/items + shipments/items (Agent 09) |
 
-Next free version: **`000012_…`** (Agents 08+).
+Next free version: **`000014_…`** (Agents 10+).
 
 ---
 
@@ -154,14 +156,16 @@ portal_address_change_requests (pending unique per order; merchant review)
 
 Separate customer auth (not merchant `users`) to avoid conflating roles.
 
-### 3.6 Packing & shipments (Agent 09)
+### 3.6 Packing & shipments (Agent 09) — shipped `000013`
 
 ```text
-packing_tasks (order_id, status, assigned_user_id?)
-packing_task_items (order_item_id, qty_packed)
-shipments (carrier, tracking_number, status, shipped_at)
-shipment_items (shipment_id, order_item_id, qty)
+packing_tasks (store+order unique; pending|in_progress|packed|cancelled; assigned_user_id?)
+packing_task_items (order_item_id, qty_to_pack, qty_packed ≤ qty_to_pack)
+shipments (carrier, tracking_number, status, shipped_at, notify_customer)
+shipment_items (shipment_id, order_item_id, quantity > 0)
 ```
+
+Reuses `order_items.packed_qty` and fulfillment statuses; no destructive changes.
 
 ### 3.7 Live shopping (Agent 12)
 
