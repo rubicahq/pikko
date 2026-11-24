@@ -27,8 +27,6 @@ test.describe("Catalog flipbook editor", () => {
     await page.locator('a[href$="/catalog/flipbook"]').click();
     await expect(page).toHaveURL(/\/catalog\/flipbook$/);
     await expect(page.getByRole("heading", { name: "Catalog flipbook" })).toBeVisible();
-    await expect(
-      page.getByText(/No catalog pages yet|Reorder pages|Publish catalog/),
-    ).toBeVisible();
+    await expect(page.getByText("No catalog pages yet", { exact: false })).toBeVisible();
   });
 });
