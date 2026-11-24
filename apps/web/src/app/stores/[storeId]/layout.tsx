@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession, getStore, getStores } from "@/lib/server-api";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { urls } from "@/lib/urls";
 
 export default async function StoreLayout({
@@ -25,8 +26,12 @@ export default async function StoreLayout({
         <DashboardSidebar user={session.user} stores={stores} currentStore={store} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-topbar items-center border-b border-border px-4 md:hidden">
-          <span className="truncate text-sm font-medium">{store.name}</span>
+        <header className="flex h-topbar items-center justify-between gap-3 border-b border-border px-4 md:px-8">
+          <span className="truncate text-sm font-medium md:hidden">{store.name}</span>
+          <span className="hidden text-sm text-foreground-secondary md:inline">
+            {store.name}
+          </span>
+          <NotificationBell storeId={storeId} />
         </header>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
       </div>

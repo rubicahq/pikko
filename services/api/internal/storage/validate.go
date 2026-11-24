@@ -28,6 +28,10 @@ var PurposeLimits = map[string]UploadLimits{
 		AllowedMIME: []string{"image/png", "image/jpeg", "image/webp", "application/pdf"},
 	},
 	"preorder_cover": {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
+	"catalog_csv": {
+		MaxBytes:    5 << 20,
+		AllowedMIME: []string{"text/csv", "text/plain", "application/csv", "application/vnd.ms-excel"},
+	},
 }
 
 func ValidateUpload(purpose string, size int64, contentType string, head []byte) (string, error) {
@@ -56,6 +60,13 @@ func ValidateUpload(purpose string, size int64, contentType string, head []byte)
 			return "", fmt.Errorf("unsupported file type")
 		}
 		// payment_evidence may also be an image — fall through to MIME checks
+	}
+	// CSV often sniffs as text/plain; accept when extension/content-type says csv
+	if purpose == "catalog_csv" {
+		lowerName := strings.ToLower(ct)
+		if strings.Contains(lowerName, "csv") || detected == "text/plain" || detected == "text/csv" {
+			return "text/csv", nil
+		}
 	}
 	if strings.HasPrefix(detected, "image/") && !mimeAllowed(detected, limits.AllowedMIME) && detected != "text/xml; charset=utf-8" {
 		// Prefer sniffed type when clearly an image mismatch

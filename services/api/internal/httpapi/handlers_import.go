@@ -24,22 +24,39 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 	}
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid_request", "PDF file is required.")
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Import file is required.")
 		return
 	}
 	defer file.Close()
-	extract := true
-	if v := r.FormValue("extract_images"); v != "" {
-		extract, _ = strconv.ParseBool(v)
+
+	source := strings.ToLower(strings.TrimSpace(r.FormValue("source")))
+	nameLower := strings.ToLower(hdr.Filename)
+	ct := strings.ToLower(hdr.Header.Get("Content-Type"))
+	isCSV := source == "csv" || strings.HasSuffix(nameLower, ".csv") || strings.Contains(ct, "csv")
+
+	var job *imports.Job
+	if isCSV {
+		job, err = h.Imports.StartCSV(r.Context(), StoreID(r), UserID(r), imports.CSVStartInput{
+			IdempotencyKey: r.Header.Get("Idempotency-Key"),
+			Filename:       hdr.Filename,
+			DeclaredType:   hdr.Header.Get("Content-Type"),
+			Reader:         file,
+			Size:           hdr.Size,
+		})
+	} else {
+		extract := true
+		if v := r.FormValue("extract_images"); v != "" {
+			extract, _ = strconv.ParseBool(v)
+		}
+		job, err = h.Imports.Start(r.Context(), StoreID(r), UserID(r), imports.StartInput{
+			ExtractImages:  extract,
+			IdempotencyKey: r.Header.Get("Idempotency-Key"),
+			Filename:       hdr.Filename,
+			DeclaredType:   hdr.Header.Get("Content-Type"),
+			Reader:         file,
+			Size:           hdr.Size,
+		})
 	}
-	job, err := h.Imports.Start(r.Context(), StoreID(r), UserID(r), imports.StartInput{
-		ExtractImages:  extract,
-		IdempotencyKey: r.Header.Get("Idempotency-Key"),
-		Filename:       hdr.Filename,
-		DeclaredType:   hdr.Header.Get("Content-Type"),
-		Reader:         file,
-		Size:           hdr.Size,
-	})
 	if err != nil {
 		if errors.Is(err, imports.ErrInvalidInput) || strings.Contains(err.Error(), "invalid input") {
 			writeError(w, r, http.StatusBadRequest, "invalid_input", err.Error())
@@ -48,7 +65,17 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusInternalServerError, "import_failed", "Unable to start catalog import.")
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+	status := http.StatusAccepted
+	if job != nil && job.SourceType == "csv" {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, map[string]any{"job": job})
+}
+
+func (h *ImportHandlers) CSVTemplate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="pikko-product-import-template.csv"`)
+	_, _ = w.Write([]byte(imports.CSVTemplate))
 }
 
 func (h *ImportHandlers) List(w http.ResponseWriter, r *http.Request) {

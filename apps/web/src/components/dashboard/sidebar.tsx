@@ -12,6 +12,8 @@ import {
   SlidersHorizontal,
   Settings,
   UserRound,
+  BarChart3,
+  Bell,
 } from "lucide-react";
 import type { Store as StoreType, User } from "@/lib/api";
 import { Wordmark } from "@/components/brand/wordmark";
@@ -21,11 +23,13 @@ import { urls } from "@/lib/urls";
 
 const nav = [
   { href: "overview", label: "Overview", icon: LayoutDashboard },
+  { href: "analytics", label: "Analytics", icon: BarChart3 },
   { href: "storefront", label: "Storefront", icon: Store },
   { href: "catalog", label: "Catalog", icon: Package },
   { href: "orders", label: "Orders", icon: ShoppingBag },
   { href: "preorders", label: "Preorders", icon: CalendarClock },
-  { href: "customers", label: "Customers", icon: Users, soon: true },
+  { href: "customers", label: "Customers", icon: Users },
+  { href: "notifications", label: "Notifications", icon: Bell },
   { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal },
   { href: "settings", label: "Settings", icon: Settings },
 ];
@@ -58,14 +62,11 @@ export function DashboardSidebar({
           return (
             <Link
               key={item.href}
-              href={item.soon ? href : href}
-              aria-disabled={item.soon}
+              href={href}
               className={cn(
                 "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground-secondary hover:bg-surface hover:text-foreground",
                 active && "bg-surface font-medium text-foreground",
-                item.soon && item.href !== "overview" && "opacity-60",
               )}
-              title={item.soon && item.href !== "overview" ? "Coming in a later phase" : undefined}
             >
               <Icon className="h-5 w-5" strokeWidth={1.75} />
               {item.label}

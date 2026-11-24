@@ -42,7 +42,7 @@ export default async function CatalogPage({
             <Link href={urls.catalogFlipbook(storeId)}>Flipbook</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href={urls.catalogImport(storeId)}>Import PDF</Link>
+            <Link href={urls.catalogImport(storeId)}>Import</Link>
           </Button>
           <Button asChild>
             <Link href={urls.storeCatalogNew(storeId)}>Add product</Link>

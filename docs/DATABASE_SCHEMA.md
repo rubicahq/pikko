@@ -1,4 +1,4 @@
-# Database Schema (Phase 0–4)
+# Database Schema (Phase 0–5)
 
 Migrations:
 
@@ -7,6 +7,7 @@ Migrations:
 - `000003_ai_pdf_import.up.sql` — import jobs, job queue, catalog pages/hotspots
 - `000004_phase3_orders_payments.up.sql` — checkout, orders, payments, tracking
 - `000005_phase4_preorder_rules.up.sql` — preorder batches / business rules
+- `000006_phase5_merchant_efficiency.up.sql` — notifications, CSV import, analytics events
 
 ## Phase 1 tables
 
@@ -70,6 +71,16 @@ Timestamps are `TIMESTAMPTZ` (UTC). Display timezone default Asia/Jakarta.
 | `order_rule_applications` | Per-order snapshots of applied rule versions |
 
 Also: `orders.preorder_batch_id` + batch name/slug/ETA snapshots + `requires_approval`; `order_items.batch_id`; `inventory_reservations.batch_id` for quotas; `stored_files.purpose` includes `preorder_cover`.
+
+## Phase 5 merchant efficiency (`000006`)
+
+| Table / change | Purpose |
+| --- | --- |
+| `notifications` | Store-scoped in-app notifications |
+| `notification_preferences` | Optional operational email/in-app prefs |
+| `analytics_events` | Lightweight event sink (dashboards mainly query orders) |
+| `catalog_import_jobs.source_type` / `csv_file_id` | PDF or CSV import jobs |
+| `stored_files.purpose` | Adds `catalog_csv` |
 
 ## Defaults on store create
 

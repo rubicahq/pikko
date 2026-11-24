@@ -2,41 +2,37 @@
 
 ## Scope
 
-Phase 4 Flexible Commerce: preorder batches, batch pricing/quotas, preorder-aware checkout with cart groups, business rules (handling fee, minimum, approval) with precedence + versioning, purchasing list, extended fulfillment (PRD §21–22, §27, §40). Built on Phase 0–3 (live on `pikko.site`).
+Phase 5 Merchant Efficiency: in-app notifications, transactional email polish (including unavailable allocation), merchant analytics (Asia/Jakarta), CSV product import, customers dashboard, plus Phase 4 leftovers (batch cover editor + variant pairing UI). AI PDF import was already complete and not re-implemented. Built on Phase 0–4 (`main` @ `01ff5d8+`).
 
 ## Completed
 
-### Phase 0–3 (prior)
+### Phase 0–4 (prior)
 
-- Auth, multi-store, storefront, catalog, AI import, flipbook, ready-stock checkout, bank transfer, tracking, emails
+- Auth, multi-store, storefront, catalog, AI PDF import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, emails
 
-### Phase 4
+### Phase 5
 
-- Migration `000005`: preorder batches/products/variants, purchasing + allocations, business rules + versions + order rule applications, order/batch snapshots, quota reservations via `inventory_reservations.batch_id`
-- Merchant APIs: preorder CRUD, product assign, purchasing, allocations, batch orders; business rules CRUD + preview
-- Public APIs: list/get batches, product open batches; checkout preview/submit preorder-aware (batch price, quota, rules, approval)
-- Cart groups (`pikko_cart_v3`): ready-stock vs per-batch preorder checked out separately
-- Storefront: active preorders section, batch page, PDP batch selector/labels
-- Merchant UI: Preorders + Business Rules (sidebar live); order confirm/reject; preorder fulfillment chain
-- Rules: precedence batch > selling model > store; versioned snapshots on each order; deterministic IDR percent rounding
-- Batch auto open/close via timestamp sync (checkout + worker tick)
-- Emails: order needs confirmation; existing Brevo/outbox idempotency retained
-- Tests: Go unit (rules/precedence/cart groups) + integration (quota, closed batch, cross-store, approval); Playwright Phase 4 flow
-- Docs updated
+- Migration `000006`: `notifications`, `notification_preferences`, `analytics_events`; CSV support on `catalog_import_jobs` (`source_type`, `csv_file_id`); `catalog_csv` file purpose
+- In-app notifications API + UI (list, unread badge, mark read / mark all) wired from new order, payment evidence, batch close, purchasing issues
+- Customer email on unavailable allocation via existing `email_jobs` / Brevo drain; batch-closed merchant email
+- Analytics overview API + UI (sales, orders, top products, conversion) with Asia/Jakarta day boundaries, store-scoped queries
+- CSV catalog import (template download, validation, duplicate SKU warnings, review → draft products)
+- Customers list/detail + internal notes editor
+- Preorder batch cover upload/clear UI; variant pairing UI on batch products
+- Tests: Go `./...`; Playwright Phase 5 smoke; docs updated
 
 ## Not in this release (by design)
 
-- Full CSV purchasing export polish / unavailable-item customer notification UX depth
-- Variant-level batch assignment UI (API table exists)
-- Customers dashboard UI (API list exists)
 - Payment gateway / refunds money movement
+- Marketing site / Phase 6 production readiness
 - VPS deploy / Emplicon (out of scope for this agent)
+- Visual charts library (tables only for analytics MVP)
 
 ## Production requirements
 
-- Run migration `000005` (idempotent migrate up from empty or existing)
-- No new required secrets; Brevo + existing env remain
-- Optional: ensure worker process runs so batch open/close sync ticks periodically (checkout still enforces timestamps)
+- Run migration `000006` (idempotent migrate up from empty or existing)
+- No new required secrets; Brevo + existing env remain (`EMAIL_MODE`, `BREVO_API_KEY`, `EMAIL_NOTIFICATION_FROM`)
+- Worker process should keep draining `email_jobs` and batch sync
 
 ## Test results
 
@@ -44,21 +40,18 @@ Phase 4 Flexible Commerce: preorder batches, batch pricing/quotas, preorder-awar
 
 `cd services/api && go test ./... -count=1 -p 1`
 
-### Playwright
+### Frontend / Playwright
 
-`cd apps/web && npx playwright test`
-
-Includes Phase 4: batch → cart group → checkout → merchant confirm.
+`cd apps/web && npx tsc --noEmit && npm run lint && npm run build && npx playwright test`
 
 ## Decisions / open questions for product
 
 1. Brevo sender domain readiness (carry-over)
-2. Paid-order cancel/refund UX when merchants need to unwind verified payments
-3. Whether unavailable preorder allocations should auto-email customers in MVP or stay merchant-driven
-4. Confirm merge → then separate deploy
+2. Paid-order cancel/refund UX (carry-over)
+3. Confirm merge → then separate deploy / migrate `000006` on production
 
 ## Known limitations
 
-- Batch cover image upload purpose supported (`preorder_cover`); merchant UI uses defaults without cover editor yet
-- Purchasing allocation UI is API-backed; list save is primary merchant path in this release
-- Multi-batch product on PDP requires selecting one open batch at add-to-cart
+- Unavailable-item email mints a fresh tracking token when the original raw token is unavailable (hash-only storage)
+- Analytics conversion = paid orders / total non-cancelled orders in range (not storefront visit conversion)
+- CSV import does not create variants from columns yet (flat products)

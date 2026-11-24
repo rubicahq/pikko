@@ -11,12 +11,13 @@ import (
 )
 
 type ListOrdersFilter struct {
-	Query            string
-	OrderStatus      string
-	PaymentStatus    string
+	Query             string
+	OrderStatus       string
+	PaymentStatus     string
 	FulfillmentStatus string
-	Limit            int
-	Offset           int
+	CustomerID        *uuid.UUID
+	Limit             int
+	Offset            int
 }
 
 func (s *Service) ListOrders(ctx context.Context, storeID uuid.UUID, f ListOrdersFilter) ([]Order, int, error) {
@@ -42,6 +43,11 @@ func (s *Service) ListOrders(ctx context.Context, storeID uuid.UUID, f ListOrder
 	if f.FulfillmentStatus != "" {
 		where = append(where, fmt.Sprintf("fulfillment_status=$%d", n))
 		args = append(args, f.FulfillmentStatus)
+		n++
+	}
+	if f.CustomerID != nil {
+		where = append(where, fmt.Sprintf("customer_id=$%d", n))
+		args = append(args, *f.CustomerID)
 		n++
 	}
 	if q := strings.TrimSpace(f.Query); q != "" {

@@ -1,4 +1,4 @@
-# Requirements Matrix (Phase 0–4)
+# Requirements Matrix (Phase 0–5)
 
 Status: `done` | `partial` | `deferred`
 
@@ -41,4 +41,11 @@ Status: `done` | `partial` | `deferred`
 | P4-5 | Purchasing list + allocations | done | purchasing API + batch detail tab |
 | P4-6 | Extended fulfillment for preorder | done | purchasing → awaiting_arrival → ship/pickup |
 | P4-7 | Emails for approval + existing drain | done | needs-confirmation template + outbox |
+| P4-8 | Batch cover + variant pairing UI | done | Phase 5 leftover: cover upload + variant assign UI |
+| P5-1 | In-app notification center (store-scoped) | done | `notifications` + `/notifications` UI + bell |
+| P5-2 | Email reliability / unavailable allocation email | done | `product_unavailable_customer` via `email_jobs` |
+| P5-3 | Merchant analytics (IDR, Asia/Jakarta, store-scoped) | done | `/analytics` API + UI |
+| P5-4 | CSV product import | done | `source_type=csv` + template + review |
+| P5-5 | Customers dashboard | done | list/detail + notes |
+| P5-6 | AI PDF import | done | prior (not re-done in Phase 5) |
 | — | VPS deploy / Emplicon | deferred | separate after merge |

@@ -41,6 +41,7 @@ Unchanged from Phase 1: magic-link request/peek/verify, session, logout, account
 | POST | `/stores/{storeId}/orders/{orderId}/payments/{paymentId}/reject` | Body `{reason}` |
 | GET | `/stores/{storeId}/orders/evidence/{evidenceId}/file` | Private evidence stream |
 | GET | `/stores/{storeId}/customers` | Store-scoped customers |
+| GET/PATCH | `/stores/{storeId}/customers/{customerId}` | Detail + notes/name/phone |
 
 Checkout enables (`stores.checkout_enabled=true`) only when ≥1 enabled bank account and ≥1 fulfillment method exist.
 
@@ -49,11 +50,13 @@ Checkout enables (`stores.checkout_enabled=true`) only when ≥1 enabled bank ac
 | Method | Path | Notes |
 | --- | --- | --- |
 | GET/POST | `/stores/{storeId}/preorders` | List / create batches |
-| GET/PATCH | `/stores/{storeId}/preorders/{batchId}` | Detail + status/window updates |
+| GET/PATCH | `/stores/{storeId}/preorders/{batchId}` | Detail + status/window updates (`cover_file_id`, `clear_cover`) |
 | POST | `/stores/{storeId}/preorders/{batchId}/products` | Assign / upsert product |
 | DELETE | `/stores/{storeId}/preorders/{batchId}/products/{productId}` | Remove assignment |
+| GET/POST | `/stores/{storeId}/preorders/{batchId}/products/{productId}/variants` | List / assign variants |
+| DELETE | `/stores/{storeId}/preorders/{batchId}/products/{productId}/variants/{variantId}` | Remove variant |
 | GET/PUT | `/stores/{storeId}/preorders/{batchId}/purchasing` | Consolidated purchasing list |
-| POST | `/stores/{storeId}/preorders/{batchId}/allocations` | Allocate purchased qty to item |
+| POST | `/stores/{storeId}/preorders/{batchId}/allocations` | Allocate purchased qty to item (emails customer when unavailable) |
 | GET | `/stores/{storeId}/preorders/{batchId}/orders` | Orders in batch |
 | GET/POST | `/stores/{storeId}/business-rules` | List / publish rule (new version) |
 | PATCH/DELETE | `/stores/{storeId}/business-rules/{ruleId}` | Update (bumps version) / delete |
@@ -61,9 +64,30 @@ Checkout enables (`stores.checkout_enabled=true`) only when ≥1 enabled bank ac
 
 Rule precedence per type: batch → selling model → store. Checkout cart lines may include `batch_id` (one group per submit).
 
-## Catalog imports (AI PDF)
+### Phase 5 notifications + analytics
 
-Uses mock AI when `AI_API_KEY` is unset. See prior sections for import + flipbook routes.
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET | `/stores/{storeId}/notifications` | List; `?unread=1` |
+| GET | `/stores/{storeId}/notifications/unread-count` | Badge count |
+| POST | `/stores/{storeId}/notifications/{id}/read` | Mark one read |
+| POST | `/stores/{storeId}/notifications/read-all` | Mark all read |
+| GET/PATCH | `/stores/{storeId}/notification-preferences` | Optional operational prefs |
+| GET | `/stores/{storeId}/analytics` | `?from=&to=&tz=` (default Asia/Jakarta) |
+
+## Catalog imports (AI PDF + CSV)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/stores/{storeId}/catalog-imports` | Multipart `file`; `source=pdf|csv` |
+| GET | `/stores/{storeId}/catalog-imports/csv-template` | Downloadable CSV template |
+| GET | `/stores/{storeId}/catalog-imports` | Recent jobs |
+| GET | `/stores/{storeId}/catalog-imports/{jobId}` | Job status |
+| GET/PATCH/DELETE | `…/items` | Review items |
+| POST | `…/confirm` | Create draft products |
+| POST | `…/retry` | Retry failed PDF jobs |
+
+Uses mock AI when `AI_API_KEY` is unset. CSV is parsed synchronously into `review_required`.
 
 ## Public storefront
 

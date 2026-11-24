@@ -6,6 +6,7 @@ import { ApiError, apiFetch, formatIDR } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BatchCoverEditor, BatchVariantPairing } from "@/components/preorders/batch-cover-variants";
 
 type BatchProduct = {
   id: string;
@@ -25,6 +26,7 @@ type Batch = {
   publication_status: string;
   opens_at: string;
   closes_at: string;
+  cover_file_id?: string | null;
   products?: BatchProduct[];
 };
 
@@ -184,6 +186,11 @@ export function BatchDetailClient({
 
       {tab === "products" ? (
         <div className="space-y-6">
+          <BatchCoverEditor
+            storeId={storeId}
+            batchId={batch.id}
+            coverFileId={batch.cover_file_id}
+          />
           <form
             className="grid gap-3 rounded-[10px] border border-border p-5 sm:grid-cols-4"
             onSubmit={(e) => {
@@ -258,7 +265,15 @@ export function BatchDetailClient({
               <tbody>
                 {(batch.products || []).map((p) => (
                   <tr key={p.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3">{p.product_name}</td>
+                    <td className="px-4 py-3">
+                      <div>{p.product_name}</div>
+                      <BatchVariantPairing
+                        storeId={storeId}
+                        batchId={batch.id}
+                        productId={p.product_id}
+                        productName={p.product_name}
+                      />
+                    </td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatIDR(p.effective_price_idr)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{p.quantity_limit ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{p.reserved_qty ?? 0}</td>
