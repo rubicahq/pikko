@@ -3,7 +3,9 @@
 **Date:** 2026-11-25 (Asia/Jakarta)  
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-05-order-management-9616`  
-**Prior:** Agent 04 at `c5edc35c7147691bd1025878acc5968b93921106`
+**Prior:** Agent 04 at `c5edc35c7147691bd1025878acc5968b93921106`  
+**Merged main SHA:** `7211978e2c24ac555f0fd7aca1da5198f43d1673`  
+**PR:** https://github.com/rubicahq/pikko/pull/15
 
 ---
 
