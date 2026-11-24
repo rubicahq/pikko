@@ -40,9 +40,15 @@ services:
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-https://app.pikko.site,https://pikko.site,https://shop.pikko.site}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_PATH: /data/storage
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_MODEL: ${AI_MODEL:-gemini/gemini-3.5-flash}
+      IMPORT_MAX_PDF_BYTES: ${IMPORT_MAX_PDF_BYTES:-26214400}
+      IMPORT_MAX_PAGES: ${IMPORT_MAX_PAGES:-50}
+      IMPORT_MAX_ITEMS: ${IMPORT_MAX_ITEMS:-500}
     ports:
       - "127.0.0.1:8100:8080"
-    mem_limit: 256m
+    mem_limit: 512m
 
   web:
     container_name: pikko-web
