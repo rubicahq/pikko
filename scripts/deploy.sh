@@ -144,8 +144,14 @@ connect_emplicon_network() {
 
 paths_changed() {
   local from="$1" to="$2"
-  if [[ -z "$from" || "$from" == "$to" ]]; then
+  # Empty "from" (first run / unknown) → rebuild everything.
+  # Identical SHAs → empty diff (no rebuild) unless --force-all.
+  if [[ -z "$from" ]]; then
     echo "ALL"
+    return 0
+  fi
+  if [[ "$from" == "$to" ]]; then
+    echo ""
     return 0
   fi
   git diff --name-only "$from" "$to"

@@ -221,17 +221,18 @@ SMOKE_PUBLIC=1 ./scripts/smoke.sh   # + public HTTPS checks
 
 ### What the script optimizes
 
-Measured on the VPS (Asia/Jakarta wall clock, BuildKit on), typical costs:
+Measured on the VPS (wall clock, BuildKit on; times in Asia/Jakarta session 2026-11-24):
 
-| Step | Before (naive docs flow) | Notes |
+| Step | Before (naive docs / wrong flags) | After (`./scripts/deploy.sh`) |
 | --- | --- | --- |
-| `git fetch/pull` | ~3s | Unavoidable |
-| Full `backup.sh` (DB+storage) | ~1s | Script skips unless migrations changed (or `--backup`) |
-| **Next.js `web` rebuild** (source change, deps cached) | **~37s** | Dominates; `npm run build` ~28s + export ~5s |
-| Go `api` rebuild (cached mods) | ~2–15s | Parallel with web when both needed |
-| `migrate` one-shot | ~1–2s | Only when api/migrate image restarts |
-| `up -d --build` wrong flags | **+10–60s** + **lost :3100/:8100** | Happens if you omit `-f docker-compose.deploy.yml` |
-| Local smoke (`/healthz` + web `/`) | <1s | Separate `scripts/smoke.sh` |
+| `git fetch/pull` | ~3s | ~3s |
+| DB backup | always ~0.5–1s | **skipped** unless migrations (or `--backup`) |
+| Web rebuild (source change, deps cached) | **~37s** (`npm run build` ~28s) | ~37s only if web paths changed |
+| API rebuild | sequential after web | **parallel** with web when both needed |
+| Full force rebuild both (cache cold after Dockerfile change) | ~60s+ and risk lost ports | **87s** once (npm ci + go + next); then cached |
+| No-op redeploy (same SHA) | still `--build` everything | **~1s** skip (after fix); smoke optional |
+| Omit deploy overlay | **ports :3100/:8100 lost**, +10–20s recreate | always both `-f` files |
+| Smoke | mixed into deploy | `<1s` via `scripts/smoke.sh` |
 
 Naive sequential `up -d --build` for a web-only change often spent ~40–60s and sometimes recreated Postgres / dropped host ports. The script:
 
