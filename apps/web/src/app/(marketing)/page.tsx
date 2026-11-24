@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/marketing/reveal";
+import { redirectIfAuthenticated } from "@/lib/auth-redirect";
 import { marketingMetadata } from "@/lib/marketing-seo";
 
 export const metadata = marketingMetadata({
@@ -8,7 +9,9 @@ export const metadata = marketingMetadata({
   path: "/",
 });
 
-export default function MarketingHomePage() {
+export default async function MarketingHomePage() {
+  await redirectIfAuthenticated();
+
   return (
     <>
       {/* Hero — brand-first, one composition, no cards/stats/icon grids */}
