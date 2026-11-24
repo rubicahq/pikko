@@ -231,8 +231,11 @@ fi
 time_step "tag_rollback" tag_rollback_images
 
 BUILD_SERVICES=()
-if (( NEED_API )); then BUILD_SERVICES+=(api); fi
-# migrate uses Dockerfile.api — building api covers migrate image name via compose
+if (( NEED_API || NEED_MIGRATE )); then
+  # Compose tags migrate separately (pikko-migrate); must rebuild it or
+  # `migrate up` can run a stale image missing new SQL files.
+  BUILD_SERVICES+=(api migrate)
+fi
 if (( NEED_WEB )); then BUILD_SERVICES+=(web); fi
 
 if (( ${#BUILD_SERVICES[@]} > 0 )); then
