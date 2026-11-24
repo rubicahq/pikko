@@ -4,8 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md` §§29, 32)  
 **Branch:** `cursor/agent-15-deploy-hardening-c5a2`  
 **Prior:** Agent 14 Security feature merge `db6c97f` (PR #35); handoff SHA tip `58f0927` (PR #36)  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_
+**Feature merge SHA:** `b00e5a4efefa7196478d080b65b4c421ec478301` (PR #37)  
+**Merged main SHA:** `b00e5a4efefa7196478d080b65b4c421ec478301`
 
 ---
 
