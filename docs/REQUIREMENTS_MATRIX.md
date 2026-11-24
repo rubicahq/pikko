@@ -1,7 +1,7 @@
 # Requirements Matrix — PRD v3.0
 
 **Statuses:** `done` | `partial` | `missing` | `owner` | `deferred`  
-**Baseline:** `main` @ `353498a`, migrations `000001`–`000006`  
+**Baseline:** `main` @ Agent 01 merge `f029fc4` (+ Agent 02 design system), migrations `000001`–`000006`  
 **Prior v4 matrix:** superseded for new work; phase IDs mapped below where relevant.
 
 ---
@@ -34,10 +34,15 @@
 
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
-| DS-01 | Brand tokens #FF3D00 + neutrals | done | `packages/design-tokens` | — | Agent 02 polish |
-| DS-02 | Component library completeness | partial | `components/ui` (Button/Input/Label/Card/Badge) | `/dev/components` | Tables/dialogs/etc. incomplete vs PRD §4 |
-| DS-03 | Brex-like marketing discipline | partial | marketing components | phase6 e2e | Agent 02 |
+| DS-01 | Brand tokens #FF3D00 + neutrals | done | `packages/design-tokens` | — | Type ramp + layout tokens expanded Agent 02 |
+| DS-02 | Component library completeness | done | `components/ui` (table, DataTable, dialog, sheet, tabs, select, empty/error/skeleton, status, toast, page-header, filter-bar + prior primitives) | `/dev/components`, design-system e2e | Toast provider opt-in per tree; not global yet |
+| DS-03 | Brex-like marketing discipline | done | marketing + `DESIGN_SYSTEM.md` rules | phase6 e2e | Preserve hero budget; no redesign of live marketing in this pass |
 | DS-04 | 24 storefront themes | done | `themes/themes.go` | themes_test | — |
+| DS-05 | Product/marketing type ramp wired | done | `tokens.css`, `tailwind.preset.js` | build | — |
+| DS-06 | Dense data table patterns | done | `ui/table.tsx`, `ui/data-table.tsx`; Orders/Customers wired | design-system e2e | Server lists use primitives; interactive DataTable for client workflows |
+| DS-07 | Empty / loading / error states | done | `empty-state`, `skeleton`, `error-state` | `/dev/components` | — |
+| DS-08 | Status badges for ops labels | done | `status-badge.tsx` | `/dev/components` | Extend map as new statuses ship |
+| DS-09 | App shell + mobile sheet nav | done | `app-shell`, `mobile-nav`, `sidebar` | multi-store / responsive | Collapsed desktop icon-rail not implemented (token reserved) |
 
 ---
 
@@ -56,9 +61,9 @@
 
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
-| NAV-01 | Store-scoped nav | partial | dashboard layout | — | Missing ops modules |
-| NAV-02 | Workspace/Operations/Configuration | missing | — | — | Agent 02/03 IA |
-| NAV-03 | Role-aware nav | missing | — | — | Needs RBAC |
+| NAV-01 | Store-scoped nav | done | `app-shell`, `sidebar`, store switcher | multi-store e2e | Ops modules appear when implemented flags flip |
+| NAV-02 | Workspace/Operations/Configuration | done | `nav-config.ts`, `sidebar-nav.tsx` | design-system e2e | Unimplemented items hidden (`implemented:false`) |
+| NAV-03 | Role-aware nav | missing | — | — | Needs RBAC (Agent 03+) |
 
 ---
 
@@ -168,6 +173,6 @@ Auth, multi-store, storefront, catalog, AI PDF/flipbook/CSV, checkout, bank tran
 
 | Stage | Top missing |
 | --- | --- |
-| 1 | RBAC roles, nav IA, campaign unification, admin order entry, item revisions |
+| 1 | RBAC roles, campaign unification, admin order entry, item revisions |
 | 2 | Vendors/receiving, finance ledger/refunds/credit, portal, packing/shipments, WhatsApp |
 | 3 | Live shopping, analytics north-star depth, full E2E A–N, security/QA pass, deploy hardening (still no auto pikko.id) |

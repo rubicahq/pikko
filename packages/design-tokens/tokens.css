@@ -65,8 +65,35 @@
   --font-sans: "Inter", Arial, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
 
+  /* Type ramp — product (dashboard) */
+  --text-page: 30px;
+  --text-page-leading: 36px;
+  --text-section: 20px;
+  --text-section-leading: 28px;
+  --text-card: 16px;
+  --text-card-leading: 24px;
+  --text-body: 14px;
+  --text-body-leading: 20px;
+  --text-table: 13px;
+  --text-table-leading: 18px;
+  --text-label: 12px;
+  --text-label-leading: 16px;
+  --text-caption: 11px;
+  --text-caption-leading: 14px;
+
+  /* Type ramp — marketing display */
+  --text-display-xl: 56px;
+  --text-display-xl-leading: 64px;
+  --text-display-lg: 44px;
+  --text-display-lg-leading: 52px;
+  --text-display-md: 36px;
+  --text-display-md-leading: 44px;
+  --text-display-sm: 28px;
+  --text-display-sm-leading: 36px;
+
   /* Layout */
   --sidebar-width: 248px;
   --sidebar-collapsed: 64px;
-  --topbar-height: 64px;
+  --topbar-height: 56px;
+  --content-gutter: 32px;
 }

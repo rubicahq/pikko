@@ -78,7 +78,22 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 02)
+## 3b. Agent 02 status (Design System)
+
+| Deliverable | Status |
+| --- | --- |
+| `DESIGN_SYSTEM.md` full spec | Done |
+| Tokens type ramp + layout | Done (`packages/design-tokens`) |
+| Shared UI (table/DataTable/dialog/sheet/tabs/select/empty/error/skeleton/status/toast/page-header) | Done |
+| App shell + NAV-02 grouped nav (hide unimplemented) | Done |
+| Orders/Customers/Catalog wired to primitives | Done |
+| `/dev/components` + design-system Playwright | Done |
+| `docs/agents/02-design-system-handoff.md` | Done |
+| DB migrations / pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 03)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
 2. Campaign table vs facade over `preorder_batches` + `live_sessions` (Agent 04).
