@@ -114,9 +114,10 @@ func (s *BrevoSender) Send(ctx context.Context, msg Message) (string, error) {
 }
 
 type Service struct {
-	DB     *pgxpool.Pool
-	Sender Sender
-	Logger *slog.Logger
+	DB              *pgxpool.Pool
+	Sender          Sender
+	Logger          *slog.Logger
+	DefaultFromName string // used when draining email_jobs (from_name is not persisted)
 }
 
 func (s *Service) Enqueue(ctx context.Context, msg Message) error {
@@ -206,8 +207,12 @@ func (s *Service) DrainPending(ctx context.Context, limit int) (int, error) {
 		if err != nil || ct.RowsAffected() == 0 {
 			continue
 		}
+		fromName := s.DefaultFromName
+		if fromName == "" {
+			fromName = "Pikko"
+		}
 		providerID, sendErr := s.Sender.Send(ctx, Message{
-			TemplateKey: j.TemplateKey, To: j.To, From: j.From,
+			TemplateKey: j.TemplateKey, To: j.To, From: j.From, FromName: fromName,
 			Subject: j.Subject, HTML: j.HTML, Text: j.Text, IdempotencyKey: j.IdempotencyKey,
 		})
 		if sendErr != nil {

@@ -39,7 +39,7 @@ type Deps struct {
 func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	urlGen := urls.New(d.Cfg.MarketingURL, d.Cfg.DashboardURL, d.Cfg.StorefrontURL, d.Cfg.APIBaseURL)
 	mailSender := email.NewSender(d.Cfg.EmailMode, d.Cfg.BrevoAPIKey, d.Logger)
-	mailSvc := &email.Service{DB: d.DB, Sender: mailSender, Logger: d.Logger}
+	mailSvc := &email.Service{DB: d.DB, Sender: mailSender, Logger: d.Logger, DefaultFromName: d.Cfg.EmailFromName}
 	authSvc := &auth.Service{DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger}
 	storeSvc := &stores.Service{DB: d.DB, Cfg: d.Cfg}
 	accountSvc := &account.Service{DB: d.DB}
