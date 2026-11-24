@@ -31,18 +31,24 @@ type CSVStartInput struct {
 }
 
 func (s *Service) StartCSV(ctx context.Context, storeID, userID uuid.UUID, in CSVStartInput) (*Job, error) {
-	if in.Size <= 0 || in.Size > maxCSVBytes {
-		return nil, fmt.Errorf("%w: CSV exceeds size limit", ErrInvalidInput)
+	if in.Size <= 0 {
+		return nil, fmt.Errorf("%w: choose a CSV file to upload", ErrInvalidInput)
+	}
+	if in.Size > maxCSVBytes {
+		return nil, fmt.Errorf("%w: CSV exceeds the 5 MB size limit", ErrInvalidInput)
 	}
 	raw, err := io.ReadAll(io.LimitReader(in.Reader, maxCSVBytes+1))
 	if err != nil {
 		return nil, err
 	}
 	if int64(len(raw)) > maxCSVBytes {
-		return nil, fmt.Errorf("%w: CSV exceeds size limit", ErrInvalidInput)
+		return nil, fmt.Errorf("%w: CSV exceeds the 5 MB size limit", ErrInvalidInput)
 	}
 	// Strip UTF-8 BOM
 	raw = bytes.TrimPrefix(raw, []byte("\xef\xbb\xbf"))
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, fmt.Errorf("%w: CSV file is empty", ErrInvalidInput)
+	}
 
 	f, err := s.Files.Upload(ctx, storeID, userID, "catalog_csv", in.Filename, "text/csv", bytes.NewReader(raw), int64(len(raw)))
 	if err != nil {
@@ -69,22 +75,31 @@ func (s *Service) StartCSV(ctx context.Context, storeID, userID uuid.UUID, in CS
 	var jobID uuid.UUID
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO catalog_import_jobs (
-			store_id, created_by, source_type, csv_file_id, extract_images, status, item_count, progress_pct, idempotency_key
-		) VALUES ($1,$2,'csv',$3,false,'processing',$4,10,$5)
+			store_id, created_by, source_type, csv_file_id, extract_images, status, item_count, progress_pct, idempotency_key, ai_provider
+		) VALUES ($1,$2,'csv',$3,false,'processing',$4,10,$5,'csv')
 		RETURNING id
 	`, storeID, userID, f.ID, len(rows), idem).Scan(&jobID)
 	if err != nil {
 		return nil, err
 	}
 
+	warnCount := 0
 	for i, row := range rows {
 		warning := row.Warning
+		if warning != nil {
+			warnCount++
+		}
+		reviewStatus := "pending"
+		if !row.Selected {
+			reviewStatus = "rejected"
+		}
+		conf := row.Confidence
 		_, err = s.DB.Exec(ctx, `
 			INSERT INTO catalog_import_items (
-				store_id, job_id, display_order, selected, uncertain, warning,
+				store_id, job_id, display_order, selected, review_status, uncertain, confidence_pct, warning,
 				name, description, brand, price_idr, sku, category_name, variant_info, raw_extraction
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'{}'::jsonb,$13::jsonb)
-		`, storeID, jobID, i, row.Selected, row.Uncertain, warning,
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'{}'::jsonb,$15::jsonb)
+		`, storeID, jobID, i, row.Selected, reviewStatus, row.Uncertain, conf, warning,
 			row.Name, row.Description, row.Brand, row.PriceIDR, row.SKU, row.Category,
 			fmt.Sprintf(`{"stock_quantity":%s,"ready_stock_eligible":%v,"preorder_eligible":%v,"row":%d}`,
 				nullIntJSON(row.StockQty), row.ReadyStock, row.Preorder, row.RowNumber),
@@ -101,12 +116,15 @@ func (s *Service) StartCSV(ctx context.Context, storeID, userID uuid.UUID, in CS
 	if parseErr != nil {
 		msg := parseErr.Error()
 		errMsg = &msg
+	} else if warnCount > 0 {
+		msg := fmt.Sprintf("%d row(s) have warnings — review before confirming", warnCount)
+		errMsg = &msg
 	}
 	_, err = s.DB.Exec(ctx, `
 		UPDATE catalog_import_jobs
-		SET status=$3, progress_pct=$4, item_count=$5, error_message=$6, updated_at=now()
+		SET status=$3, progress_pct=$4, item_count=$5, warning_count=$6, error_message=$7, updated_at=now()
 		WHERE id=$1 AND store_id=$2
-	`, jobID, storeID, status, progress, len(rows), errMsg)
+	`, jobID, storeID, status, progress, len(rows), warnCount, errMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -139,16 +157,27 @@ type csvRow struct {
 	Preorder    bool
 	Selected    bool
 	Uncertain   bool
+	Confidence  *float64
 	Warning     *string
 }
 
 func parseProductCSV(raw []byte, maxRows int) ([]csvRow, error) {
+	// Detect common delimiter mistakes early (semicolon / tab only files).
+	sample := string(raw)
+	if len(sample) > 2048 {
+		sample = sample[:2048]
+	}
+	if !strings.Contains(sample, ",") && (strings.Contains(sample, ";") || strings.Contains(sample, "\t")) {
+		return nil, fmt.Errorf("CSV must use comma separators — download the template and save as CSV (not Excel semicolon)")
+	}
+
 	r := csv.NewReader(bytes.NewReader(raw))
 	r.TrimLeadingSpace = true
 	r.FieldsPerRecord = -1
+	r.LazyQuotes = true
 	records, err := r.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("invalid CSV: %w", err)
+		return nil, fmt.Errorf("invalid CSV format: %v — check quotes and commas", err)
 	}
 	if len(records) == 0 {
 		return nil, fmt.Errorf("CSV is empty")
@@ -156,19 +185,29 @@ func parseProductCSV(raw []byte, maxRows int) ([]csvRow, error) {
 	header := normalizeHeader(records[0])
 	idx := map[string]int{}
 	for i, h := range header {
+		if h == "" {
+			continue
+		}
+		if _, exists := idx[h]; exists {
+			return nil, fmt.Errorf("duplicate column header: %s", h)
+		}
 		idx[h] = i
 	}
 	required := []string{"name", "price_idr"}
+	var missing []string
 	for _, key := range required {
 		if _, ok := idx[key]; !ok {
-			return nil, fmt.Errorf("missing required column: %s", key)
+			missing = append(missing, key)
 		}
 	}
+	if len(missing) > 0 {
+		return nil, fmt.Errorf("missing required column(s): %s — expected headers like name,price_idr,sku,…", strings.Join(missing, ", "))
+	}
 	var out []csvRow
-	var firstErr error
+	var rowWarnings []string
 	data := records[1:]
 	if len(data) > maxRows {
-		return nil, fmt.Errorf("CSV exceeds %d row limit", maxRows)
+		return nil, fmt.Errorf("CSV has %d data rows; maximum is %d", len(data), maxRows)
 	}
 	seenSKU := map[string]int{}
 	for i, rec := range data {
@@ -188,24 +227,42 @@ func parseProductCSV(raw []byte, maxRows int) ([]csvRow, error) {
 		var warnings []string
 		selected := true
 		uncertain := false
+		conf := 95.0
 		var price *int64
 		if name == "" {
 			warnings = append(warnings, "name is required")
 			selected = false
 			uncertain = true
+			conf = 20
 		}
 		if priceRaw == "" {
 			warnings = append(warnings, "price_idr is required")
 			selected = false
 			uncertain = true
+			if conf > 30 {
+				conf = 30
+			}
 		} else {
-			p, err := strconv.ParseInt(strings.ReplaceAll(priceRaw, ",", ""), 10, 64)
-			if err != nil || p < 0 {
-				warnings = append(warnings, "price_idr must be a non-negative integer (IDR)")
+			cleaned := strings.ReplaceAll(priceRaw, ",", "")
+			cleaned = strings.ReplaceAll(cleaned, " ", "")
+			cleaned = strings.TrimPrefix(strings.ToUpper(cleaned), "IDR")
+			cleaned = strings.TrimPrefix(cleaned, "RP")
+			cleaned = strings.TrimSpace(cleaned)
+			if strings.Contains(cleaned, ".") {
+				warnings = append(warnings, "price_idr must be whole rupiah (no decimals)")
 				selected = false
 				uncertain = true
+				conf = 35
 			} else {
-				price = &p
+				p, err := strconv.ParseInt(cleaned, 10, 64)
+				if err != nil || p < 0 {
+					warnings = append(warnings, "price_idr must be a non-negative integer (IDR)")
+					selected = false
+					uncertain = true
+					conf = 35
+				} else {
+					price = &p
+				}
 			}
 		}
 		sku := get("sku")
@@ -213,29 +270,49 @@ func parseProductCSV(raw []byte, maxRows int) ([]csvRow, error) {
 			if prev, ok := seenSKU[strings.ToLower(sku)]; ok {
 				warnings = append(warnings, fmt.Sprintf("duplicate SKU also on row %d", prev))
 				uncertain = true
+				if conf > 60 {
+					conf = 60
+				}
 			} else {
 				seenSKU[strings.ToLower(sku)] = rowNum
 			}
 		}
-		ready := parseBoolDefault(get("ready_stock_eligible"), true)
-		preorder := parseBoolDefault(get("preorder_eligible"), false)
+		readyRaw := get("ready_stock_eligible")
+		preorderRaw := get("preorder_eligible")
+		ready, readyOK := parseBoolStrict(readyRaw, true)
+		preorder, preorderOK := parseBoolStrict(preorderRaw, false)
+		if readyRaw != "" && !readyOK {
+			warnings = append(warnings, "ready_stock_eligible must be true/false")
+			uncertain = true
+			if conf > 70 {
+				conf = 70
+			}
+		}
+		if preorderRaw != "" && !preorderOK {
+			warnings = append(warnings, "preorder_eligible must be true/false")
+			uncertain = true
+			if conf > 70 {
+				conf = 70
+			}
+		}
 		var stock *int
 		if sq := get("stock_quantity"); sq != "" {
 			n, err := strconv.Atoi(sq)
 			if err != nil || n < 0 {
 				warnings = append(warnings, "stock_quantity must be a non-negative integer")
 				uncertain = true
+				if conf > 70 {
+					conf = 70
+				}
 			} else {
 				stock = &n
 			}
 		}
 		var warnPtr *string
 		if len(warnings) > 0 {
-			w := strings.Join(warnings, "; ")
+			w := fmt.Sprintf("row %d: %s", rowNum, strings.Join(warnings, "; "))
 			warnPtr = &w
-			if firstErr == nil {
-				firstErr = fmt.Errorf("%s", w)
-			}
+			rowWarnings = append(rowWarnings, w)
 		}
 		out = append(out, csvRow{
 			RowNumber:   rowNum,
@@ -250,13 +327,20 @@ func parseProductCSV(raw []byte, maxRows int) ([]csvRow, error) {
 			Preorder:    preorder,
 			Selected:    selected,
 			Uncertain:   uncertain,
+			Confidence:  &conf,
 			Warning:     warnPtr,
 		})
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("CSV has no data rows")
+		return nil, fmt.Errorf("CSV has no data rows — add at least one product under the header")
 	}
-	_ = firstErr
+	if len(rowWarnings) > 0 {
+		summary := rowWarnings[0]
+		if len(rowWarnings) > 1 {
+			summary = fmt.Sprintf("%s (+%d more)", rowWarnings[0], len(rowWarnings)-1)
+		}
+		return out, fmt.Errorf("%s", summary)
+	}
 	return out, nil
 }
 
@@ -280,15 +364,20 @@ func isBlankRow(rec []string) bool {
 }
 
 func parseBoolDefault(v string, def bool) bool {
+	b, _ := parseBoolStrict(v, def)
+	return b
+}
+
+func parseBoolStrict(v string, def bool) (value bool, ok bool) {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case "":
-		return def
+		return def, true
 	case "1", "true", "yes", "y":
-		return true
+		return true, true
 	case "0", "false", "no", "n":
-		return false
+		return false, true
 	default:
-		return def
+		return def, false
 	}
 }
 

@@ -190,8 +190,9 @@ func (h *FlipbookHandlers) PublicHotspotProduct(w http.ResponseWriter, r *http.R
 			"product_id":   p.ID,
 			"product_slug": p.Slug,
 			"product_url":  h.URLs.Product(slug, p.Slug),
+			"cart_url":     h.URLs.Storefront(slug) + "/cart",
+			"checkout_url": h.URLs.Storefront(slug) + "/checkout",
 		},
-		// Cart is not fully implemented yet — storefront uses this hook + product_url.
-		"checkout_hook": "add_to_cart_or_product_link",
+		"checkout_hook": "add_to_cart",
 	})
 }

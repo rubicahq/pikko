@@ -282,11 +282,11 @@ Target IA:
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| PDF-01 | Upload PDF → job queue → page render → AI extract → review items → confirm draft products | Done |
-| PDF-02 | CSV import + template | Done |
-| PDF-03 | Flipbook pages + hotspots → `link_ref` product contract | Done |
-| PDF-04 | Public catalog flipbook on storefront | Done |
-| PDF-05 | Mock AI when no key; OpenAI-compat gateway | Done |
+| PDF-01 | Upload PDF → job queue → page render → AI extract → review items → confirm draft products | Done (Agent 11 hardened: confidence, reject, bulk, retry cleanup) |
+| PDF-02 | CSV import + template | Done (Agent 11 clearer row/format errors) |
+| PDF-03 | Flipbook pages + hotspots → `link_ref` product contract | Done (Agent 11 bbox clamp + drag reposition) |
+| PDF-04 | Public catalog flipbook on storefront | Done (Agent 11 cart/checkout polish) |
+| PDF-05 | Mock AI when no key; OpenAI-compat gateway | Done (Agent 11 provider metadata + confidences) |
 
 ---
 
@@ -614,7 +614,7 @@ Do not skip acceptance gates.
 | ID | Scenario | Target stage | Current |
 | --- | --- | --- | --- |
 | E2E-A | Multi-store isolation | 1 | Covered (Playwright multi-store) |
-| E2E-B | PDF catalog → products → flipbook hotspot checkout | 3 | Partial (import+flipbook+checkout exist; full chain test) |
+| E2E-B | PDF catalog → products → flipbook hotspot checkout | 3 | Done (API chain; Playwright deferred to stage smoke) |
 | E2E-C | Admin order entry | 1 | Missing |
 | E2E-D | Purchasing aggregation | 2 | Done (API + workspace; Playwright deferred) |
 | E2E-E | Partial availability allocation | 2 | Partial |

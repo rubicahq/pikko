@@ -191,8 +191,51 @@ func validBBox(x, y, w, h float64) bool {
 		x+w <= 100.0001 && y+h <= 100.0001
 }
 
+// NormalizeBBox clamps hotspot geometry into a valid page percentage box.
+func NormalizeBBox(in *HotspotInput) bool {
+	if in.WidthPct <= 0 {
+		in.WidthPct = 10
+	}
+	if in.HeightPct <= 0 {
+		in.HeightPct = 10
+	}
+	if in.XPct < 0 {
+		in.XPct = 0
+	}
+	if in.YPct < 0 {
+		in.YPct = 0
+	}
+	if in.WidthPct > 100 {
+		in.WidthPct = 100
+	}
+	if in.HeightPct > 100 {
+		in.HeightPct = 100
+	}
+	if in.XPct > 100 {
+		in.XPct = 100
+	}
+	if in.YPct > 100 {
+		in.YPct = 100
+	}
+	if in.XPct+in.WidthPct > 100 {
+		in.XPct = 100 - in.WidthPct
+		if in.XPct < 0 {
+			in.WidthPct = 100
+			in.XPct = 0
+		}
+	}
+	if in.YPct+in.HeightPct > 100 {
+		in.YPct = 100 - in.HeightPct
+		if in.YPct < 0 {
+			in.HeightPct = 100
+			in.YPct = 0
+		}
+	}
+	return validBBox(in.XPct, in.YPct, in.WidthPct, in.HeightPct)
+}
+
 func (s *Service) CreateHotspot(ctx context.Context, storeID, pageID uuid.UUID, in HotspotInput) (*Hotspot, error) {
-	if !validBBox(in.XPct, in.YPct, in.WidthPct, in.HeightPct) {
+	if !NormalizeBBox(&in) {
 		return nil, ErrInvalidInput
 	}
 	var exists bool
@@ -217,7 +260,7 @@ func (s *Service) CreateHotspot(ctx context.Context, storeID, pageID uuid.UUID, 
 }
 
 func (s *Service) UpdateHotspot(ctx context.Context, storeID, hotspotID uuid.UUID, in HotspotInput) (*Hotspot, error) {
-	if !validBBox(in.XPct, in.YPct, in.WidthPct, in.HeightPct) {
+	if !NormalizeBBox(&in) {
 		return nil, ErrInvalidInput
 	}
 	if in.ProductID != nil {

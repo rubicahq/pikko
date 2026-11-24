@@ -20,6 +20,14 @@ export function ImportUpload({ storeId }: { storeId: string }) {
       setError(mode === "csv" ? "Choose a CSV file." : "Choose a PDF catalog file.");
       return;
     }
+    if (mode === "pdf" && file.type && !file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf")) {
+      setError("File must be a PDF.");
+      return;
+    }
+    if (mode === "csv" && !file.name.toLowerCase().endsWith(".csv") && file.type && !file.type.includes("csv") && !file.type.includes("text")) {
+      setError("File must be a CSV. Download the template if you are unsure of the format.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -53,7 +61,7 @@ export function ImportUpload({ storeId }: { storeId: string }) {
   return (
     <form onSubmit={onSubmit} className="max-w-xl space-y-5 rounded-lg border border-border bg-background p-5">
       <div>
-        <h2 className="text-lg font-medium text-foreground">Import catalog</h2>
+        <h2 className="text-lg font-semibold text-foreground">Import catalog</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
           Import from PDF (AI) or CSV template. Results are drafts — nothing publishes automatically.
         </p>
@@ -92,7 +100,9 @@ export function ImportUpload({ storeId }: { storeId: string }) {
               className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-2"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
-            <p className="text-xs text-foreground-muted">Max 25 MB, 50 pages, 500 items.</p>
+            <p className="text-xs text-foreground-muted">
+              Max 25 MB, 50 pages, 500 items. Password-protected PDFs are not supported.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">
             <input
@@ -111,12 +121,14 @@ export function ImportUpload({ storeId }: { storeId: string }) {
             <input
               id="csv"
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,text/csv,text/plain"
               className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-2"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
             <p className="text-xs text-foreground-muted">
-              Required columns: name, price_idr. Max 5 MB / 500 rows.
+              Required columns: <code className="text-foreground">name</code>,{" "}
+              <code className="text-foreground">price_idr</code> (whole rupiah, no decimals). Max 5 MB /
+              500 rows. Use comma separators.
             </p>
           </div>
           <a
@@ -128,7 +140,11 @@ export function ImportUpload({ storeId }: { storeId: string }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-error">{error}</p>}
+      {error && (
+        <p className="rounded-md border border-error-border bg-error-bg px-3 py-2 text-sm text-error">
+          {error}
+        </p>
+      )}
       <Button type="submit" disabled={busy}>
         {busy ? "Uploading…" : "Start import"}
       </Button>

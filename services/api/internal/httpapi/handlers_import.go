@@ -59,7 +59,7 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		if errors.Is(err, imports.ErrInvalidInput) || strings.Contains(err.Error(), "invalid input") {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", err.Error())
+			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
 			return
 		}
 		writeError(w, r, http.StatusInternalServerError, "import_failed", "Unable to start catalog import.")
@@ -146,13 +146,40 @@ func (h *ImportHandlers) PatchItem(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, imports.ErrInvalidInput) {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", err.Error())
+			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
 			return
 		}
 		writeError(w, r, http.StatusInternalServerError, "patch_failed", "Unable to update import item.")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"item": item})
+}
+
+func (h *ImportHandlers) BulkItems(w http.ResponseWriter, r *http.Request) {
+	jobID, err := uuid.Parse(r.PathValue("jobID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
+		return
+	}
+	var in imports.BulkItemsInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	res, err := h.Imports.BulkItems(r.Context(), StoreID(r), jobID, in)
+	if err != nil {
+		if errors.Is(err, imports.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
+			return
+		}
+		if errors.Is(err, imports.ErrInvalidInput) {
+			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
+			return
+		}
+		writeError(w, r, http.StatusInternalServerError, "bulk_failed", "Unable to update import items.")
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 func (h *ImportHandlers) DeleteItem(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +219,7 @@ func (h *ImportHandlers) Confirm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, imports.ErrInvalidInput) {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", err.Error())
+			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
 			return
 		}
 		writeError(w, r, http.StatusInternalServerError, "confirm_failed", "Unable to confirm import.")
@@ -214,11 +241,27 @@ func (h *ImportHandlers) Retry(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if errors.Is(err, imports.ErrInvalidInput) {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", err.Error())
+			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
 			return
 		}
 		writeError(w, r, http.StatusInternalServerError, "retry_failed", "Unable to retry import.")
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"job": job})
+}
+
+func publicImportErr(err error) string {
+	msg := err.Error()
+	msg = strings.TrimPrefix(msg, "invalid input: ")
+	msg = strings.TrimPrefix(msg, "invalid input")
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return "Invalid import request."
+	}
+	// Capitalize first rune for UI copy.
+	r := []rune(msg)
+	if r[0] >= 'a' && r[0] <= 'z' {
+		r[0] = r[0] - ('a' - 'A')
+	}
+	return string(r)
 }

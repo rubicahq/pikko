@@ -61,6 +61,8 @@ export function FlipbookViewer({
   const [productURL, setProductURL] = useState<string | null>(null);
   const [variantId, setVariantId] = useState<string | null>(null);
   const [cartMsg, setCartMsg] = useState<string | null>(null);
+  const [hotspotError, setHotspotError] = useState<string | null>(null);
+  const [hotspotLoading, setHotspotLoading] = useState(false);
   const touchX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -102,15 +104,28 @@ export function FlipbookViewer({
 
   async function openHotspot(hs: FlipHotspot) {
     if (!hs.product_id) return;
-    const res = await fetch(
-      urls.api(`/api/v1/public/stores/${storeSlug}/catalog/products/${hs.product_id}`),
-    );
-    if (!res.ok) return;
-    const data = await res.json();
-    setProduct(data.product);
-    setProductURL(data.link_ref?.product_url || urls.storefrontProduct(storeSlug, data.product.slug));
-    setVariantId(data.product.variants?.[0]?.id || null);
+    setHotspotLoading(true);
+    setHotspotError(null);
     setCartMsg(null);
+    try {
+      const res = await fetch(
+        urls.api(`/api/v1/public/stores/${storeSlug}/catalog/products/${hs.product_id}`),
+      );
+      if (!res.ok) {
+        setHotspotError("This product is unavailable right now.");
+        setProduct(null);
+        return;
+      }
+      const data = await res.json();
+      setProduct(data.product);
+      setProductURL(data.link_ref?.product_url || urls.storefrontProduct(storeSlug, data.product.slug));
+      setVariantId(data.product.variants?.[0]?.id || null);
+    } catch {
+      setHotspotError("Unable to load product. Check your connection and try again.");
+      setProduct(null);
+    } finally {
+      setHotspotLoading(false);
+    }
   }
 
   function handleAdd() {
@@ -125,7 +140,7 @@ export function FlipbookViewer({
       variantId: variantId,
       quantity: 1,
     });
-    setCartMsg("Added to cart (local). Full checkout lands in a later phase — view product for details.");
+    setCartMsg("Added to cart — continue to checkout when you are ready.");
   }
 
   const title = useMemo(
@@ -135,9 +150,26 @@ export function FlipbookViewer({
 
   if (!pages.length) {
     return (
-      <p className="p-8 text-center text-sm text-foreground-secondary">
-        This catalog has no published pages yet.
-      </p>
+      <main className="mx-auto flex min-h-[60vh] max-w-reading flex-col items-start justify-center px-4 py-16">
+        <p className="text-sm text-foreground-secondary">
+          <a href={urls.storefrontPath(storeSlug)} className="hover:text-foreground">
+            {storeName}
+          </a>
+          <span className="mx-1.5">/</span>
+          Catalog
+        </p>
+        <h1 className="mt-3 text-2xl font-semibold text-foreground">Catalog coming soon</h1>
+        <p className="mt-2 text-sm text-foreground-secondary">
+          This store has not published flipbook pages yet. Browse products from the storefront home
+          instead.
+        </p>
+        <a
+          href={urls.storefrontPath(storeSlug)}
+          className="mt-6 text-sm font-medium text-brand-dark underline-offset-2 hover:underline"
+        >
+          Back to store
+        </a>
+      </main>
     );
   }
 
@@ -145,7 +177,12 @@ export function FlipbookViewer({
     <div className="flex min-h-screen flex-col bg-background-subtle">
       <header className="flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{storeName}</p>
+          <a
+            href={urls.storefrontPath(storeSlug)}
+            className="truncate text-sm font-semibold text-foreground hover:text-brand-dark"
+          >
+            {storeName}
+          </a>
           <p className="text-xs text-foreground-secondary">{title}</p>
         </div>
         <div className="flex items-center gap-1">
@@ -218,12 +255,12 @@ export function FlipbookViewer({
             <button
               key={hs.id}
               type="button"
-              className="absolute border border-brand/70 bg-brand/10 transition-colors hover:bg-brand/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
+              className="absolute min-h-[28px] min-w-[28px] border border-brand/70 bg-brand/10 transition-colors hover:bg-brand/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
               style={{
                 left: `${hs.x_pct}%`,
                 top: `${hs.y_pct}%`,
-                width: `${hs.width_pct}%`,
-                height: `${hs.height_pct}%`,
+                width: `${Math.max(hs.width_pct, 4)}%`,
+                height: `${Math.max(hs.height_pct, 4)}%`,
               }}
               aria-label={hs.product_name ? `Open ${hs.product_name}` : "Open product"}
               onClick={() => openHotspot(hs)}
@@ -231,6 +268,13 @@ export function FlipbookViewer({
           ))}
         </div>
       </div>
+
+      {hotspotLoading && (
+        <p className="px-4 text-center text-sm text-foreground-secondary">Loading product…</p>
+      )}
+      {hotspotError && !product && (
+        <p className="px-4 text-center text-sm text-error">{hotspotError}</p>
+      )}
 
       <div className="flex items-center justify-center gap-3 border-t border-border bg-background px-4 py-3 sm:hidden">
         <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => go("prev")}>
@@ -318,13 +362,23 @@ export function FlipbookViewer({
               <Button type="button" onClick={handleAdd}>
                 Add to cart
               </Button>
+              <Button type="button" variant="outline" asChild>
+                <a href={urls.storefrontCart(storeSlug)}>View cart</a>
+              </Button>
               {productURL && (
-                <Button type="button" variant="outline" asChild>
-                  <a href={productURL}>View product</a>
+                <Button type="button" variant="ghost" asChild>
+                  <a href={productURL}>Product page</a>
                 </Button>
               )}
             </div>
-            {cartMsg && <p className="mt-3 text-xs text-foreground-secondary">{cartMsg}</p>}
+            {cartMsg && (
+              <p className="mt-3 text-xs text-success">
+                {cartMsg}{" "}
+                <a className="underline-offset-2 hover:underline" href={urls.storefrontCheckout(storeSlug)}>
+                  Checkout
+                </a>
+              </p>
+            )}
           </div>
         </div>
       )}

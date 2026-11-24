@@ -54,7 +54,7 @@ Money on products/variants: integer IDR. Status: draft/published/archived.
 
 ### 2.3 Import & flipbook
 
-`job_queue`, `outbox_events`, `catalog_import_jobs` (+ `source_type`, `csv_file_id`), `catalog_import_items`, `catalog_pages`, `catalog_page_hotspots`.
+`job_queue`, `outbox_events`, `catalog_import_jobs` (+ `source_type`, `csv_file_id`, Agent 11 `warning_count` / `ai_provider`), `catalog_import_items` (+ Agent 11 `confidence_pct` / `review_status`), `catalog_pages`, `catalog_page_hotspots`. Migration `000015_pdf_import_hardening` additive only.
 
 ### 2.4 Commerce
 
