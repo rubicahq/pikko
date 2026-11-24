@@ -1,50 +1,34 @@
 # Testing
 
-## Unit (Go)
+## Go
 
 ```bash
-cd services/api && go test ./internal/validate ./internal/urls ./internal/auth -count=1
+export TEST_DATABASE_URL=postgres://pikko:pikko@localhost:5432/pikko_test?sslmode=disable
+cd services/api && go test ./... -count=1 -p 1
 ```
 
-Covers token entropy/hashing, slug/email validation, URL generation, open-redirect allowlist.
+Use `-p 1` so packages sharing `pikko_test` do not truncate concurrently.
 
-## Integration (Go + Postgres)
+Coverage highlights:
 
-Requires `pikko_test` database migrated:
+- Unit: themes (24 PRD hex), money/IDR, slug validation, URLs
+- Integration: auth, store create, catalog CRUD, cross-store 404 on products, storefront publish → public product + `link_ref`
 
-```bash
-MIGRATIONS_PATH=file:///workspace/database/migrations \
-  DATABASE_URL=postgres://pikko:pikko@localhost:5432/pikko_test?sslmode=disable \
-  go run ./services/api/cmd/migrate up
-
-cd services/api && go test ./internal/auth ./internal/stores -count=1
-```
-
-Covers:
-
-- Magic link peek does not consume; verify consumes once
-- Concurrent verify → single account
-- Session revocation
-- Store create + ownership
-- Cross-store HTTP access denied (404)
-- Onboarding resume + idempotent create
-
-## E2E (Playwright)
+## Playwright
 
 ```bash
-# API + web must be running
+# API on :8080, web on :3000, DATABASE_URL set, migrations applied
 cd apps/web && npx playwright test
 ```
 
-Uses `EMAIL_MODE=log` `dev_token` path — no real Brevo calls, no production auth bypass.
+Suites:
 
-Scenarios:
+- Phase 1 auth/onboarding/multi-store/responsive
+- Phase 2 product + publish + public storefront
+- Phase 2 API cross-store isolation (separate request contexts)
 
-- Marketing home loads
-- Auth → confirm → onboarding → create store → overview
-- Additional store + switcher navigation
-- Responsive checks at 375, 390, 768, 1024, 1440
+## Manual checks
 
-## Visual / responsive
-
-Playwright viewport suite in `apps/web/e2e/responsive.spec.ts`.
+- Upload logo/favicon on Settings; publish; confirm favicon on public page
+- Draft product not visible on public storefront
+- Unauthorized store id returns 404 (not 403)

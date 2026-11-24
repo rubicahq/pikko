@@ -1,44 +1,55 @@
-# API Reference (Phase 0/1)
+# API Reference (Phase 0–2)
 
-Base: `/api/v1`. JSON errors: `{ "error": { "code", "message", "request_id" } }`.
+Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
-## Auth
+## Auth / account / stores
 
-| Method | Path | Auth | Notes |
-| --- | --- | --- | --- |
-| POST | `/auth/magic-link/request` | — | Body `{email}`. Generic success. Dev/test + `EMAIL_MODE=log` may return `dev_token`. |
-| GET | `/auth/magic-link/peek?token=` | — | Validates token; **does not consume**. |
-| POST | `/auth/magic-link/verify` | — | Body `{token}`. Consumes atomically; sets session cookie. |
-| GET | `/auth/session` | cookie/bearer | Current user + session |
-| POST | `/auth/logout` | — | Revokes current session |
-| POST | `/auth/logout-all` | yes | Revokes all sessions |
-| GET | `/auth/sessions` | yes | Active sessions |
-| DELETE | `/auth/sessions/{sessionID}` | yes | Revoke one |
+Unchanged from Phase 1: magic-link request/peek/verify, session, logout, account, stores CRUD/archive, onboarding.
 
-## Account
+## Meta
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/account` | Profile + preferences |
-| PATCH | `/account` | `display_name`, `language`, `timezone` |
+- `GET /meta/themes` (auth) — 24 curated themes
+- `GET /meta/categories` (auth) — business categories for onboarding
 
-## Stores & onboarding
+## Store-scoped (auth + membership)
 
-| Method | Path | Notes |
-| --- | --- | --- |
-| GET | `/stores` | Authorized stores (`?include_archived=true`) |
-| POST | `/stores` | Create with full payload (two-step fields) |
-| GET | `/stores/slug-available?slug=` | Availability |
-| GET | `/stores/suggest-slug?name=` | Suggestion |
-| GET | `/stores/{storeID}` | Requires membership |
-| PATCH | `/stores/{storeID}` | Patch identity fields |
-| POST | `/stores/{storeID}/archive` | Soft archive |
-| GET | `/onboarding/draft` | Get/create resumable draft |
-| POST | `/onboarding/identity` | Step 1 |
-| POST | `/onboarding/selling-model` | Step 2 fields |
-| POST | `/onboarding/complete` | Create store + membership |
-| GET | `/meta/categories` | Business categories |
+- `GET/PATCH /stores/{storeId}/storefront?channel=draft|published`
+- `POST /stores/{storeId}/storefront/publish`
+- `POST /stores/{storeId}/storefront/discard`
+- `PUT /stores/{storeId}/storefront/featured`
+- `GET /stores/{storeId}/setup-checklist`
+- `POST /stores/{storeId}/files` multipart `purpose` + `file`
+- `GET /stores/{storeId}/files/{fileId}`
+- `GET/POST /stores/{storeId}/categories`
+- `PATCH/DELETE /stores/{storeId}/categories/{categoryId}`
+- `GET/POST /stores/{storeId}/products`
+- `GET/PATCH /stores/{storeId}/products/{productId}`
+- `POST /stores/{storeId}/products/{productId}/status`
+- `POST /stores/{storeId}/products/{productId}/archive`
+- `GET/POST /stores/{storeId}/collections`
 
-## Health
+Product write body:
 
-`GET /healthz` — DB ping.
+```json
+{
+  "product": {
+    "name": "Tote",
+    "sku": "TOTE-1",
+    "base_price_idr": 125000,
+    "status": "draft"
+  },
+  "options": [],
+  "variants": [],
+  "image_file_ids": ["…"]
+}
+```
+
+## Public
+
+- `GET /public/stores/{slug}`
+- `GET /public/stores/{slug}/products`
+- `GET /public/stores/{slug}/products/{productSlug}` — includes `product_url` + `link_ref`
+- `GET /public/stores/{slug}/categories`
+- `GET /public/files/{storeId}/{fileId}` — published stores only
+
+All public product payloads omit `cost_price_idr`.

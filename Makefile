@@ -13,7 +13,7 @@ tidy:
 	cd services/api && go mod tidy
 
 test-api:
-	cd services/api && go test ./...
+	cd services/api && go test ./... -count=1 -p 1
 
 test-e2e:
 	cd apps/web && npx playwright test

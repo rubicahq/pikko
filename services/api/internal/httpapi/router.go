@@ -9,9 +9,12 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/account"
 	"github.com/rubicahq/pikko/services/api/internal/auth"
+	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
+	"github.com/rubicahq/pikko/services/api/internal/files"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
+	"github.com/rubicahq/pikko/services/api/internal/storefront"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
@@ -30,10 +33,14 @@ func NewRouter(d Deps) http.Handler {
 	authSvc := &auth.Service{DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger}
 	storeSvc := &stores.Service{DB: d.DB, Cfg: d.Cfg}
 	accountSvc := &account.Service{DB: d.DB}
+	storefrontSvc := &storefront.Service{DB: d.DB}
+	catalogSvc := &catalog.Service{DB: d.DB}
+	filesSvc := &files.Service{DB: d.DB, Storage: d.Storage}
 
 	authH := &AuthHandlers{Auth: authSvc, Cfg: d.Cfg}
 	accountH := &AccountHandlers{Account: accountSvc}
 	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg}
+	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -82,6 +89,40 @@ func NewRouter(d Deps) http.Handler {
 	mux.Handle("GET /api/v1/stores/{storeID}", storeAuthed(storeH.Get))
 	mux.Handle("PATCH /api/v1/stores/{storeID}", storeAuthed(storeH.Patch))
 	mux.Handle("POST /api/v1/stores/{storeID}/archive", storeAuthed(storeH.Archive))
+
+	// Phase 2: storefront, branding files, catalog
+	mux.Handle("GET /api/v1/meta/themes", authMW.Require(http.HandlerFunc(p2.ListThemes)))
+	mux.Handle("GET /api/v1/stores/{storeID}/storefront", storeAuthed(p2.GetStorefront))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/storefront", storeAuthed(p2.PatchStorefront))
+	mux.Handle("POST /api/v1/stores/{storeID}/storefront/publish", storeAuthed(p2.PublishStorefront))
+	mux.Handle("POST /api/v1/stores/{storeID}/storefront/discard", storeAuthed(p2.DiscardStorefront))
+	mux.Handle("PUT /api/v1/stores/{storeID}/storefront/featured", storeAuthed(p2.SetFeatured))
+	mux.Handle("GET /api/v1/stores/{storeID}/setup-checklist", storeAuthed(p2.SetupChecklist))
+
+	mux.Handle("POST /api/v1/stores/{storeID}/files", storeAuthed(p2.UploadFile))
+	mux.Handle("GET /api/v1/stores/{storeID}/files/{fileID}", storeAuthed(p2.GetFile))
+
+	mux.Handle("GET /api/v1/stores/{storeID}/categories", storeAuthed(p2.ListCategories))
+	mux.Handle("POST /api/v1/stores/{storeID}/categories", storeAuthed(p2.CreateCategory))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/categories/{categoryID}", storeAuthed(p2.UpdateCategory))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/categories/{categoryID}", storeAuthed(p2.DeleteCategory))
+
+	mux.Handle("GET /api/v1/stores/{storeID}/products", storeAuthed(p2.ListProducts))
+	mux.Handle("POST /api/v1/stores/{storeID}/products", storeAuthed(p2.CreateProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}", storeAuthed(p2.GetProduct))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/products/{productID}", storeAuthed(p2.UpdateProduct))
+	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/status", storeAuthed(p2.PatchProductStatus))
+	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/archive", storeAuthed(p2.ArchiveProduct))
+
+	mux.Handle("GET /api/v1/stores/{storeID}/collections", storeAuthed(p2.ListCollections))
+	mux.Handle("POST /api/v1/stores/{storeID}/collections", storeAuthed(p2.CreateCollection))
+
+	// Public storefront + assets (published only)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products", p2.PublicProducts)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products/{productSlug}", p2.PublicProduct)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/categories", p2.PublicCategories)
+	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
 
 	var handler http.Handler = mux
 	handler = SecurityHeaders(handler)
