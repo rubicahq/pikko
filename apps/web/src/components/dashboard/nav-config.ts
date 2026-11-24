@@ -28,15 +28,14 @@ export type NavItem = {
 };
 
 export type NavGroup = {
-  id: "workspace" | "operations" | "configuration";
+  id: "workspace" | "operations" | "relationships" | "manage";
   label: string;
   items: NavItem[];
 };
 
 /**
- * Merchant IA per PRD §6.
- * Unimplemented modules stay in this config with implemented:false so later
- * agents can flip them on without reshaping the shell.
+ * Merchant IA — Friendly Commerce Workspace (BMC-like groups).
+ * Unimplemented modules stay with implemented:false so later agents can flip them on.
  */
 export const MERCHANT_NAV: NavGroup[] = [
   {
@@ -53,8 +52,6 @@ export const MERCHANT_NAV: NavGroup[] = [
     label: "Operations",
     items: [
       { href: "orders", label: "Orders", icon: ShoppingBag, implemented: true },
-      { href: "customers", label: "Customers", icon: Users, implemented: true },
-      // Deferred — Agents 06–09 / finance
       { href: "purchasing", label: "Purchasing", icon: ClipboardList, implemented: true },
       { href: "packing", label: "Packing", icon: Boxes, implemented: false },
       { href: "shipments", label: "Shipments", icon: Truck, implemented: false },
@@ -62,8 +59,17 @@ export const MERCHANT_NAV: NavGroup[] = [
     ],
   },
   {
-    id: "configuration",
-    label: "Configuration",
+    id: "relationships",
+    label: "Relationships",
+    items: [
+      { href: "customers", label: "Customers", icon: Users, implemented: true },
+      { href: "vendors", label: "Vendors", icon: Building2, implemented: true },
+      { href: "team", label: "Team", icon: UserCog, implemented: true },
+    ],
+  },
+  {
+    id: "manage",
+    label: "Manage",
     items: [
       { href: "catalog", label: "Catalog", icon: Package, implemented: true },
       { href: "campaigns", label: "Campaigns", icon: Megaphone, implemented: true },
@@ -71,8 +77,6 @@ export const MERCHANT_NAV: NavGroup[] = [
       { href: "storefront", label: "Storefront", icon: Store, implemented: true },
       { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal, implemented: true },
       { href: "settings", label: "Settings", icon: Settings, implemented: true },
-      { href: "vendors", label: "Vendors", icon: Building2, implemented: true },
-      { href: "team", label: "Team", icon: UserCog, implemented: true },
     ],
   },
 ];
@@ -87,7 +91,6 @@ export function liveNavGroups(
       items: group.items.filter((item) => {
         if (!item.implemented) return false;
         if (!permissions) return true;
-        // Lazy import avoided: inline map matches apps/web/src/lib/rbac.ts NAV_PERMISSION
         const required = NAV_PERM[item.href];
         if (!required) return true;
         return permissions.includes(required);

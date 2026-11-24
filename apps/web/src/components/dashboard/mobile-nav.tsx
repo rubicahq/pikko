@@ -49,7 +49,7 @@ export function MobileNav({
           <Link
             href={urls.accountSettings()}
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground-secondary hover:bg-surface hover:text-foreground"
+            className="flex h-10 items-center gap-2 rounded-md px-3 text-sm text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
           >
             <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.75} />
             <span className="min-w-0 truncate">{user.display_name || user.email}</span>

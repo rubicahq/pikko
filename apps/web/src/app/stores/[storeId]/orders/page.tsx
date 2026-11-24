@@ -49,13 +49,13 @@ export default async function OrdersPage({
           <>
             <Link
               href={`/stores/${storeId}/orders/import`}
-              className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-background-subtle"
+              className="inline-flex h-10 items-center rounded-md border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-surface-hover"
             >
               Import CSV
             </Link>
             <Link
               href={`/stores/${storeId}/orders/new`}
-              className="inline-flex h-10 items-center rounded-md bg-dark px-4 text-sm font-medium text-foreground-inverse hover:bg-foreground"
+              className="inline-flex h-10 items-center rounded-md bg-ink px-4 text-sm font-semibold text-foreground-inverse hover:bg-foreground"
             >
               New order
             </Link>

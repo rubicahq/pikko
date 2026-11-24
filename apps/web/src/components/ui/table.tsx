@@ -9,7 +9,7 @@ export function Table({
   return (
     <div
       className={cn(
-        "relative w-full overflow-auto rounded-lg border border-border bg-background",
+        "relative w-full overflow-auto rounded-xl border border-border bg-background",
         stickyHeader && "max-h-[min(70vh,720px)]",
       )}
     >
@@ -22,7 +22,12 @@ export function Table({
 }
 
 export function TableHeader({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("bg-surface [&_tr]:border-b [&_tr]:border-border", className)} {...props} />;
+  return (
+    <thead
+      className={cn("bg-background [&_tr]:border-b [&_tr]:border-border", className)}
+      {...props}
+    />
+  );
 }
 
 export function TableBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
@@ -49,8 +54,8 @@ export function TableHead({
   return (
     <th
       className={cn(
-        "h-10 px-4 text-left align-middle text-label uppercase tracking-wide text-foreground-secondary",
-        sticky && "sticky top-0 z-10 bg-surface",
+        "h-11 px-4 text-left align-middle text-label font-semibold text-foreground-muted",
+        sticky && "sticky top-0 z-10 bg-background",
         className,
       )}
       {...props}
@@ -59,5 +64,5 @@ export function TableHead({
 }
 
 export function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn("px-4 py-3 align-middle", className)} {...props} />;
+  return <td className={cn("h-[52px] px-4 py-3 align-middle", className)} {...props} />;
 }
