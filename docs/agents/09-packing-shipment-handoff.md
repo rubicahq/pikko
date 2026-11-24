@@ -4,8 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-09-packing-shipment-c907`  
 **Prior:** Agent 08 main tip `ca6e528` (portal PR #23/`bd002b7` + handoff `#24`)  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_  
+**Feature merge SHA:** `a0338806177cfd5674f9fa0e0292eef00a34176b` (PR #25)  
+**Merged main SHA:** `a0338806177cfd5674f9fa0e0292eef00a34176b`
 
 ---
 
