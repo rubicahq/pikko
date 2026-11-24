@@ -207,30 +207,62 @@ Optional env: `API_RATE_LIMIT_IP_PER_HOUR` (default 1200). Health: `/livez`, `/h
 
 ## Redeploy / update (main)
 
+**Preferred:** idempotent script (keeps deploy overlay ports, selective rebuild, optional backup, smoke, rollback):
+
 ```bash
 cd ~/pikko
-# Keep .env (secrets). Tag current images first for rollback.
+./scripts/deploy.sh                 # pull main, rebuild only what changed, smoke
+./scripts/deploy.sh --force-all     # rebuild api+web anyway
+./scripts/deploy.sh --backup        # force pg_dump even without new migrations
+./scripts/deploy.sh --skip-smoke    # deploy without smoke
+./scripts/smoke.sh                  # smoke only (loopback)
+SMOKE_PUBLIC=1 ./scripts/smoke.sh   # + public HTTPS checks
+```
+
+### What the script optimizes
+
+Measured on the VPS (wall clock, BuildKit on; times in Asia/Jakarta session 2026-11-24):
+
+| Step | Before (naive docs / wrong flags) | After (`./scripts/deploy.sh`) |
+| --- | --- | --- |
+| `git fetch/pull` | ~3s | ~3s |
+| DB backup | always ~0.5–1s | **skipped** unless migrations (or `--backup`) |
+| Web rebuild (source change, deps cached) | **~37s** (`npm run build` ~28s) | ~37s only if web paths changed |
+| API rebuild | sequential after web | **parallel** with web when both needed |
+| Full force rebuild both (cache cold after Dockerfile change) | ~60s+ and risk lost ports | **87s** once (npm ci + go + next); then cached |
+| No-op redeploy (same SHA) | still `--build` everything | **~1s** skip (after fix); smoke optional |
+| Omit deploy overlay | **ports :3100/:8100 lost**, +10–20s recreate | always both `-f` files |
+| Smoke | mixed into deploy | `<1s` via `scripts/smoke.sh` |
+
+Naive sequential `up -d --build` for a web-only change often spent ~40–60s and sometimes recreated Postgres / dropped host ports. The script:
+
+1. Always uses `-f docker-compose.yml -f docker-compose.deploy.yml` (ports stay on `127.0.0.1:8100` / `:3100`)
+2. Enables BuildKit + cache mounts (`go mod` / `go-build` / `.npm` / Next `.next/cache`)
+3. Builds **web + api in parallel** when both changed; **skips** unchanged services
+4. Backs up DB **only** when `database/migrations/*` changed (override with `--backup`)
+5. Tags `pikko-*:pre-<stamp>` and **rolls back** if smoke/`healthz` fails
+6. Attaches to `emplicon_emplicon` additively (never recreates Emplicon)
+
+Manual equivalent (legacy):
+
+```bash
+cd ~/pikko
+# Keep .env (secrets). Prefer ./scripts/deploy.sh instead of this block.
 sudo docker tag pikko-api:latest pikko-api:pre-$(date -u +%Y%m%dT%H%M%SZ)
 sudo docker tag pikko-web:latest pikko-web:pre-$(date -u +%Y%m%dT%H%M%SZ)
 
-mkdir -p ~/backups
-sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
-  > ~/backups/pikko-$(date -u +%Y%m%dT%H%M%SZ).dump
-
 git fetch origin main && git checkout main && git pull origin main
-
-# Ensure AI/import env keys exist in .env (values stay server-only):
-#   AI_API_KEY, AI_BASE_URL, AI_MODEL=gemini/gemini-3.5-flash
-#   IMPORT_MAX_PDF_BYTES, IMPORT_MAX_PAGES, IMPORT_MAX_ITEMS
-#   STORAGE_DRIVER=local (volume pikko_api_storage)
 
 sudo docker compose -p pikko \
   -f docker-compose.yml -f docker-compose.deploy.yml \
-  --profile proxy up -d --build
-# migrate one-shot runs before api; confirm: schema_migrations.version == latest
+  --profile proxy build --parallel api web
+sudo docker compose -p pikko \
+  -f docker-compose.yml -f docker-compose.deploy.yml \
+  --profile proxy up -d --no-build
 
 sudo docker network connect emplicon_emplicon pikko-web || true
 sudo docker network connect emplicon_emplicon pikko-api || true
+./scripts/smoke.sh
 ```
 
 ### Storage volume ownership
