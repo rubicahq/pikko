@@ -230,7 +230,8 @@ Measured on the VPS (wall clock, BuildKit on; times in Asia/Jakarta session 2026
 | Web rebuild (source change, deps cached) | **~37s** (`npm run build` ~28s) | ~37s only if web paths changed |
 | API rebuild | sequential after web | **parallel** with web when both needed |
 | Full force rebuild both (cache cold after Dockerfile change) | ~60s+ and risk lost ports | **87s** once (npm ci + go + next); then cached |
-| No-op redeploy (same SHA) | still `--build` everything | **~1s** skip (after fix); smoke optional |
+| Force rebuild both (warm BuildKit / Next cache) | ~40–60s + port recovery | **~29s** (build 26s + up 2s + smoke 1s); ports kept |
+| No-op redeploy (same SHA) | still `--build` everything | **~1s** skip; smoke optional |
 | Omit deploy overlay | **ports :3100/:8100 lost**, +10–20s recreate | always both `-f` files |
 | Smoke | mixed into deploy | `<1s` via `scripts/smoke.sh` |
 
