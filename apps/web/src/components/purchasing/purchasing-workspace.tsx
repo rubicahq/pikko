@@ -206,7 +206,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
             onClick={() => setTab(t)}
             className={
               tab === t
-                ? "rounded-md bg-dark px-4 py-2 text-sm font-medium text-foreground-inverse"
+                ? "rounded-md bg-ink px-4 py-2 text-sm font-semibold text-foreground-inverse"
                 : "rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground-secondary hover:bg-background-subtle"
             }
           >

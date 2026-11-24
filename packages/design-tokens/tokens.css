@@ -1,7 +1,7 @@
 /**
- * Pikko design tokens — soft-gradient SaaS (Brex usability + warmer identity).
- * Source of truth for brand colors, gradients, radii, shadows, and type.
- * Map to Tailwind via apps/web/tailwind.config.ts + tailwind.preset.js.
+ * Pikko design tokens — Friendly Commerce Workspace
+ * Source of truth: docs/DESIGN_SYSTEM.md (Buy Me a Coffee simplicity + Pikko orange).
+ * Gradients are optional accents only — not the workspace foundation.
  */
 :root {
   /* Brand */
@@ -14,7 +14,7 @@
   --brand-soft: #ffe1d5;
   --brand-border: #ffd1bf;
 
-  /* Named palette aliases */
+  /* Named palette */
   --cool-mist: #dce4f0;
   --cloud-white: #f5f6fa;
   --ink: #15191e;
@@ -23,67 +23,71 @@
   /* Surfaces */
   --background: #ffffff;
   --background-subtle: #f5f6fa;
-  --surface: #f0f3f8;
-  --surface-strong: #dce4f0;
+  --surface: #f3f4f6;
+  --surface-strong: #f0f1f3;
+  --surface-hover: #f3f4f6;
+  --surface-active: #f0f1f3;
+  --surface-disabled: #f3f4f6;
 
   /* Foreground */
   --foreground: #15191e;
-  --foreground-secondary: #606975;
-  --foreground-muted: #8b8d98;
+  --foreground-secondary: #626975;
+  --foreground-muted: #747b86;
   --foreground-subtle: #b9bbc6;
   --foreground-inverse: #fcfcfd;
-  --dark: #000710;
+  --dark: #15191e;
 
-  /* Borders — lightweight */
-  --border: #e4e8ef;
+  /* Borders */
+  --border: #e5e7eb;
+  --border-subtle: #eef0f3;
   --border-strong: #c7cad2;
 
-  /* Gradients */
-  --gradient-ambient: linear-gradient(155deg, #dce4f0 0%, #f0f3f8 50%, #fafafc 100%);
-  --gradient-warm: linear-gradient(140deg, #ffffff 0%, #fff6f1 50%, #ffd1bf 100%);
+  /* Gradients — accents only (Connie, empty art, announcements) */
+  --gradient-ambient: linear-gradient(160deg, #f5f6fa 0%, #f5f6fa 70%, #eaf0f7 100%);
+  --gradient-warm: linear-gradient(135deg, #ffffff 0%, #fff7f3 50%, #ffe1d5 100%);
   --gradient-brand: linear-gradient(135deg, #ff3d00 0%, #ff8050 100%);
   --gradient-chart: linear-gradient(180deg, #ff8050 0%, #ffd1bf 100%);
 
   /* Semantic */
   --success: #166534;
-  --success-bg: #f0fdf4;
+  --success-bg: #eaf7ee;
   --success-border: #bbf7d0;
   --warning: #92400e;
-  --warning-bg: #fffbeb;
+  --warning-bg: #fff4db;
   --warning-border: #fde68a;
-  --error: #b91c1c;
-  --error-bg: #fef2f2;
+  --error: #b42318;
+  --error-bg: #fdecec;
   --error-border: #fecaca;
   --info: #1d4ed8;
-  --info-bg: #eff6ff;
+  --info-bg: #edf4ff;
   --info-border: #bfdbfe;
   --neutral: #4b5563;
-  --neutral-bg: #f3f4f6;
+  --neutral-bg: #f1f2f4;
   --neutral-border: #e5e7eb;
 
-  /* Radii — controls 10–12px; cards 16–20px */
+  /* Radii — inputs/buttons 10; cards 14; large/dialogs 16 */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 20px;
+  --radius-xl: 14px;
+  --radius-2xl: 16px;
 
-  /* Shadows — subtle realistic card elevation; borders still primary */
+  /* Shadows — prefer borders; light card elevation only */
   --shadow-xs: 0 1px 2px rgba(21, 25, 30, 0.04);
-  --shadow-sm: 0 2px 8px rgba(21, 25, 30, 0.05), 0 1px 2px rgba(21, 25, 30, 0.03);
-  --shadow-md: 0 8px 24px rgba(21, 25, 30, 0.07), 0 2px 6px rgba(21, 25, 30, 0.04);
+  --shadow-sm: 0 1px 3px rgba(21, 25, 30, 0.04);
+  --shadow-md: 0 8px 24px rgba(21, 25, 30, 0.08);
   --shadow-overlay: 0 16px 48px rgba(21, 25, 30, 0.12);
 
-  /* Typography — Plus Jakarta Sans primary; Inter kept as loaded fallback */
+  /* Typography — Plus Jakarta Sans */
   --font-sans: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
 
-  /* Type ramp — product (dashboard) */
-  --text-page: 30px;
-  --text-page-leading: 36px;
-  --text-section: 20px;
-  --text-section-leading: 28px;
+  /* Type ramp — product */
+  --text-page: 26px;
+  --text-page-leading: 32px;
+  --text-section: 18px;
+  --text-section-leading: 24px;
   --text-card: 16px;
   --text-card-leading: 24px;
   --text-body: 14px;
@@ -94,6 +98,12 @@
   --text-label-leading: 16px;
   --text-caption: 11px;
   --text-caption-leading: 14px;
+  --text-nav-group: 10px;
+  --text-nav-group-leading: 14px;
+  --text-metric: 32px;
+  --text-metric-leading: 40px;
+  --text-metric-secondary: 24px;
+  --text-metric-secondary-leading: 32px;
 
   /* Type ramp — marketing display */
   --text-display-xl: 56px;
@@ -105,13 +115,14 @@
   --text-display-sm: 28px;
   --text-display-sm-leading: 36px;
 
-  /* Layout */
-  --sidebar-width: 248px;
+  /* Layout — BMC-like shell */
+  --sidebar-width: 232px;
   --sidebar-collapsed: 64px;
-  --topbar-height: 56px;
+  --topbar-height: 52px;
   --content-gutter: 32px;
+  --overview-max: 1120px;
 
-  /* Sidebar / glass (restrained — no heavy blur on lists/tables) */
-  --sidebar-bg: rgba(255, 255, 255, 0.78);
-  --glass-bg: rgba(255, 255, 255, 0.72);
+  /* Sidebar — solid white, no glass */
+  --sidebar-bg: #ffffff;
+  --workspace-bg: #f5f6fa;
 }

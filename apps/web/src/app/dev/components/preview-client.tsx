@@ -67,7 +67,8 @@ function PreviewBody() {
       <section className="space-y-4">
         <h2 className="text-section">Buttons</h2>
         <div className="flex flex-wrap gap-3">
-          <Button>Primary</Button>
+          <Button>Primary (Ink)</Button>
+          <Button variant="brand">Brand</Button>
           <Button variant="secondary">Secondary</Button>
           <Button variant="outline">Outline</Button>
           <Button variant="ghost">Ghost</Button>

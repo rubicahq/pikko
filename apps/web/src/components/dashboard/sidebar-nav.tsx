@@ -23,7 +23,7 @@ export function SidebarNav({
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Store">
       {sections.map((group) => (
         <div key={group.id}>
-          <p className="px-3 pb-1.5 text-caption font-medium uppercase tracking-wide text-foreground-muted">
+          <p className="px-3 pb-1.5 text-nav-group uppercase text-foreground-muted">
             {group.label}
           </p>
           <div className="space-y-0.5">
@@ -37,12 +37,15 @@ export function SidebarNav({
                   href={href}
                   onClick={onNavigate}
                   className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground",
-                    active && "bg-surface font-medium text-foreground",
+                    "flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground",
+                    active && "bg-surface-active font-semibold text-foreground",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="h-5 w-5 shrink-0" strokeWidth={1.75} />
+                  <Icon
+                    className={cn("h-5 w-5 shrink-0", active && "text-brand")}
+                    strokeWidth={1.75}
+                  />
                   <span className="truncate">{item.label}</span>
                 </Link>
               );

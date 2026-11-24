@@ -1,210 +1,340 @@
-# Design System — Pikko (soft-gradient SaaS)
+# Design System — Pikko (Friendly Commerce Workspace)
 
 **Owner:** Design / frontend agents  
-**Direction:** Soft-gradient SaaS built on Brex-inspired nav, hierarchy, and operational density. Warmer, more approachable identity — not a flat corporate dashboard and not a neon/generic AI look.  
-**Tokens source of truth:** `packages/design-tokens/` (`tokens.css`, `design-tokens.css`, `tailwind.preset.js`). Project preference: soft-gradient palette + Plus Jakarta Sans.  
+**Direction:** Buy Me a Coffee dashboard simplicity with Pikko’s orange palette — complex operations, simple experience.  
+**Authority:** Project `docs/pikko-master-design-system.md` + `preferences.md` Design Authority.  
+**Supersedes:** Brex-heavy, Roomlio, corporate SaaS, glassmorphism, bento, and soft-gradient-as-foundation (PR #17 ambient wash everywhere). Gradients are **optional accents only**.  
+**Tokens:** `packages/design-tokens/` (`tokens.css`, `design-tokens.css`, `tailwind.preset.js`).  
 **Components:** `apps/web/src/components/ui` + `apps/web/src/components/dashboard`.  
 **Dev preview:** `/dev/components` (blocked in production).
 
+This is a visual/UX redesign of the existing application — **not** a rebuild of business functionality, APIs, DB, auth, or RBAC.
+
 ---
 
-## 1. Personality
+## 1. Design Authority
 
-Premium, modern, soft, approachable, operationally sharp. Ambient cool mist → cloud wash behind solid content surfaces. Brand orange as accent (~5%) plus warm peach / soft-orange feature washes where intentional. Borders stay lightweight; card shadows are subtle and realistic. Glass is restrained (shell chrome only) — never heavy blur on tables, lists, or repeated rows.
+This document is the definitive in-repo visual specification for Pikko. When prior docs conflict (Brex nav chrome, glass shell, soft-gradient foundation), **this document wins**.
 
-Keep from the Brex-inspired baseline:
+Primary visual reference: Buy Me a Coffee merchant dashboard (simplicity, friendly personality, nav treatment, hierarchy, spacing, component styling). **Do not** adopt BMC yellow. Preserve Pikko orange.
 
-- Clear sidebar IA and dense, readable tables
-- Strong typography hierarchy over decoration
-- Marketing hero budget: brand + one headline + one line + CTA
+---
+
+## 2. Product Context
+
+Pikko is a commerce and operations platform for independent sellers (jastipers, preorder sellers, online merchants). The product is operationally deep; the UI must feel light and approachable.
+
+---
+
+## 3. Visual Personality
+
+Friendly, modern, lightweight, organized, approachable, trustworthy, slightly playful, practical.
 
 ### Avoid
 
-- Purple→indigo gradients; cream `#F4F1EA` + terracotta + serif
-- Solid-orange sidebars; orange on every icon
-- Pill `rounded-full` everywhere; heavy multi-layer shadows; neon glow
-- Heavy glass / blur on scroll surfaces, data tables, or list rows
-- 3-column icon-in-circle feature grids; big-number KPI heroes on marketing
-- Inter-only undifferentiated hierarchy (product face is Plus Jakarta Sans)
+- Corporate enterprise / generic admin templates
+- Excessive card grids and four-KPI Overview dashboards
+- Heavy borders, dense tiny type, decorative illustrations on ops pages
+- Unnecessary glass / backdrop blur on shell or data surfaces
+- Heavy shadows; soft-gradient-everywhere; futuristic AI aesthetics
+- Purple→indigo gradients; cream `#F4F1EA` + terracotta + serif; Inter-only hierarchy
+- Solid-orange sidebars; orange on every icon; pill `rounded-full` everywhere
 
 ---
 
-## 2. Color tokens
+## 4. Color System
 
 | Token | CSS var | Value | Use |
 | --- | --- | --- | --- |
-| Brand primary | `--brand-primary` | `#FF3D00` | Accent, primary buttons |
-| Soft orange | `--brand-soft-orange` | `#FF8050` | Charts, soft accents (`brand-orange`) |
-| Warm peach | `--brand-warm-peach` / `--brand-soft` | `#FFE1D5` | Soft highlight / selected |
-| Brand hover | `--brand-hover` | `#EB3800` | Hover |
-| Brand pressed | `--brand-pressed` | `#D63200` | Active |
-| Brand accessible | `--brand-accessible-dark` | `#C83200` | White text on brand; focus rings |
-| Brand border | `--brand-border` | `#FFD1BF` | Soft brand outlines |
-| Cool mist | `--cool-mist` | `#DCE4F0` | Ambient wash, stronger chrome (`mist`) |
-| Cloud white | `--cloud-white` / `--background-subtle` | `#F5F6FA` | Soft panels (`cloud`) |
-| White | `--background` / `--white` | `#FFFFFF` | Solid content surfaces |
-| Ink | `--foreground` / `--ink` | `#15191E` | Primary text |
-| Secondary text | `--foreground-secondary` | `#606975` | Supporting text |
-| Foreground muted | `--foreground-muted` | `#8B8D98` | Meta / placeholders |
-| Foreground subtle | `--foreground-subtle` | `#B9BBC6` | Disabled hints |
-| Foreground inverse | `--foreground-inverse` | `#FCFCFD` | Text on dark |
-| Dark | `--dark` | `#000710` | Secondary CTA / charcoal |
-| Border | `--border` | `#E4E8EF` | Lightweight default borders |
-| Border strong | `--border-strong` | `#C7CAD2` | Emphasized borders |
-| Surface | `--surface` | `#F0F3F8` | Nav active, table header |
-| Surface strong | `--surface-strong` | `#DCE4F0` | Stronger chrome |
+| Brand Orange | `--brand-primary` | `#FF3D00` | Selective accent / brand button |
+| Soft Orange | `--brand-soft-orange` | `#FF8050` | Soft accents, charts |
+| Warm Peach | `--brand-warm-peach` / `--brand-soft` | `#FFE1D5` | Connie / soft highlight |
+| Cool Mist | `--cool-mist` | `#DCE4F0` | Subtle ambient tip only |
+| Cloud White | `--cloud-white` / `--workspace-bg` | `#F5F6FA` | Workspace canvas |
+| Ink Black | `--ink` / `--foreground` / `--dark` | `#15191E` | Text + **primary buttons** |
+| Pure White | `--background` / `--white` | `#FFFFFF` | Sidebar, cards, tables |
 
-### Gradients
+### Neutrals
 
-| Name | CSS var / Tailwind | Value | Use |
-| --- | --- | --- | --- |
-| Ambient | `--gradient-ambient` / `bg-ambient` | `155deg #DCE4F0 → #F0F3F8 → #FAFAFC` | App canvas / shell |
-| Warm feature | `--gradient-warm` / `bg-warm-feature` | `140deg #FFFFFF → #FFF6F1 → #FFD1BF` | Feature panels, Connie |
-| Brand | `--gradient-brand` / `bg-brand-gradient` | `135deg #FF3D00 → #FF8050` | Primary brand washes / CTAs |
-| Chart soft | `--gradient-chart` / `bg-chart-soft` | `180deg #FF8050 → #FFD1BF` | Chart fills |
-
-### Semantic (never use brand orange for warning/error)
-
-| Tone | Text | Background | Border |
-| --- | --- | --- | --- |
-| Success | `#166534` | `#F0FDF4` | `#BBF7D0` |
-| Warning | `#92400E` | `#FFFBEB` | `#FDE68A` |
-| Error | `#B91C1C` | `#FEF2F2` | `#FECACA` |
-| Info | `#1D4ED8` | `#EFF6FF` | `#BFDBFE` |
-| Neutral | `#4B5563` | `#F3F4F6` | `#E5E7EB` |
-
-**A11y:** White small text on `#FF3D00` fails WCAG. Prefer dark text on brand orange, or white on `#C83200`.
-
-Tailwind: `bg-brand`, `bg-brand-orange`, `bg-mist`, `bg-cloud`, `text-ink`, `bg-ambient`, `bg-warm-feature`, etc. via `tailwind.preset.js`.
-
----
-
-## 3. Typography
-
-| Context | Font | CSS |
-| --- | --- | --- |
-| Product UI (default) | Plus Jakarta Sans (`next/font` → `--font-jakarta`) | `font-sans` |
-| Marketing display | Plus Jakarta Sans | `font-display` |
-| Legacy / opt-in Inter | Inter (`--font-inter`) | `font-inter` |
-
-Inter remains loaded so abrupt consumer breakage is avoided; new UI should use the Jakarta stack. Body 400, headings 500, selective 600. Tabular nums for money (`tabular-nums`). Sentence case. Marketing headlines tracking ≈ `-0.02em` to `-0.03em`.
-
-### Product type ramp
-
-| Role | Utility | Size / leading | Weight |
-| --- | --- | --- | --- |
-| Page title | `text-page` | 30 / 36 | 500 |
-| Section | `text-section` | 20 / 28 | 500 |
-| Card title | `text-card` | 16 / 24 | 500 |
-| Body | `text-body` | 14 / 20 | 400 |
-| Table cell | `text-table` | 13 / 18 | 400 |
-| Label | `text-label` | 12 / 16 | 500 |
-| Caption | `text-caption` | 11 / 14 | 400 |
-
-### Marketing display ramp
-
-| Role | Utility | Size / leading |
-| --- | --- | --- |
-| Display XL | `text-display-xl` | 56 / 64 |
-| Display LG | `text-display-lg` | 44 / 52 |
-| Display MD | `text-display-md` | 36 / 44 |
-| Display SM | `text-display-sm` | 28 / 36 |
-
----
-
-## 4. Spacing, radius, shadow, motion
-
-- **Spacing base:** 4px. Approved: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128. Prefer Tailwind scale. Content gutter: `--content-gutter`.
-- **Radii:** xs 4, sm 6, **md 10** (buttons/inputs), **lg 12**, **xl 16** (cards), **2xl 20**. Controls stay 10–12px; cards 16–20px. **Avoid pills.**
-- **Shadows:** `shadow-xs` / `sm` / `md` / `overlay` — subtle realistic elevation on cards; prefer 1px borders for tables/lists.
-- **Icons:** Lucide, stroke **1.75**; sizes 16 / 20 / 24 / 32.
-- **Motion:** hover 150ms, standard 200ms, dialog 220ms. Respect `prefers-reduced-motion`.
-
----
-
-## 5. Layout & shell
-
-| Surface | Notes |
+| Role | Value |
 | --- | --- |
-| App canvas | `bg-ambient` (cool mist wash); content cards stay solid white |
-| Sidebar | Soft white / light translucent (`bg-white/80`, light blur); not solid orange |
-| Topbar | Matching translucent white; restrained glass only |
-| Tables / lists | Solid `bg-background`, high readability — **no** backdrop blur on rows |
-| Marketing | max ~1280; reading 680–760 |
-| Dashboard | sidebar 248; content max 1440; topbar 56 |
-| Auth | form max 420 |
-| Checkout | max 1120; two-column desktop |
+| Text primary | `#15191E` |
+| Text secondary | `#626975` |
+| Text muted | `#747B86` |
+| Border default | `#E5E7EB` |
+| Border subtle | `#EEF0F3` |
+| Surface hover | `#F3F4F6` |
+| Surface active | `#F0F1F3` |
+| Surface disabled | `#F3F4F6` |
+
+### Status
+
+| Tone | Text | Background |
+| --- | --- | --- |
+| Success | `#166534` | `#EAF7EE` |
+| Warning | `#92400E` | `#FFF4DB` |
+| Error | `#B42318` | `#FDECEC` |
+| Information | `#1D4ED8` | `#EDF4FF` |
+| Neutral | `#4B5563` | `#F1F2F4` |
+
+Never use brand orange for warning/error. Prefer dark text on brand orange for small type, or white on `#C83200` when needed for contrast.
+
+---
+
+## 5. Color Distribution
+
+Approximate page mix: **~45% white, 30% cloud white, 10% ink, 7% cool mist, 4% brand orange, 3% warm peach, 1% soft orange.** Orange is selective, not everywhere.
+
+---
+
+## 6. Gradient System
+
+Gradients are **optional accents**, not the workspace foundation.
+
+| Name | CSS / Tailwind | Value | Allowed use |
+| --- | --- | --- | --- |
+| Ambient | `--gradient-ambient` / `bg-ambient` | `160deg #F5F6FA → #F5F6FA 70% → #EAF0F7` | Subtle canvas tip only |
+| Connie / warm | `--gradient-warm` / `bg-warm-feature` | `135deg #FFFFFF → #FFF7F3 → #FFE1D5` | Connie, onboarding accents, empty-state art, announcements |
+| Brand | `--gradient-brand` / `bg-brand-gradient` | `135deg #FF3D00 → #FF8050` | Rare promotional washes |
+| Chart soft | `--gradient-chart` / `bg-chart-soft` | Soft orange fill | Charts when present |
+
+**Forbidden on:** tables, standard forms, sidebar, every card, badges, dropdowns.
+
+Default workspace background: solid Cloud White (`bg-workspace` / `--workspace-bg`).
+
+---
+
+## 7. Typography
+
+**Plus Jakarta Sans** for product UI and marketing display (`next/font` → `--font-jakarta`, `font-sans` / `font-display`). Inter may remain loaded (`font-inter`) for gradual migration; new UI uses Jakarta.
+
+| Role | Size / weight | Notes |
+| --- | --- | --- |
+| Page title | 26 / 700 | `text-page` |
+| Greeting | 24 / 700 | Overview |
+| Section | 18 / 700 | `text-section` |
+| Card title | 16 / 600 | `text-card` |
+| Primary metric | 32 / 700 | `text-metric` |
+| Secondary metric | 24 / 600 | `text-metric-secondary` |
+| Body / nav / button | 14 / 400–600 | Nav 500, button 600 |
+| Table | 13 / 400 | `text-table`, `tabular-nums` for money |
+| Supporting | 12 / 400 | Labels / meta |
+| Nav group | 10 / 600 | Uppercase sparingly |
+
+Sentence case. Marketing display tracking ≈ `-0.02em` to `-0.03em`.
+
+---
+
+## 8. Spacing
+
+4px base. Approved: 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 (+ extended scale as needed). Prefer Tailwind scale — no arbitrary `mt-[13px]`.
+
+| Context | Value |
+| --- | --- |
+| Card padding | 24 (compact 16) |
+| Section gap | 24 |
+| Desktop workspace padding | 32 |
+| Mobile padding | 16 |
+
+---
+
+## 9. Border Radius
+
+| Element | Radius |
+| --- | --- |
+| Badges | 6 (`rounded-sm`) |
+| Inputs / buttons / nav items | 10 (`rounded-md`) |
+| Dropdowns | 12 (`rounded-lg`) |
+| Cards | 14 (`rounded-xl`) |
+| Large / feature / dialogs | 16 (`rounded-2xl`) |
+| Avatars | circular |
+
+Compact dashboard actions **may** be pill; not everything is pill.
+
+---
+
+## 10. Elevation
+
+- Cards: white + 1px subtle border; optional `shadow-sm` (`0 1px 3px rgba(21,25,30,0.04)`)
+- Dropdown: `shadow-md`
+- Modal: `shadow-overlay`
+- Prefer borders and whitespace over stacked shadows. No multi-layer neon glow.
+
+---
+
+## 11. Desktop Shell
+
+| Surface | Spec |
+| --- | --- |
+| Sidebar | **232px**, solid white, fixed, padding 16, subtle right border — **no glass** |
+| Workspace | Cloud White `#F5F6FA`, padding 32 |
+| Overview content | max width **1120px** (`max-w-overview`) |
+| Ops pages | full dashboard width; tables stay dense |
+| Top bar | Minimal; solid white; notifications — no heavy translucent blur |
 
 Validate: **375, 390, 768, 1024, 1440** — no horizontal overflow.
 
 ---
 
-## 6. Merchant navigation IA
+## 12. Sidebar Navigation
 
-Grouped sidebar (`nav-config.ts`) — structure unchanged by this visual update:
+BMC-like composition: logo → store switcher → View store → grouped nav → Connie entry → Settings → account.
 
-| Group | Live items | Hidden until built |
-| --- | --- | --- |
-| **Workspace** | Overview, Notifications, Analytics | — |
-| **Operations** | Orders, Customers | Purchasing, Packing, Shipments, Payments/Finance |
-| **Configuration** | Catalog, Preorders, Storefront, Business Rules, Settings, Team (when live) | Vendors |
+| Group | Items (live when implemented) |
+| --- | --- |
+| **Workspace** | Overview, Notifications, Analytics |
+| **Operations** | Orders, Purchasing, Packing*, Shipments*, Payments |
+| **Relationships** | Customers, Vendors, Team |
+| **Manage** | Catalog, Campaigns, Preorders, Storefront, Business Rules, Settings |
 
-Shell: `AppShell` + `DashboardSidebar` + `MobileNav`. Store context via switcher + `/stores/{storeId}/…`.
+\*Hidden until built (`implemented: false` in `nav-config.ts`).
 
----
-
-## 7. Component library
-
-| Component | Path | Notes |
-| --- | --- | --- |
-| Button | `ui/button.tsx` | `rounded-md` (10px); primary / secondary / outline / ghost / destructive / link |
-| Input / Label / IdR | `ui/input`, `label`, `idr-input` | Control radius 10px |
-| Card | `ui/card.tsx` | `rounded-xl` (16px), light `shadow-sm`, solid/near-opaque white |
-| Badge / StatusBadge | `ui/badge`, `status-badge` | Semantic tones |
-| Table / DataTable | `ui/table`, `data-table` | Solid white container; sticky header; no glass rows |
-| Empty / Error / Skeleton | `ui/empty-state`, `error-state`, `skeleton` | |
-| Dialog / Sheet / Tabs / Select / Toast | corresponding `ui/*` | Sheet uses soft white panel |
-| PageHeader / FilterBar | `ui/page-header`, `filter-bar` | |
-
-### Charts
-
-When charts ship: use soft orange fills (`bg-chart-soft` / `--gradient-chart` / `--brand-soft-orange`). Avoid neon series colors and heavy glow.
-
-### Connie (if / when present)
-
-Apply warm-feature treatment (`bg-warm-feature` / `--gradient-warm`) — soft peach wash, not flat charcoal and not neon glass. No Connie surface in the repo at time of this update; follow this when introducing one.
-
-### Data tables
-
-- Header: `bg-surface`, uppercase `text-label`, sticky optional
-- Rows: 1px `border-border`; hover `bg-background-subtle`; solid backgrounds only
-- Money / counts: `tabular-nums`, right-aligned
-- Empty → `EmptyState`; loading → `Skeleton`; failure → `ErrorState`
+Nav items: height 40px, 12px horizontal pad, 20px icons stroke ~1.75, radius 10.  
+**Active:** `#F0F1F3` background, ink text, selective orange icon — **not** a solid orange row.
 
 ---
 
-## 8. Storefront themes
+## 13. Iconography
 
-24 curated themes in Go `internal/themes`. Merchant theme colors **never** affect backoffice.
-
----
-
-## 9. Usage rules
-
-1. Import from `@/components/ui/*` and `@/components/dashboard/*` — extend tokens, do not invent parallel palettes.
-2. Prefer token-driven visual changes; do **not** rebuild pages or change API/DB/business logic for design direction.
-3. Preserve nav hierarchy and operational density.
-4. Marketing: keep hero budget tight; no AI-generic feature grids.
-5. Glass only on shell chrome (sidebar/topbar); never on tables/lists.
+Lucide (or consistent rounded outline set). Stroke ~1.75. Selected nav may use orange accent. No emoji / mixed / 3D nav icons.
 
 ---
 
-## 10. Acceptance (soft-gradient update)
+## 14. Overview Dashboard
 
-- [x] Tokens + Tailwind preset encode palette, gradients, radii, fonts
-- [x] Global CSS + root layout load Plus Jakarta Sans; Inter remains available
-- [x] Shared shell/card/table updated; pages not rebuilt
-- [x] This doc reflects soft-gradient direction
-- [x] No API/DB/business-logic changes
+**Vertical hierarchy benchmark** — not a four-KPI card grid.
 
-See also Project `preferences.md` (design direction) and agent handoffs under the Project store `internal/`.
+| Block | Content |
+| --- | --- |
+| **A. Store summary** | One card: greeting, store identity, share/view actions, divider, **sales dominant** + supporting metrics from real data |
+| **B. Needs attention** | Actionable list (setup gaps, payment reviews) |
+| **C. Recent orders** | Dense rows linking to order detail |
+| **D. Connie** | Compact warm-gradient entry; no fake insights; no AI backend required |
+
+Never fabricate production metrics.
+
+---
+
+## 15. Page Header
+
+Title + optional one-line description + primary/secondary actions. No banners or heroes on ops pages. Use `PageHeader`.
+
+---
+
+## 16. Buttons
+
+| Variant | Treatment |
+| --- | --- |
+| **Primary** | Ink `#15191E` bg, white text, height 40, radius 10, weight 600 |
+| **Secondary / outline** | White + border |
+| **Brand** | `#FF3D00` — selective emphasis only |
+| **Ghost** | Text + hover surface |
+| **Destructive** | Error red |
+
+Include hover, active, focus, disabled, loading states. Focus: subtle brand ring, no glow.
+
+---
+
+## 17. Forms
+
+Input height **42**, radius 10, labels 13/600 above. Focus: subtle orange ring. Disabled uses surface-disabled. Prefer shared `Input` / `Label` / IDR helpers.
+
+---
+
+## 18. Data Tables
+
+Dense and practical:
+
+- White container, radius 14, light border
+- Header ~44px; row 52px (compact 40)
+- Subtle horizontal dividers; no heavy vertical grid
+- Money right-aligned, `tabular-nums`
+- Keep sort / filter / search / pagination / bulk
+- **Do not** cardify high-volume tables on desktop
+
+---
+
+## 19. Status Badges
+
+11–12px type; semantic tones from §4. Use `Badge` / `StatusBadge`. Never brand-orange for error/warning.
+
+---
+
+## 20. Connie
+
+Team persona entry (sidebar + Overview warm panel). Visual only until an AI backend exists — no fabricated insights, no new AI API in this redesign.
+
+---
+
+## 21. Empty States
+
+Clear title, one supporting sentence, **one** primary CTA. Prefer `EmptyState`. Soft warm wash allowed for illustrated empties; not required on every empty.
+
+---
+
+## 22. Loading
+
+Skeletons (`Skeleton` / `TableSkeleton`) matching final layout density. Respect `prefers-reduced-motion`.
+
+---
+
+## 23. Responsive
+
+Mobile: drawer nav (`MobileNav` + `Sheet`), stacked headers, full-width tables that scroll horizontally when needed. Desktop: 232px sidebar + cloud workspace.
+
+---
+
+## 24. Internationalization
+
+Indonesian merchants first. Copy is practical Bahasa/English-friendly sentence case. Currency IDR with thousand separators (`formatIDR`).
+
+---
+
+## 25. Accessibility
+
+Target WCAG 2.2 AA. Visible focus rings; don’t rely on color alone for status; maintain contrast on brand orange; keyboard reach for nav, dialogs, tables.
+
+---
+
+## 26. Implementation Principles
+
+1. Central tokens + Tailwind preset — extend tokens, don’t invent parallel palettes.
+2. Shared components in `ui/*` and `dashboard/*`.
+3. Preserve API / DB / auth / RBAC / workflows.
+4. Hide unimplemented nav via `implemented: false`.
+5. Prefer token-driven visual changes; redesign Overview composition; keep ops tables dense.
+
+---
+
+## 27. Rollout Steps
+
+| Step | Scope |
+| --- | --- |
+| **1** | Tokens, typography (Jakarta), shell/sidebar, core components (buttons Ink primary, inputs 10px, cards 14px) |
+| **2** | Overview vertical hierarchy |
+| **3** | Language across operational pages (headers, dense tables) |
+
+---
+
+## 28. Testing Guidance
+
+Prefer typecheck, lint, build, and targeted unit/API tests. No full Playwright suite required for visual redesign. Reserve Playwright for critical journeys at stage gates.
+
+---
+
+## 29. Acceptance
+
+- [x] Visibly BMC-simple with Pikko orange — not a mere recolor of soft-gradient shell
+- [x] White 232px sidebar; Cloud White workspace; no glass foundation
+- [x] Primary buttons Ink Black; brand orange selective
+- [x] Overview is vertical hierarchy (not four KPI cards)
+- [x] Connie is visual entry only
+- [x] Unimplemented nav remains hidden
+- [x] No API/DB/auth/RBAC/workflow regressions
+- [x] `docs/DESIGN_SYSTEM.md` matches this authority
+
+---
+
+## 30. Doc Ownership
+
+Update this file when visual rules change. Project store master: `pikko-master-design-system.md`. Handoffs under Project `internal/`. Soft-gradient PR #17 notes are historical; do not re-apply ambient gradient as the default shell foundation.
