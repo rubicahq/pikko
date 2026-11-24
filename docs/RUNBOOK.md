@@ -2,6 +2,8 @@
 
 Audience: operators on the Emplicon VPS. Keep Emplicon untouched.
 
+**Prefer `docs/DEPLOYMENT_RUNBOOK.md` as the PRD v3 / Agent 15 day-2 entrypoint** (SSH `-p 2021`, migration head `000016`, deploy script hardening). This file remains for Phase 6 detail and incident notes.
+
 ## Surfaces
 
 | Host | Role |

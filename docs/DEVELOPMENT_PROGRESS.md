@@ -57,7 +57,7 @@
 | **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | **Done** — LIVE-01–03 + E2E-K API |
 | **13 Analytics** | North-star fulfilled items metric | analytics | **Done** — AN-01–04 + DASH ops widgets |
 | **14 Security/QA** | Threat pass, TEST_REPORT, E2E A–N | all e2e | **Done** — SEC hardening + `docs/TEST_REPORT.md`; E2E A–N honest |
-| **15 Integration/Deploy** | Runbook validation; smoke; **no auto cutover** | deploy scripts | DEPLOYMENT_RUNBOOK current; owner checklist only for pikko.id |
+| **15 Integration/Deploy** | Runbook validation; smoke; **no auto cutover** | deploy scripts | **Done** — runbook + script hardening; owner checklist only for pikko.id |
 
 ---
 
@@ -257,7 +257,45 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 13+)
+## 3m. Agent 13 status (Operational Analytics)
+
+| Deliverable | Status |
+| --- | --- |
+| AN-01–04 + DASH widgets | Done (no new migration) |
+| Overview / Analytics Friendly Workspace UI | Done |
+| `docs/agents/13-analytics-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 3n. Agent 14 status (Security & QA)
+
+| Deliverable | Status |
+| --- | --- |
+| SEC hardening (evidence, money, rate limits, headers) | Done |
+| `docs/TEST_REPORT.md` + E2E A–N honesty | Done |
+| Stage 3 critical Playwright smoke | Done |
+| `docs/agents/14-security-qa-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 3o. Agent 15 status (Integration & Deploy)
+
+| Deliverable | Status |
+| --- | --- |
+| `scripts/deploy.sh` / `smoke.sh` hardening | Done (BuildKit, backup-on-migrate, health waits, rollback, env-only public smoke) |
+| Compose healthcheck (web) + Emplicon coexistence | Done (`pikko-postgres` preserved) |
+| `docs/DEPLOYMENT_RUNBOOK.md` owner-ready through `000016` | Done |
+| LAUNCH / DEPLOY / RUNBOOK cross-links | Done |
+| Matrix / progress / handoff | Done |
+| Auto `pikko.id` cutover | **Not in scope** (owner `LAUNCH.md` only) |
+
+**PRD v3 serial plan (Agents 01–15): complete** on `pikko.site`. Domain cutover remains owner-gated.
+
+---
+
+## 4. Open decisions (non-blocking)
 
 1. Customer portal auth model: separate customer identities (shipped Agent 08).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live ops shipped Agent 12.

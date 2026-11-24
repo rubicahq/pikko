@@ -1,7 +1,7 @@
 # Architecture — Pikko Modular Monolith (PRD v3.0)
 
 **Owner:** Agent 01 (Lead Architect)  
-**Baseline:** `main` @ `353498a`, migrations `000001`–`000006`  
+**Baseline:** PRD v3 Agents 01–15 complete; migrations `000001`–`000016` (production domain `pikko.site`)  
 **Rule:** Additive evolution only. No greenfield rewrite. No destructive production migrations.
 
 ---

@@ -603,7 +603,7 @@ Store is the tenant boundary. All business rows carry `store_id`. Storage keys: 
 | 12 Live Shopping & Storefront | Live sessions + storefront polish | Storefront + themes |
 | 13 Analytics | North-star dashboards | Analytics service |
 | 14 Security/QA | Hardening, TEST_REPORT, E2E A–N | Existing e2e |
-| 15 Integration/Deploy | Runbook execution support; no auto pikko.id | Deploy scripts |
+| 15 Integration/Deploy | Runbook + script hardening; no auto pikko.id | **Done** — `DEPLOYMENT_RUNBOOK.md`, `deploy.sh`/`smoke.sh` |
 
 Do not skip acceptance gates.
 

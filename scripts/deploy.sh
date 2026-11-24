@@ -5,14 +5,22 @@
 #   docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml
 # so host ports 127.0.0.1:8100 / :3100 stay published.
 #
+# Hardening (Agent 15):
+#   - BuildKit + parallel selective rebuild
+#   - pg_dump backup before migration-bearing deploys (and with --backup)
+#   - wait for postgres healthy before migrate/backup
+#   - pre-* image tags + rollback on smoke/health failure
+#   - domain-agnostic public smoke via env (never auto-cutover to pikko.id)
+#
 # Usage:
 #   ./scripts/deploy.sh                 # pull main, selective rebuild, smoke
 #   ./scripts/deploy.sh --no-pull       # deploy current checkout
 #   ./scripts/deploy.sh --force-all     # rebuild api+web regardless of diff
 #   ./scripts/deploy.sh --backup        # force DB backup even without migrations
 #   ./scripts/deploy.sh --skip-smoke    # skip smoke (default runs fast local smoke)
-#   ./scripts/deploy.sh --public-smoke  # also hit public HTTPS endpoints
+#   ./scripts/deploy.sh --public-smoke  # also hit public HTTPS endpoints (env URLs)
 #   ./scripts/deploy.sh --dry-run       # print plan only
+#   ./scripts/deploy.sh --ref=main      # deploy a specific ref (default: main)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +34,7 @@ RUN_SMOKE=1
 PUBLIC_SMOKE=0
 DRY_RUN=0
 PROFILE_PROXY=1
+HEALTH_TIMEOUT_SEC="${DEPLOY_HEALTH_TIMEOUT_SEC:-90}"
 
 for arg in "$@"; do
   case "$arg" in
@@ -38,7 +47,7 @@ for arg in "$@"; do
     --no-proxy) PROFILE_PROXY=0 ;;
     --ref=*) REF="${arg#--ref=}" ;;
     -h|--help)
-      sed -n '2,20p' "$0"
+      sed -n '2,28p' "$0"
       exit 0
       ;;
     *)
@@ -48,6 +57,7 @@ for arg in "$@"; do
   esac
 done
 
+# BuildKit (cache mounts in Dockerfiles rely on this)
 export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 export BUILDKIT_PROGRESS="${BUILDKIT_PROGRESS:-plain}"
@@ -68,6 +78,9 @@ COMPOSE=(
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 LOG_PREFIX="[pikko-deploy ${STAMP}]"
 TIMINGS=()
+BACKUP_DIR="${BACKUP_DIR:-$HOME/backups/pikko}"
+# Deploy-time dumps live under deploy/ so cron directory backups stay separate.
+DEPLOY_BACKUP_DIR="${DEPLOY_BACKUP_DIR:-$BACKUP_DIR/deploy}"
 
 log() { echo "${LOG_PREFIX} $*"; }
 time_step() {
@@ -97,11 +110,24 @@ time_step() {
 }
 
 ensure_emplicon_untouched() {
-  # Refuse destructive Emplicon project ops; this script never names emplicon.
+  # Refuse destructive Emplicon project ops; this script never names emplicon
+  # as a compose project. Network attach is additive-only (see connect_emplicon_network).
   if [[ "$*" == *emplicon* ]]; then
     echo "Refusing command that mentions emplicon" >&2
     exit 3
   fi
+}
+
+preflight() {
+  [[ -f docker-compose.yml ]] || { echo "missing docker-compose.yml" >&2; exit 1; }
+  [[ -f docker-compose.deploy.yml ]] || { echo "missing docker-compose.deploy.yml" >&2; exit 1; }
+  [[ -f scripts/smoke.sh ]] || { echo "missing scripts/smoke.sh" >&2; exit 1; }
+  if [[ ! -f .env ]] && (( ! DRY_RUN )); then
+    log "WARN: no .env in $ROOT — compose may fail on required secrets (POSTGRES_PASSWORD)"
+  fi
+  local head_mig
+  head_mig="$(ls -1 database/migrations/*_*.up.sql 2>/dev/null | sed 's|.*/||' | sort | tail -1 || true)"
+  log "migration tree tip file: ${head_mig:-none}"
 }
 
 tag_rollback_images() {
@@ -181,7 +207,7 @@ plan_services() {
       apps/web/*|packages/*|Dockerfile.web)
         NEED_WEB=1
         ;;
-      docker-compose.yml|docker-compose.deploy.yml|.dockerignore|scripts/deploy.sh)
+      docker-compose.yml|docker-compose.deploy.yml|.dockerignore|scripts/deploy.sh|scripts/smoke.sh)
         NEED_API=1
         NEED_WEB=1
         ;;
@@ -189,22 +215,87 @@ plan_services() {
   done <<< "$diff"
 }
 
-backup_db() {
-  mkdir -p "${BACKUP_DIR:-$HOME/backups/pikko}"
-  local dest="${BACKUP_DIR:-$HOME/backups/pikko}/pikko-${STAMP}.dump"
+wait_postgres_healthy() {
+  local deadline=$((SECONDS + HEALTH_TIMEOUT_SEC))
+  local st
   if ! "${DOCKER[@]}" inspect pikko-postgres >/dev/null 2>&1; then
+    log "postgres container missing — will start via compose"
+    return 0
+  fi
+  while (( SECONDS < deadline )); do
+    st="$("${DOCKER[@]}" inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' pikko-postgres 2>/dev/null || echo missing)"
+    if [[ "$st" == "healthy" || "$st" == "running" ]]; then
+      # Prefer pg_isready when healthy/running
+      if "${DOCKER[@]}" exec pikko-postgres pg_isready -U "${POSTGRES_USER:-pikko}" -d "${POSTGRES_DB:-pikko}" >/dev/null 2>&1; then
+        log "postgres ready ($st)"
+        return 0
+      fi
+    fi
+    sleep 2
+  done
+  log "ERROR: postgres not ready within ${HEALTH_TIMEOUT_SEC}s (last=$st)"
+  return 1
+}
+
+backup_db() {
+  mkdir -p "$DEPLOY_BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR" 2>/dev/null || true
+  chmod 700 "$DEPLOY_BACKUP_DIR" 2>/dev/null || true
+  local dest="${DEPLOY_BACKUP_DIR}/pikko-${STAMP}.dump"
+  if ! "${DOCKER[@]}" inspect pikko-postgres >/dev/null 2>&1; then
+    if (( NEED_MIGRATE )); then
+      log "ERROR: postgres missing but migrations planned — cannot backup"
+      return 1
+    fi
     log "postgres container missing — skip backup"
     return 0
   fi
+  wait_postgres_healthy
+  umask 077
   "${DOCKER[@]}" exec pikko-postgres \
     pg_dump -U "${POSTGRES_USER:-pikko}" -d "${POSTGRES_DB:-pikko}" -Fc \
     > "$dest"
-  log "backup → $dest"
+  if [[ ! -s "$dest" ]]; then
+    log "ERROR: backup empty at $dest"
+    rm -f "$dest"
+    return 1
+  fi
+  # Keep a small SHA beside the dump for restore verification.
+  (cd "$(dirname "$dest")" && sha256sum "$(basename "$dest")" > "pikko-${STAMP}.sha256")
+  log "backup → $dest ($(du -h "$dest" | awk '{print $1}'))"
+}
+
+log_schema_version() {
+  if (( DRY_RUN )); then return 0; fi
+  if ! "${DOCKER[@]}" inspect pikko-postgres >/dev/null 2>&1; then
+    return 0
+  fi
+  local ver
+  ver="$("${DOCKER[@]}" exec pikko-postgres \
+    psql -U "${POSTGRES_USER:-pikko}" -d "${POSTGRES_DB:-pikko}" -Atc \
+    "SELECT COALESCE(MAX(version),0) FROM schema_migrations WHERE dirty = false;" 2>/dev/null || echo "?")"
+  log "schema_migrations head (clean) = ${ver}"
+}
+
+wait_local_health() {
+  local deadline=$((SECONDS + HEALTH_TIMEOUT_SEC))
+  local code
+  while (( SECONDS < deadline )); do
+    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 3 http://127.0.0.1:8100/healthz 2>/dev/null || echo 000)"
+    if [[ "$code" == "200" ]]; then
+      log "api healthz ready"
+      return 0
+    fi
+    sleep 2
+  done
+  log "ERROR: api healthz not 200 within ${HEALTH_TIMEOUT_SEC}s (last=$code)"
+  return 1
 }
 
 # --- main ---
 ensure_emplicon_untouched
-log "root=$ROOT ref=$REF"
+preflight
+log "root=$ROOT ref=$REF buildkit=${DOCKER_BUILDKIT} dry_run=${DRY_RUN}"
 
 OLD_SHA="$(git rev-parse HEAD)"
 if (( DO_PULL )); then
@@ -220,6 +311,13 @@ log "sha ${OLD_SHA:0:7} → ${NEW_SHA:0:7}"
 DIFF="$(paths_changed "$OLD_SHA" "$NEW_SHA")"
 plan_services "$DIFF"
 log "plan api=${NEED_API} web=${NEED_WEB} migrate=${NEED_MIGRATE} force_all=${FORCE_ALL}"
+
+# Ensure postgres is up before backup/migrate when containers already exist.
+if (( ! DRY_RUN )); then
+  if "${DOCKER[@]}" inspect pikko-postgres >/dev/null 2>&1; then
+    time_step "wait_postgres" wait_postgres_healthy
+  fi
+fi
 
 if (( NEED_MIGRATE || FORCE_BACKUP )); then
   time_step "backup_db" backup_db
@@ -259,7 +357,9 @@ up_deploy() {
     "${COMPOSE[@]}" "${args[@]}"
   else
     "${COMPOSE[@]}" "${args[@]}" postgres
+    wait_postgres_healthy
     if (( NEED_API || NEED_MIGRATE )); then
+      # migrate is one-shot; compose waits for service_completed_successfully before api.
       "${COMPOSE[@]}" "${args[@]}" migrate api
     fi
     if (( NEED_WEB )); then
@@ -267,13 +367,17 @@ up_deploy() {
     fi
   fi
   connect_emplicon_network
+  log_schema_version
 }
 
 if (( ${#BUILD_SERVICES[@]} > 0 || NEED_MIGRATE )); then
   time_step "compose_up" up_deploy
 else
   log "skip compose up (nothing to restart); ensuring network attach"
-  if (( ! DRY_RUN )); then connect_emplicon_network; fi
+  if (( ! DRY_RUN )); then
+    connect_emplicon_network
+    log_schema_version
+  fi
   TIMINGS+=("compose_up=skipped")
 fi
 
@@ -291,11 +395,35 @@ if (( ! DRY_RUN )); then
     rollback
     exit 1
   fi
+  time_step "wait_healthz" wait_local_health || { rollback; exit 1; }
 fi
 
+load_surface_urls_from_env() {
+  # Domain-agnostic (E2E-N): pull only surface URL keys from .env for public smoke.
+  # Never flips DNS or rewrites production hosts to pikko.id.
+  local f="$ROOT/.env" line key val
+  [[ -f "$f" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    key="${line%%=*}"
+    val="${line#*=}"
+    case "$key" in
+      MARKETING_URL|DASHBOARD_URL|STOREFRONT_URL|API_BASE_URL|APP_BASE_DOMAIN)
+        val="${val%$'\r'}"
+        if [[ "$val" == \"*\" ]]; then val="${val:1:${#val}-2}"; fi
+        if [[ "$val" == \'*\' ]]; then val="${val:1:${#val}-2}"; fi
+        export "${key}=${val}"
+        ;;
+    esac
+  done < "$f"
+}
+
 smoke() {
-  local args=()
-  if (( PUBLIC_SMOKE )); then args+=(); export SMOKE_PUBLIC=1; fi
+  if (( PUBLIC_SMOKE )); then
+    export SMOKE_PUBLIC=1
+  fi
+  load_surface_urls_from_env
   bash "$ROOT/scripts/smoke.sh"
 }
 
@@ -304,18 +432,10 @@ if (( RUN_SMOKE )); then
     rollback
     exit 1
   fi
-  # Explicit healthz gate for rollback contract
-  if (( ! DRY_RUN )); then
-    code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8100/healthz || echo 000)"
-    if [[ "$code" != "200" ]]; then
-      log "healthz HTTP $code"
-      rollback
-      exit 1
-    fi
-  fi
 else
   TIMINGS+=("smoke=skipped")
 fi
 
 log "done sha=${NEW_SHA:0:7}"
 log "timings: ${TIMINGS[*]}"
+log "note: pikko.id cutover is owner-gated — see docs/LAUNCH.md (this script never flips DNS/env to pikko.id)"

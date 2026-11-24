@@ -3,6 +3,9 @@
 **Do not execute this cutover without explicit owner approval.**  
 This document is the ordered operator runbook. Code is domain-agnostic; switching hosts is configuration + DNS + TLS + Brevo — not a schema migration.
 
+**Day-2 production ops (pikko.site) live in `docs/DEPLOYMENT_RUNBOOK.md`.**  
+`scripts/deploy.sh` / `scripts/smoke.sh` are env-URL driven (E2E-N) and **never** auto-cutover to `pikko.id`. Agent 15 (Integration/Deploy) only hardens deploy/runbook — it does not run this checklist.
+
 Related templates:
 
 | Artifact | Path |
@@ -11,7 +14,8 @@ Related templates:
 | Nginx serve pikko.id | `infrastructure/nginx/emplicon-nginx.d-pikko.id.conf.example` |
 | Nginx redirect pikko.site | `infrastructure/nginx/emplicon-nginx.d-pikko.site-redirect.conf.example` |
 | Deploy compose | `docker-compose.deploy.yml` |
-| Day-2 ops | `docs/DEPLOYMENT.md`, `docs/RUNBOOK.md` |
+| Day-2 ops entrypoint | `docs/DEPLOYMENT_RUNBOOK.md` |
+| Legacy detail | `docs/DEPLOYMENT.md`, `docs/RUNBOOK.md` |
 
 Target hosts after cutover:
 

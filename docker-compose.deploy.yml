@@ -60,6 +60,7 @@ services:
   web:
     container_name: pikko-web
     restart: unless-stopped
+    # Inherits healthcheck from docker-compose.yml (node fetch on :3000).
     build:
       args:
         NEXT_PUBLIC_APP_ENV: production
