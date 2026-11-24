@@ -3,7 +3,9 @@
 **Date:** 2026-11-25 (Asia/Jakarta)  
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-04-campaign-catalog-5f34`  
-**Prior:** Agent 03 at `f610203b59ae803d3041dd25fcb5b165ab5ac059` (includes PR #12 + e2e hardening)
+**Prior:** Agent 03 at `f610203b59ae803d3041dd25fcb5b165ab5ac059` (includes PR #12 + e2e hardening)  
+**Merged main SHA:** `8b8f7c9bb1a924e7c3f7f8b874bb2d2234b61d3b`  
+**PR:** https://github.com/rubicahq/pikko/pull/13
 
 ---
 
