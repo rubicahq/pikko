@@ -2,8 +2,11 @@
 
 **Date:** 2026-11-25 (Asia/Jakarta)  
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
-**Branch:** `cursor/agent-03-auth-multistore-f4b8`  
-**Prior:** Agent 02 at `54181f59ddf2492ac5882691118c3ccdf984525f`
+**Branch:** `cursor/agent-03-auth-multistore-f4b8` (+ e2e hardening `cursor/agent-03-e2e-hardening-d7fd`)  
+**Prior:** Agent 02 at `54181f59ddf2492ac5882691118c3ccdf984525f`  
+**Merged main SHA:** `c63c03e056de248fea8ebcc86cbd381c19b45afb`  
+**Feature merge:** PR #12 → `115440464ea835588e686139e0a9398fa684ae30`  
+**E2E hardening merge:** `c63c03e056de248fea8ebcc86cbd381c19b45afb`
 
 ---
 
@@ -18,6 +21,7 @@
 | UI | `/stores/{id}/team`, `/invites/accept`, role-aware nav (NAV-03), switcher role labels |
 | Onboarding | Setup checklist now reflects real payment methods + fulfillment |
 | Tests | `rbac` unit, `team` + stores isolation integration, `e2e/team-rbac.spec.ts` |
+| E2E hardening | `/dev` respects `APP_ENV` under `next start`; team-rbac reloads after API invite |
 | Docs | Matrix / progress / schema / API contracts / this handoff |
 
 **Preserved:** Magic-link auth, sessions, owner multi-store, Brevo delivery, tenant isolation patterns.  
@@ -27,12 +31,10 @@
 
 ## 2. Acceptance gate evidence
 
-Per owner testing policy (speed over full Playwright loops):
-
-- `go test` on `rbac`, `team`, `stores`, `auth`, `httpapi` (invite + tenant isolation)
-- `tsc --noEmit`, eslint, `next build`
-- Critical journey coverage via Go integration tests (invite accept, Store A staff denied Store B, role permission 403s)
-- `e2e/team-rbac.spec.ts` preserved for stage smoke later — not required to block this handover
+- `go test ./...` green (incl. `rbac`, `team`, `stores`, `auth`, `httpapi`)
+- `tsc --noEmit`, eslint, `next build` green
+- Full Playwright suite **30/30** green against `next start`/standalone with `APP_ENV=development` and `127.0.0.1` URLs
+- Critical journeys: magic-link auth, multi-store, invite accept, Store A staff denied Store B, catalog role nav, `/dev/components` under non-production APP_ENV
 
 ---
 
