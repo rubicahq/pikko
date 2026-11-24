@@ -35,7 +35,7 @@ export function SheetContent({
       <SheetOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed z-50 flex h-full w-[min(100%,20rem)] flex-col border-border bg-white/95 shadow-md duration-dialog",
+          "fixed z-50 flex h-full w-[min(100%,20rem)] flex-col border-border bg-background shadow-md duration-dialog",
           side === "left" ? "left-0 top-0 border-r" : "right-0 top-0 border-l",
           className,
         )}

@@ -23,6 +23,9 @@ module.exports = {
         surface: {
           DEFAULT: "var(--surface)",
           strong: "var(--surface-strong)",
+          hover: "var(--surface-hover)",
+          active: "var(--surface-active)",
+          disabled: "var(--surface-disabled)",
         },
         foreground: {
           DEFAULT: "var(--foreground)",
@@ -34,8 +37,10 @@ module.exports = {
         dark: "var(--dark)",
         border: {
           DEFAULT: "var(--border)",
+          subtle: "var(--border-subtle)",
           strong: "var(--border-strong)",
         },
+        workspace: "var(--workspace-bg)",
         success: {
           DEFAULT: "var(--success)",
           bg: "var(--success-bg)",
@@ -103,18 +108,30 @@ module.exports = {
         ],
       },
       fontSize: {
-        page: ["var(--text-page)", { lineHeight: "var(--text-page-leading)", fontWeight: "500" }],
+        page: ["var(--text-page)", { lineHeight: "var(--text-page-leading)", fontWeight: "700" }],
         section: [
           "var(--text-section)",
-          { lineHeight: "var(--text-section-leading)", fontWeight: "500" },
+          { lineHeight: "var(--text-section-leading)", fontWeight: "700" },
         ],
-        card: ["var(--text-card)", { lineHeight: "var(--text-card-leading)", fontWeight: "500" }],
+        card: ["var(--text-card)", { lineHeight: "var(--text-card-leading)", fontWeight: "600" }],
         body: ["var(--text-body)", { lineHeight: "var(--text-body-leading)", fontWeight: "400" }],
         table: ["var(--text-table)", { lineHeight: "var(--text-table-leading)", fontWeight: "400" }],
-        label: ["var(--text-label)", { lineHeight: "var(--text-label-leading)", fontWeight: "500" }],
+        label: ["var(--text-label)", { lineHeight: "var(--text-label-leading)", fontWeight: "600" }],
         caption: [
           "var(--text-caption)",
           { lineHeight: "var(--text-caption-leading)", fontWeight: "400" },
+        ],
+        "nav-group": [
+          "var(--text-nav-group)",
+          { lineHeight: "var(--text-nav-group-leading)", fontWeight: "600", letterSpacing: "0.06em" },
+        ],
+        metric: [
+          "var(--text-metric)",
+          { lineHeight: "var(--text-metric-leading)", fontWeight: "700" },
+        ],
+        "metric-secondary": [
+          "var(--text-metric-secondary)",
+          { lineHeight: "var(--text-metric-secondary-leading)", fontWeight: "600" },
         ],
         "display-xl": [
           "var(--text-display-xl)",
@@ -142,6 +159,7 @@ module.exports = {
         reading: "760px",
         auth: "420px",
         dashboard: "1440px",
+        overview: "var(--overview-max)",
         checkout: "1120px",
       },
       width: {

@@ -11,8 +11,8 @@ body {
 
 body {
   color: var(--foreground);
-  background: var(--gradient-ambient);
-  background-attachment: fixed;
+  /* Cloud White workspace — ambient gradient is optional subtle wash, not soft-gradient foundation */
+  background: var(--workspace-bg);
   font-family: var(--font-jakarta), "Plus Jakarta Sans", var(--font-inter), Inter, Arial, sans-serif;
   font-feature-settings: "ss01" on, "cv11" on;
   -webkit-font-smoothing: antialiased;
@@ -22,13 +22,12 @@ body {
   font-family: var(--font-jakarta), "Plus Jakarta Sans", var(--font-inter), Inter, Arial, sans-serif;
 }
 
-/* Opt-in Inter for surfaces that still prefer the previous product face */
 .font-inter {
   font-family: var(--font-inter), Inter, Arial, sans-serif;
 }
 
 *:focus-visible {
-  outline: 2px solid var(--brand-accessible-dark);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 2px;
 }
 

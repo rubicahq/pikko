@@ -1,8 +1,8 @@
 {
   "name": "@pikko/design-tokens",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Pikko design tokens — soft-gradient SaaS",
+  "description": "Pikko design tokens — Friendly Commerce Workspace",
   "main": "tokens.css",
   "files": ["tokens.css", "design-tokens.css", "tailwind.preset.js"]
 }

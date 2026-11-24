@@ -16,7 +16,7 @@ export function AppShell({
 }) {
   const permissions = currentStore.permissions;
   return (
-    <div className="flex min-h-screen bg-ambient">
+    <div className="flex min-h-screen bg-workspace">
       <div className="sticky top-0 hidden h-screen md:block">
         <DashboardSidebar
           user={user}
@@ -26,7 +26,7 @@ export function AppShell({
         />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-topbar items-center justify-between gap-3 border-b border-border/70 bg-white/80 px-4 backdrop-blur-sm supports-[backdrop-filter]:bg-white/70 md:px-8">
+        <header className="sticky top-0 z-30 flex h-topbar items-center justify-between gap-3 border-b border-border bg-background px-4 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <MobileNav
               user={user}
@@ -34,12 +34,8 @@ export function AppShell({
               currentStore={currentStore}
               permissions={permissions}
             />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{currentStore.name}</p>
-              <p className="truncate text-caption text-foreground-muted">
-                {currentStore.slug}
-                {currentStore.role ? ` · ${currentStore.role}` : ""}
-              </p>
+            <div className="min-w-0 md:hidden">
+              <p className="truncate text-sm font-semibold text-foreground">{currentStore.name}</p>
             </div>
           </div>
           <NotificationBell storeId={currentStore.id} />
