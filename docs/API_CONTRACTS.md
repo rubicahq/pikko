@@ -214,6 +214,13 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | GET/PUT | `/stores/{storeID}/preorders/{batchID}/purchasing` |
 | POST | `/stores/{storeID}/preorders/{batchID}/allocations` |
 | GET | `/stores/{storeID}/preorders/{batchID}/orders` |
+| GET | `/stores/{storeID}/purchasing` |
+| GET | `/stores/{storeID}/purchasing/eligibility` |
+| POST | `/stores/{storeID}/purchasing/unavailable-impact` |
+| POST | `/stores/{storeID}/orders/{orderID}/items/{itemID}/unavailable` |
+| GET/POST | `/stores/{storeID}/receiving` |
+| GET | `/stores/{storeID}/receiving/{receivingID}` |
+| PATCH | `/stores/{storeID}/receiving/{receivingID}/lines/{lineID}` |
 | GET/POST | `/stores/{storeID}/business-rules` |
 | PATCH/DELETE | `/stores/{storeID}/business-rules/{ruleID}` |
 | POST | `/stores/{storeID}/business-rules/preview` |
@@ -250,7 +257,7 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | Customer portal auth + orders | Agent 08 `/portal/*` |
 | Packing + shipments | Agent 09 |
 | Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |
-| Vendors / receiving | Agent 06 |
+| Vendors / receiving | **Shipped Agent 06** — vendors RBAC + `/purchasing/*` + `/receiving/*` |
 | Live sessions | Agent 12 |
 | WhatsApp template resolve | Agent 10 |
 

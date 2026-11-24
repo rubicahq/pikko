@@ -48,6 +48,7 @@ func resetAuthTables(t *testing.T, pool *pgxpool.Pool) {
 		         storefront_banners, storefront_configs,
 		         campaign_products, campaigns,
 		         product_attribute_values, attribute_definitions,
+		         receiving_lines, receiving_records,
 		         product_vendors, vendors,
 		         collection_products, collections,
 		         variant_option_values, product_variants, product_option_values, product_options,

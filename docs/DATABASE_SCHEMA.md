@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000008`  
+**Baseline migrations:** `000001`–`000010`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -17,8 +17,10 @@
 | 000006 | `phase5_merchant_efficiency` | Notifications, analytics_events, CSV import columns |
 | 000007 | `team_rbac` | Widen membership roles; `team_invites` |
 | 000008 | `campaign_catalog` | Campaigns + brands/vendors/attrs; link preorder batches |
+| 000009 | `order_management` | Order source/campaign, item availability cols, revisions, drafts |
+| 000010 | `purchasing_allocation` | Vendor splits on purchasing records, version, receiving foundation |
 
-Next free version: **`000009_…`** (Agents 05+).
+Next free version: **`000011_…`** (Agents 07+).
 
 ---
 
@@ -116,12 +118,12 @@ campaign_products (price/availability/selling_phase overrides)
 preorder_batches.campaign_id (backfilled)
 ```
 
-### 3.3 Vendors & receiving (Agent 06)
+### 3.3 Vendors & receiving (`000010` — Agent 06) ✅
 
 ```text
-vendors / product_vendors already from 000008 — extend with:
-purchase_orders / purchase_order_lines (optional MVP-lite: purchasing_records + vendor_id)
-receiving_records / receiving_lines → link purchasing + inventory adjustments
+preorder_purchasing_records: + vendor_id, received_qty, version (multi-vendor + concurrency)
+preorder_item_allocations: allocated_qty CHECK widened to >= 0
+receiving_records / receiving_lines → purchasing handoff + partial discrepancy notes
 ```
 
 ### 3.4 Finance (Agent 07)

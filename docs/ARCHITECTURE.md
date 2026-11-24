@@ -187,8 +187,9 @@ This architecture documents support for:
 
 - Multi-store tenancy — **implemented**
 - Order-item operations — **partial; qty adjust + availability columns (Agent 05); split/unavailable finance later**
-- Purchasing allocations — **implemented for preorder batches**
-- Historical revisions — **status history + `order_revisions` / `order_item_events` (Agent 05)**
+- Purchasing allocations — **store-wide workspace + multi-vendor + concurrency (Agent 06)**
+- Historical revisions — **status history + `order_revisions` / `order_item_events` (Agent 05/06)**
+- Receiving foundation — **`receiving_records` / lines (Agent 06)**
 - Financial reconciliation — **payments live; ledger/refund/credit planned for Agent 07**
 
 No application feature code in Agent 01 scope.

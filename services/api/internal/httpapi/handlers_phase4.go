@@ -167,6 +167,7 @@ func (h *CommerceHandlers) AllocateBatchItem(w http.ResponseWriter, r *http.Requ
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
 		return
 	}
+	in.ActorUserID = UserID(r)
 	if err := h.Commerce.AllocatePurchased(r.Context(), StoreID(r), batchID, in); err != nil {
 		h.mapErr(w, r, err)
 		return
