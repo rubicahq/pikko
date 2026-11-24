@@ -4,9 +4,9 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-03-auth-multistore-f4b8` (+ e2e hardening `cursor/agent-03-e2e-hardening-d7fd`)  
 **Prior:** Agent 02 at `54181f59ddf2492ac5882691118c3ccdf984525f`  
-**Merged main SHA:** `f5bd16c84574597bf593ad0d2fe74c6980de8666`  
+**Merged main SHA:** `e759f91d34a11c978c18cb769369247fd40608f7`  
 **Feature merge:** PR #12 → `115440464ea835588e686139e0a9398fa684ae30`  
-**E2E hardening merge:** `f5bd16c84574597bf593ad0d2fe74c6980de8666`
+**E2E hardening merge:** `c63c03e056de248fea8ebcc86cbd381c19b45afb`
 
 ---
 
