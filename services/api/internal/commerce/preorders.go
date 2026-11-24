@@ -161,6 +161,17 @@ func (s *Service) SyncBatchStatuses(ctx context.Context, storeID *uuid.UUID) (in
 	if err != nil {
 		return 0, err
 	}
+	// Mirror operational_status onto linked campaigns (CAMP-05)
+	syncCampaignSQL := `
+		UPDATE campaigns c SET operational_status=b.operational_status, updated_at=now()
+		FROM preorder_batches b
+		WHERE c.id=b.campaign_id AND c.store_id=b.store_id
+		  AND c.operational_status IS DISTINCT FROM b.operational_status`
+	if storeID != nil {
+		_, _ = s.DB.Exec(ctx, syncCampaignSQL+` AND b.store_id=$1`, *storeID)
+	} else {
+		_, _ = s.DB.Exec(ctx, syncCampaignSQL)
+	}
 	return int(tag1.RowsAffected() + tag2.RowsAffected() + tag3.RowsAffected()), nil
 }
 

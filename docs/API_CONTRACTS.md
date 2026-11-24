@@ -38,7 +38,9 @@
 | Prefix | Agent |
 | --- | --- |
 | `/stores/{id}/team` | 03/10 |
-| `/stores/{id}/vendors` | 06 |
+| `/stores/{id}/campaigns` | 04 |
+| `/stores/{id}/brands` / `attributes` | 04 |
+| `/stores/{id}/vendors` | 04 foundation / 06 |
 | `/stores/{id}/receiving` | 06 |
 | `/stores/{id}/finance` | 07 |
 | `/stores/{id}/packing` | 09 |
@@ -125,6 +127,24 @@ Store-scoped routes also enforce granular permissions via `RequirePermission` (c
 | POST | `/stores/{storeID}/products/{productID}/status` |
 | POST | `/stores/{storeID}/products/{productID}/archive` |
 | GET/POST | `/stores/{storeID}/collections` |
+| GET/POST | `/stores/{storeID}/brands` |
+| PATCH | `/stores/{storeID}/brands/{brandID}` |
+| GET/POST | `/stores/{storeID}/vendors` |
+| PATCH | `/stores/{storeID}/vendors/{vendorID}` |
+| GET/POST/DELETE | `/stores/{storeID}/products/{productID}/vendors[/{vendorID}]` |
+| GET/POST | `/stores/{storeID}/attributes` |
+| PATCH | `/stores/{storeID}/attributes/{attributeID}` |
+| GET/PUT/DELETE | `/stores/{storeID}/products/{productID}/attributes[/{attributeID}]` |
+
+### 2.5b Campaigns (Agent 04)
+
+| Method | Path | Auth / permission |
+| --- | --- | --- |
+| GET/POST | `/stores/{storeID}/campaigns` | `campaign.read` / `campaign.write` |
+| GET/PATCH | `/stores/{storeID}/campaigns/{campaignID}` | `campaign.read` / `campaign.write` |
+| POST/DELETE | `/stores/{storeID}/campaigns/{campaignID}/products[/{productID}]` | `campaign.write` |
+
+Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 
 ### 2.6 Catalog import + flipbook
 

@@ -66,6 +66,7 @@ type Product struct {
 	Description        *string        `json:"description,omitempty"`
 	SKU                *string        `json:"sku,omitempty"`
 	Brand              *string        `json:"brand,omitempty"`
+	BrandID            *uuid.UUID     `json:"brand_id,omitempty"`
 	CategoryID         *uuid.UUID     `json:"category_id,omitempty"`
 	CategoryName       *string        `json:"category_name,omitempty"`
 	BasePriceIDR       int64          `json:"base_price_idr"`
@@ -271,7 +272,7 @@ func (s *Service) ListProducts(ctx context.Context, storeID uuid.UUID, f Product
 	}
 	args = append(args, f.Limit, f.Offset)
 	q := fmt.Sprintf(`
-		SELECT p.id, p.store_id, p.name, p.slug, p.description, p.sku, p.brand, p.category_id, c.name,
+		SELECT p.id, p.store_id, p.name, p.slug, p.description, p.sku, p.brand, p.brand_id, p.category_id, c.name,
 		       p.base_price_idr, p.compare_at_price_idr, p.cost_price_idr,
 		       p.ready_stock_eligible, p.preorder_eligible, p.availability, p.inventory_mode,
 		       p.stock_quantity, p.weight_grams, p.status, p.created_at, p.updated_at
@@ -290,7 +291,7 @@ func (s *Service) ListProducts(ctx context.Context, storeID uuid.UUID, f Product
 	for rows.Next() {
 		var p Product
 		if err := rows.Scan(
-			&p.ID, &p.StoreID, &p.Name, &p.Slug, &p.Description, &p.SKU, &p.Brand, &p.CategoryID, &p.CategoryName,
+			&p.ID, &p.StoreID, &p.Name, &p.Slug, &p.Description, &p.SKU, &p.Brand, &p.BrandID, &p.CategoryID, &p.CategoryName,
 			&p.BasePriceIDR, &p.CompareAtPriceIDR, &p.CostPriceIDR,
 			&p.ReadyStockEligible, &p.PreorderEligible, &p.Availability, &p.InventoryMode,
 			&p.StockQuantity, &p.WeightGrams, &p.Status, &p.CreatedAt, &p.UpdatedAt,
@@ -309,6 +310,7 @@ type ProductInput struct {
 	Description        *string    `json:"description"`
 	SKU                *string    `json:"sku"`
 	Brand              *string    `json:"brand"`
+	BrandID            *uuid.UUID `json:"brand_id"`
 	CategoryID         *uuid.UUID `json:"category_id"`
 	BasePriceIDR       int64      `json:"base_price_idr"`
 	CompareAtPriceIDR  *int64     `json:"compare_at_price_idr"`
@@ -396,11 +398,11 @@ func (s *Service) CreateProduct(ctx context.Context, storeID uuid.UUID, in Produ
 	var id uuid.UUID
 	err = tx.QueryRow(ctx, `
 		INSERT INTO products (
-			store_id, name, slug, description, sku, brand, category_id, base_price_idr, compare_at_price_idr, cost_price_idr,
+			store_id, name, slug, description, sku, brand, brand_id, category_id, base_price_idr, compare_at_price_idr, cost_price_idr,
 			ready_stock_eligible, preorder_eligible, availability, inventory_mode, stock_quantity, weight_grams, status
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		RETURNING id
-	`, storeID, name, slug, p.Description, p.SKU, p.Brand, p.CategoryID, p.BasePriceIDR, p.CompareAtPriceIDR, p.CostPriceIDR,
+	`, storeID, name, slug, p.Description, p.SKU, p.Brand, p.BrandID, p.CategoryID, p.BasePriceIDR, p.CompareAtPriceIDR, p.CostPriceIDR,
 		ready, pre, avail, inv, p.StockQuantity, p.WeightGrams, status).Scan(&id)
 	if isUniqueViolation(err) {
 		return nil, ErrConflict
@@ -481,6 +483,10 @@ func (s *Service) UpdateProduct(ctx context.Context, storeID, productID uuid.UUI
 	if p.Brand != nil {
 		brand = p.Brand
 	}
+	brandID := cur.BrandID
+	if p.BrandID != nil {
+		brandID = p.BrandID
+	}
 	cat := cur.CategoryID
 	if p.CategoryID != nil {
 		cat = p.CategoryID
@@ -510,12 +516,12 @@ func (s *Service) UpdateProduct(ctx context.Context, storeID, productID uuid.UUI
 
 	ct, err := tx.Exec(ctx, `
 		UPDATE products SET
-			name=$3, slug=$4, description=$5, sku=$6, brand=$7, category_id=$8,
-			base_price_idr=$9, compare_at_price_idr=$10, cost_price_idr=$11,
-			ready_stock_eligible=$12, preorder_eligible=$13, availability=$14, inventory_mode=$15,
-			stock_quantity=$16, weight_grams=$17, status=$18, updated_at=now()
+			name=$3, slug=$4, description=$5, sku=$6, brand=$7, brand_id=$8, category_id=$9,
+			base_price_idr=$10, compare_at_price_idr=$11, cost_price_idr=$12,
+			ready_stock_eligible=$13, preorder_eligible=$14, availability=$15, inventory_mode=$16,
+			stock_quantity=$17, weight_grams=$18, status=$19, updated_at=now()
 		WHERE id=$1 AND store_id=$2
-	`, productID, storeID, name, slug, desc, sku, brand, cat, base, compare, cost, ready, pre, avail, inv, stock, weight, status)
+	`, productID, storeID, name, slug, desc, sku, brand, brandID, cat, base, compare, cost, ready, pre, avail, inv, stock, weight, status)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrConflict
@@ -663,7 +669,7 @@ func (s *Service) writeImages(ctx context.Context, tx pgx.Tx, storeID, productID
 func (s *Service) GetProduct(ctx context.Context, storeID, productID uuid.UUID, publicOnly bool) (*Product, error) {
 	var p Product
 	err := s.DB.QueryRow(ctx, `
-		SELECT p.id, p.store_id, p.name, p.slug, p.description, p.sku, p.brand, p.category_id, c.name,
+		SELECT p.id, p.store_id, p.name, p.slug, p.description, p.sku, p.brand, p.brand_id, p.category_id, c.name,
 		       p.base_price_idr, p.compare_at_price_idr, p.cost_price_idr,
 		       p.ready_stock_eligible, p.preorder_eligible, p.availability, p.inventory_mode,
 		       p.stock_quantity, p.weight_grams, p.status, p.created_at, p.updated_at
@@ -671,7 +677,7 @@ func (s *Service) GetProduct(ctx context.Context, storeID, productID uuid.UUID, 
 		LEFT JOIN categories c ON c.id=p.category_id
 		WHERE p.id=$1 AND p.store_id=$2
 	`, productID, storeID).Scan(
-		&p.ID, &p.StoreID, &p.Name, &p.Slug, &p.Description, &p.SKU, &p.Brand, &p.CategoryID, &p.CategoryName,
+		&p.ID, &p.StoreID, &p.Name, &p.Slug, &p.Description, &p.SKU, &p.Brand, &p.BrandID, &p.CategoryID, &p.CategoryName,
 		&p.BasePriceIDR, &p.CompareAtPriceIDR, &p.CostPriceIDR,
 		&p.ReadyStockEligible, &p.PreorderEligible, &p.Availability, &p.InventoryMode,
 		&p.StockQuantity, &p.WeightGrams, &p.Status, &p.CreatedAt, &p.UpdatedAt,

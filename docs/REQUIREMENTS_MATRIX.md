@@ -71,12 +71,12 @@
 
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
-| CAMP-01–04 | Preorder batches | done | `commerce/preorders.go`, UI | phase4 e2e | — |
-| CAMP-05 | Unified campaign abstraction | missing | — | — | Agent 04 |
-| LIVE-01–03 | Live shopping | missing | — | — | Agent 12 |
-| CAT-01–03,07 | Catalog core + snapshots | done | `catalog/` | phase2 e2e | — |
-| CAT-04 | Brands entity | partial | product fields | — | Agent 04 |
-| CAT-05–06 | Vendors link / custom attrs | missing | — | — | 04/06 |
+| CAMP-01–04 | Preorder batches | done | `commerce/preorders.go`, UI | phase4 e2e | Preserved; synced into campaigns |
+| CAMP-05 | Unified campaign abstraction | done | `campaigns/`, `/campaigns` UI, migration `000008` | campaigns integration | Live behavior still Agent 12 |
+| LIVE-01–03 | Live shopping | partial | campaign type=`live` + flags | campaigns integration | Quick-add / feed ops → Agent 12 |
+| CAT-01–03,07 | Catalog core + snapshots | done | `catalog/` | phase2 e2e | Collections unchanged |
+| CAT-04 | Brands entity | done | `brands` + `products.brand_id` | campaigns integration | Text `brand` column kept |
+| CAT-05–06 | Vendors link / custom attrs | done (foundation) | `vendors`, `product_vendors`, `attribute_*` | campaigns integration | Purchasing UX → Agent 06 |
 | PDF-01–05 | AI PDF + CSV + flipbook | done | imports, flipbook, ai | catalog-import, flipbook e2e | AI quality depends on key/model |
 
 ---
@@ -119,7 +119,7 @@
 
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
-| VEN-01–03 | Vendors | missing | — | — | Agent 06 |
+| VEN-01–03 | Vendors | partial | `vendors` + product links (Agent 04) | campaigns integration | Purchasing splits / UI → Agent 06 |
 | RCV-01–03 | Receiving | missing | — | — | Agent 06 |
 | PACK-01–03 | Packing | missing | fulfillment status manual | — | Agent 09 |
 | SHIP-01–03 | Shipments | missing/partial | emails only | — | Agent 09 |

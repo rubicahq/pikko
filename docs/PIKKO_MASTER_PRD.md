@@ -252,13 +252,13 @@ Target IA:
 | CAMP-02 | Assign products/variants; price override; quota | Done |
 | CAMP-03 | Open/close by absolute timestamps; job sync | Done |
 | CAMP-04 | Public listing on storefront | Done |
-| CAMP-05 | Unified “campaign” abstraction spanning preorder + live | Missing |
+| CAMP-05 | Unified “campaign” abstraction spanning preorder + live | Done (Agent 04; live ops deepen in 12) |
 
 ## 7.2 Live shopping
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| LIVE-01 | Live shopping session (not video stream) — timed window, quick-add SKUs | Missing |
+| LIVE-01 | Live shopping session (not video stream) — timed window, quick-add SKUs | Partial (campaign shell + flags; Agent 12) |
 | LIVE-02 | Merchant quick-add to customer carts/orders during live | Missing |
 | LIVE-03 | Live order feed / concurrency-safe inventory | Missing |
 
@@ -271,9 +271,9 @@ Target IA:
 | CAT-01 | Products CRUD; draft/published/archived; images; SKU; prices integer IDR | Done |
 | CAT-02 | Variants via options; price override; stock | Done |
 | CAT-03 | Categories + collections + featured | Done (collections create; featured via storefront) |
-| CAT-04 | Brands as first-class entities | Partial (text field only) |
-| CAT-05 | Vendors linked to products | Missing |
-| CAT-06 | Custom attributes | Missing |
+| CAT-04 | Brands as first-class entities | Done (Agent 04; text field retained) |
+| CAT-05 | Vendors linked to products | Done foundation (Agent 04; purchasing Agent 06) |
+| CAT-06 | Custom attributes | Done foundation (Agent 04) |
 | CAT-07 | Historical order line snapshots immutable | Done |
 
 ---

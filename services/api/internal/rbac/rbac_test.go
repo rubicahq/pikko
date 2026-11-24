@@ -60,3 +60,23 @@ func TestCSCanVerifyPayments(t *testing.T) {
 		t.Fatal("cs needs payment verification")
 	}
 }
+
+func TestCampaignPermissions(t *testing.T) {
+	if !rbac.HasPermission(rbac.RoleCatalog, rbac.PermCampaignWrite) {
+		t.Fatal("catalog role needs campaign.write")
+	}
+	if !rbac.HasPermission(rbac.RoleCS, rbac.PermCampaignRead) {
+		t.Fatal("cs needs campaign.read")
+	}
+	if rbac.HasPermission(rbac.RoleCS, rbac.PermCampaignWrite) {
+		t.Fatal("cs must not write campaigns")
+	}
+	perm, ok := rbac.NavPermission("campaigns")
+	if !ok || perm != rbac.PermCampaignRead {
+		t.Fatalf("nav campaigns -> %s ok=%v", perm, ok)
+	}
+	perm, ok = rbac.NavPermission("preorders")
+	if !ok || perm != rbac.PermCampaignRead {
+		t.Fatalf("nav preorders -> %s ok=%v", perm, ok)
+	}
+}

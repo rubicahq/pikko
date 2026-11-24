@@ -32,6 +32,9 @@ func (h *CommerceHandlers) CreateBatch(w http.ResponseWriter, r *http.Request) {
 		h.mapErr(w, r, err)
 		return
 	}
+	if h.Campaigns != nil {
+		_ = h.Campaigns.EnsureLinkedFromBatch(r.Context(), StoreID(r), b.ID)
+	}
 	writeJSON(w, http.StatusCreated, map[string]any{"batch": b})
 }
 
@@ -65,6 +68,10 @@ func (h *CommerceHandlers) PatchBatch(w http.ResponseWriter, r *http.Request) {
 		h.mapErr(w, r, err)
 		return
 	}
+	if h.Campaigns != nil {
+		_ = h.Campaigns.EnsureLinkedFromBatch(r.Context(), StoreID(r), batchID)
+		_ = h.Campaigns.SyncFromBatch(r.Context(), StoreID(r), batchID)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"batch": b})
 }
 
@@ -84,6 +91,10 @@ func (h *CommerceHandlers) AssignBatchProduct(w http.ResponseWriter, r *http.Req
 		h.mapErr(w, r, err)
 		return
 	}
+	if h.Campaigns != nil {
+		_ = h.Campaigns.EnsureLinkedFromBatch(r.Context(), StoreID(r), batchID)
+		_ = h.Campaigns.SyncBatchProduct(r.Context(), StoreID(r), batchID, in.ProductID)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"product": p})
 }
 
@@ -101,6 +112,9 @@ func (h *CommerceHandlers) RemoveBatchProduct(w http.ResponseWriter, r *http.Req
 	if err := h.Commerce.RemoveBatchProduct(r.Context(), StoreID(r), batchID, productID); err != nil {
 		h.mapErr(w, r, err)
 		return
+	}
+	if h.Campaigns != nil {
+		_ = h.Campaigns.RemoveBatchProductMirror(r.Context(), StoreID(r), batchID, productID)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
