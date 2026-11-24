@@ -177,4 +177,4 @@ Auth, multi-store, storefront, catalog, AI PDF/flipbook/CSV, checkout, bank tran
 | --- | --- |
 | 1 | Campaign unification, admin order entry, item revisions (RBAC done by Agent 03) |
 | 2 | Packing/shipments, WhatsApp (portal + finance done) |
-| 3 | Deploy hardening / runbook (Agent 15); still no auto pikko.id. Security/QA + E2E A–N + analytics done. |
+| 3 | **Done** — Agents 11–15 complete; still no auto pikko.id (owner `LAUNCH.md` only). |

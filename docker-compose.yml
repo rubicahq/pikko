@@ -37,6 +37,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    # Distroless image has no curl/wget — host-side health is scripts/smoke.sh
+    # and deploy.sh wait on 127.0.0.1:8100/healthz (deploy overlay).
     environment:
       APP_ENV: ${APP_ENV:-production}
       APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-pikko.site}
@@ -96,7 +98,20 @@ services:
       API_BASE_URL: http://api:8080
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-pikko_session}
     depends_on:
-      - api
+      api:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
     networks:
       - pikko
     expose:

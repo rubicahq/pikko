@@ -222,16 +222,18 @@ Then recreate `api` (env) and redeploy `web` (marketing `/` and `/auth` redirect
 
 ## Redeploy / update (main)
 
-**Preferred:** idempotent script (keeps deploy overlay ports, selective rebuild, optional backup, smoke, rollback):
+**Preferred:** idempotent script (keeps deploy overlay ports, selective rebuild, optional backup, smoke, rollback). Full operator checklist: **`docs/DEPLOYMENT_RUNBOOK.md`**.
 
 ```bash
+ssh -p 2021 ubuntu@43.163.99.95
 cd ~/pikko
 ./scripts/deploy.sh                 # pull main, rebuild only what changed, smoke
 ./scripts/deploy.sh --force-all     # rebuild api+web anyway
 ./scripts/deploy.sh --backup        # force pg_dump even without new migrations
+./scripts/deploy.sh --public-smoke  # + public HTTPS (env URLs; no pikko.id flip)
 ./scripts/deploy.sh --skip-smoke    # deploy without smoke
-./scripts/smoke.sh                  # smoke only (loopback)
-SMOKE_PUBLIC=1 ./scripts/smoke.sh   # + public HTTPS checks
+./scripts/smoke.sh                  # smoke only (loopback + readyz)
+SMOKE_PUBLIC=1 ./scripts/smoke.sh   # + public HTTPS checks (env-driven)
 ```
 
 ### What the script optimizes
