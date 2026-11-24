@@ -18,7 +18,9 @@ async function signInAndCreateStore(
     timeout: 15000,
   });
   await page.getByLabel("Store name").fill(storeName);
+  await page.getByLabel("Store URL").click();
   await page.getByLabel("Store URL").fill(slug);
+  await expect(page.getByLabel("Store URL")).toHaveValue(slug);
   await page.locator("#category").selectOption("other");
   await page.getByRole("button", { name: "Continue." }).click();
   await page.getByRole("button", { name: /Ready Stock/ }).click();
