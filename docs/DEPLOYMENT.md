@@ -5,166 +5,156 @@
 VPS (same host as Emplicon): `ssh -p 2021 ubuntu@43.163.99.95`  
 Checkout path on the server: `~/pikko` (separate from `~/emplicon`).
 
-**Hard rule:** Pikko is its own Docker Compose project. Do **not** modify, restart, remove, or prune Emplicon containers, volumes, networks, or nginx config while deploying Pikko.
-
-Intended hostnames (PRD / production DNS):
+**Hard rule:** Pikko is its own Docker Compose project. Do **not** recreate, stop, or prune Emplicon containers/volumes. Nginx changes for Pikko are additive (`nginx.d` snippet + graceful `nginx -s reload` after `nginx -t` only).
 
 | Surface | Host |
 | --- | --- |
-| Marketing | `pikko.site` |
-| Dashboard | `app.pikko.site` |
-| Storefront | `shop.pikko.site` |
-| API | `api.pikko.site` |
+| Marketing | `https://pikko.site` |
+| Dashboard | `https://app.pikko.site` |
+| Storefront | `https://shop.pikko.site` |
+| API | `https://api.pikko.site` |
 
-### DNS status (checked 2026-11-24)
+### DNS / Cloudflare (current)
 
-- `pikko.site` NS: Cloudflare (`mona.ns.cloudflare.com`, `jaime.ns.cloudflare.com`)
-- **No A/AAAA records** yet for `pikko.site`, `app.`, `shop.`, `api.`, or `www.`
-- Until DNS + TLS exist, Pikko is exposed on a free host port via its own nginx proxy (see Interim access below). Do not point Emplicon’s `:80`/`:443` nginx at Pikko until DNS is ready.
+- NS: Cloudflare
+- A records (DNS-only / grey cloud): `pikko.site`, `app.`, `shop.`, `api.` → `43.163.99.95`
+- Keep **DNS-only** until HTTPS is verified; enable Cloudflare Proxied afterward if desired (then use Full / Full Strict)
+- `www.pikko.site` is optional (no A record required for the current cert)
 
-## Emplicon pattern (read-only reference)
+## Architecture on the VPS
 
-Emplicon runs as compose project services on network `emplicon_emplicon`, with `emplicon-nginx` publishing host `:80`/`:443` and including `deploy/nginx.d/*.conf`. Extra apps (e.g. Rubica Engage) join that network and add an nginx.d snippet.
+| Piece | Detail |
+| --- | --- |
+| Compose project | `pikko` |
+| Network | `pikko_pikko` (+ `pikko-web` / `pikko-api` also attached to `emplicon_emplicon`) |
+| Volumes | `pikko_postgres_data`, `pikko_api_storage` |
+| Containers | `pikko-postgres`, `pikko-api`, `pikko-web`, `pikko-proxy` (optional `:9090`), migrate one-shot |
+| Public edge | `emplicon-nginx` `:80`/`:443` via `~/emplicon/deploy/nginx.d/pikko.site.conf` |
+| TLS files | `~/emplicon/deploy/ssl/pikko/{fullchain,privkey}.pem` (from Let’s Encrypt) |
+| ACME webroot | `~/emplicon/deploy/acme-webroot` (mounted at `/var/www/acme`) |
+| Renew hook | `/etc/letsencrypt/renewal-hooks/deploy/pikko.sh` |
 
-Pikko mirrors the isolation idea with:
-
-- Compose project name: `pikko`
-- Network: `pikko_pikko`
-- Volumes: `pikko_postgres_data`, `pikko_api_storage`
-- Containers: `pikko-postgres`, `pikko-api`, `pikko-web`, `pikko-proxy` (+ one-shot `pikko-migrate-*`)
-- Own reverse proxy on host **`:9090`** (does not conflict with Emplicon)
+Repo example (kept in sync with production intent):  
+`infrastructure/nginx/emplicon-nginx.d-pikko.site.conf.example`
 
 ## First-time VPS deploy
 
 ```bash
-# On the VPS
 git clone --branch cursor/phase-0-1-foundation-auth-b6f8 git@github.com:rubicahq/pikko.git ~/pikko
 cd ~/pikko
 
-# Generate production secrets on the server only (never commit or print)
 umask 077
 cp .env.example .env
-# Set POSTGRES_PASSWORD to a long random value, keep EMAIL_MODE=log
-# until a Brevo API key is supplied. For interim HTTP port access set:
-#   AUTH_COOKIE_SECURE=false
-#   MARKETING_URL / DASHBOARD_URL / STOREFRONT_URL / API_BASE_URL
-#     and NEXT_PUBLIC_* counterparts to http://43.163.99.95:9090
-#   API_CORS_ORIGINS to match those origins
+# Set POSTGRES_PASSWORD (long random). Keep EMAIL_MODE=log until Brevo is ready.
+# Production URLs:
+#   MARKETING_URL=https://pikko.site
+#   DASHBOARD_URL=https://app.pikko.site
+#   STOREFRONT_URL=https://shop.pikko.site
+#   API_BASE_URL=https://api.pikko.site
+#   NEXT_PUBLIC_* matching the above
+#   AUTH_COOKIE_SECURE=true
+#   API_CORS_ORIGINS=https://app.pikko.site,https://pikko.site,https://shop.pikko.site
 chmod 600 .env
 
 sudo docker compose -p pikko \
   -f docker-compose.yml -f docker-compose.deploy.yml \
   --profile proxy up -d --build
+
+# Let Emplicon nginx reach Pikko (additive; does not restart Emplicon)
+sudo docker network connect emplicon_emplicon pikko-web
+sudo docker network connect emplicon_emplicon pikko-api
 ```
 
-Services: `postgres`, `migrate` (one-shot), `api`, `web`, `proxy`.
+Services: `postgres`, `migrate` (one-shot), `api`, `web`, optional `proxy` on `:9090`.
 
-Dockerfiles:
+### TLS (Let’s Encrypt, Emplicon pattern)
 
-- `Dockerfile.api` — Go API + migrate binary
-- `Dockerfile.web` — Next.js standalone
+1. Install HTTP+ACME vhost first (or full HTTPS config from the example once certs exist).
+2. Issue cert **without stopping nginx** (webroot):
 
-### Interim access (DNS not ready)
+```bash
+sudo certbot certonly --webroot \
+  -w /home/ubuntu/emplicon/deploy/acme-webroot \
+  -d pikko.site -d app.pikko.site -d shop.pikko.site -d api.pikko.site \
+  --agree-tos -m kya@rubica.co.id
+```
 
-| Entry | URL |
-| --- | --- |
-| App + API (via pikko-proxy) | http://43.163.99.95:9090/ |
-| Health | http://43.163.99.95:9090/healthz |
-| Loopback web | http://127.0.0.1:3100/ |
-| Loopback API | http://127.0.0.1:8100/healthz |
+3. Copy into the nginx SSL mount and install renew hook (already present on the VPS as `pikko.sh`):
 
-`pikko-proxy` is the VPS front door for now. Host `:80`/`:443` remain Emplicon’s.
+```bash
+sudo mkdir -p /home/ubuntu/emplicon/deploy/ssl/pikko
+sudo cp /etc/letsencrypt/live/pikko.site/fullchain.pem /home/ubuntu/emplicon/deploy/ssl/pikko/
+sudo cp /etc/letsencrypt/live/pikko.site/privkey.pem /home/ubuntu/emplicon/deploy/ssl/pikko/
+sudo chown ubuntu:ubuntu /home/ubuntu/emplicon/deploy/ssl/pikko/*.pem
+sudo chmod 644 /home/ubuntu/emplicon/deploy/ssl/pikko/fullchain.pem
+sudo chmod 600 /home/ubuntu/emplicon/deploy/ssl/pikko/privkey.pem
+```
 
-### After DNS + TLS are ready
+4. Install HTTPS vhost → `nginx -t` → `nginx -s reload` (never recreate `emplicon-nginx` for a config change).
 
-1. Create Cloudflare A records for `pikko.site`, `www`, `app`, `shop`, `api` → `43.163.99.95` (proxied or DNS-only per TLS plan).
-2. Issue/install TLS certs (Cloudflare origin cert or Let’s Encrypt) under a path Emplicon nginx can mount, e.g. `~/emplicon/deploy/ssl/pikko/`.
-3. Attach Pikko app containers to Emplicon’s network (**additive**, does not restart Emplicon):
+Auto-renew uses `certbot.timer` + deploy hook that copies PEMs and reloads nginx. Verify with:
 
-   ```bash
-   sudo docker network connect emplicon_emplicon pikko-web
-   sudo docker network connect emplicon_emplicon pikko-api
-   ```
+```bash
+sudo certbot renew --dry-run --cert-name pikko.site
+```
 
-4. Install `infrastructure/nginx/emplicon-nginx.d-pikko.site.conf.example` as `~/emplicon/deploy/nginx.d/pikko.site.conf`, adjust TLS paths, then `nginx -t` + `nginx -s reload` inside `emplicon-nginx` (reload only — do not recreate the container).
-5. Update `~/pikko/.env` URLs to `https://…pikko.site`, set `AUTH_COOKIE_SECURE=true`, rebuild/recreate `api` + `web`, and optionally stop publishing `:9090` once hostname routing works.
+### Rollback (nginx vhost only)
 
-## Local without Docker
+1. Remove `~/emplicon/deploy/nginx.d/pikko.site.conf` (or restore previous copy from `~/backups/pikko-tls-*`).
+2. `sudo docker exec emplicon-nginx nginx -t`
+3. `sudo docker exec emplicon-nginx nginx -s reload`
 
-1. PostgreSQL 16+ with databases `pikko` / `pikko_test`
-2. `cp .env.example .env` and set `DATABASE_URL`
-3. `make migrate`
-4. Terminal A: `make api`
-5. Terminal B: `cd apps/web && npm run dev`
+Emplicon server blocks are unchanged by this rollback.
 
-Web proxies `/api/v1/*` to the API so session cookies stay same-origin on localhost:3000.
+## Verify
+
+```bash
+dig +short pikko.site app.pikko.site shop.pikko.site api.pikko.site
+curl -sSI http://pikko.site/ | head    # expect 301 → https
+curl -sS https://pikko.site/ -o /dev/null -w '%{http_code}\n'
+curl -sS https://app.pikko.site/ -o /dev/null -w '%{http_code}\n'
+curl -sS https://shop.pikko.site/ -o /dev/null -w '%{http_code}\n'
+curl -sS https://api.pikko.site/healthz
+# Emplicon smoke (local, bypass Cloudflare):
+curl -sk --resolve emplicon.com:443:127.0.0.1 https://emplicon.com/ -o /dev/null -w '%{http_code}\n'
+```
 
 ## Secrets
 
-Never commit `.env` or API keys. Required production secrets (generated on the VPS):
+Never commit `.env`. On the VPS: `~/pikko/.env` mode `600`.
 
-- `POSTGRES_PASSWORD` / `DATABASE_URL`
-- `BREVO_API_KEY` (only when `EMAIL_MODE=brevo`)
+- `POSTGRES_PASSWORD` / DB URL
+- `BREVO_API_KEY` only when switching `EMAIL_MODE=brevo`
 - storage credentials when using S3
-
-Keep `EMAIL_MODE=log` until Brevo sender domains are verified and a key is provided.
-
-## TLS / proxy
-
-Terminate TLS at nginx (Emplicon front door or a future dedicated edge). Forward `X-Forwarded-For` and `X-Forwarded-Proto`. Set `AUTH_COOKIE_SECURE=true` only when the browser reaches the app over HTTPS.
 
 ## Migrations
 
-Compose runs `migrate` before `api` starts:
+Compose runs migrate before api. Manual:
 
 ```bash
 sudo docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml run --rm migrate
 ```
 
-## Verify
+## App rollback
 
 ```bash
-sudo docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml --profile proxy ps
-curl -sS http://127.0.0.1:9090/healthz
-curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9090/
-curl -sS http://127.0.0.1:9090/api/v1/auth/session   # expect 401 JSON when logged out
+cd ~/pikko
+git fetch && git checkout <previous-sha>
+sudo docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml --profile proxy up -d --build
+sudo docker network connect emplicon_emplicon pikko-web || true
+sudo docker network connect emplicon_emplicon pikko-api || true
 ```
 
-Confirm Emplicon containers were not restarted (compare `docker inspect … StartedAt` / container IDs before and after).
-
-## Rollback
-
-1. **App-only rollback (preferred):** rebuild/recreate from a previous known-good git SHA / image tag:
-
-   ```bash
-   cd ~/pikko
-   git fetch && git checkout <previous-sha>
-   sudo docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml --profile proxy up -d --build
-   ```
-
-2. **Stop Pikko without deleting data:**
-
-   ```bash
-   sudo docker compose -p pikko -f docker-compose.yml -f docker-compose.deploy.yml --profile proxy stop
-   ```
-
-3. **Do not** run `docker compose down -v`, `docker volume rm`, `docker system prune`, or drop the Postgres database. Volume deletion requires explicit operator approval.
-
-4. Prefer forward-fix migrations. If a bad migration ships, restore from backup (below) before any destructive SQL.
+Do **not** `docker compose down -v`, prune volumes, or drop the database without explicit approval.
 
 ## Backup notes
 
-- Postgres data lives in Docker volume `pikko_postgres_data`.
-- Object/local uploads live in `pikko_api_storage`.
-- Logical dump example (non-destructive):
+```bash
+sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
+  > ~/backups/pikko-$(date -u +%Y%m%dT%H%M%SZ).dump
+```
 
-  ```bash
-  sudo docker exec pikko-postgres pg_dump -U pikko -d pikko -Fc \
-    > ~/backups/pikko-$(date -u +%Y%m%dT%H%M%SZ).dump
-  ```
-
-- Keep dumps off the compose project directory; encrypt/store per your normal VPS backup routine.
-- Restoring a dump is a deliberate ops action — never automate restore into a live volume without approval.
+Volumes: `pikko_postgres_data`, `pikko_api_storage`. Keep dumps outside the compose tree.
 
 ## Redeploy / update
 
@@ -174,13 +164,20 @@ git pull
 sudo docker compose -p pikko \
   -f docker-compose.yml -f docker-compose.deploy.yml \
   --profile proxy up -d --build
+sudo docker network connect emplicon_emplicon pikko-web || true
+sudo docker network connect emplicon_emplicon pikko-api || true
 ```
 
-## Local Docker (developer machine)
+## Local without Docker
+
+1. PostgreSQL 16+ with `pikko` / `pikko_test`
+2. `cp .env.example .env` and set `DATABASE_URL`
+3. `make migrate` → `make api` → `cd apps/web && npm run dev`
+
+## Local Docker
 
 ```bash
 cp .env.example .env
 docker compose up --build -d
-# optional proxy: add a compose override that publishes e.g. "8088:80", then:
-docker compose --profile proxy up --build -d
+# optional proxy: publish a free host port in an override, then --profile proxy
 ```

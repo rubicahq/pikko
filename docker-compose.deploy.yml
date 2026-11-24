@@ -22,10 +22,10 @@ services:
     environment:
       APP_ENV: production
       APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-pikko.site}
-      MARKETING_URL: ${MARKETING_URL:-http://127.0.0.1:9090}
-      DASHBOARD_URL: ${DASHBOARD_URL:-http://127.0.0.1:9090}
-      STOREFRONT_URL: ${STOREFRONT_URL:-http://127.0.0.1:9090}
-      API_BASE_URL: ${API_BASE_URL:-http://127.0.0.1:9090}
+      MARKETING_URL: ${MARKETING_URL:-https://pikko.site}
+      DASHBOARD_URL: ${DASHBOARD_URL:-https://app.pikko.site}
+      STOREFRONT_URL: ${STOREFRONT_URL:-https://shop.pikko.site}
+      API_BASE_URL: ${API_BASE_URL:-https://api.pikko.site}
       DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
       EMAIL_MODE: ${EMAIL_MODE:-log}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
@@ -33,11 +33,11 @@ services:
       EMAIL_ACCOUNT_FROM: ${EMAIL_ACCOUNT_FROM:-account@pikko.site}
       EMAIL_NOTIFICATION_FROM: ${EMAIL_NOTIFICATION_FROM:-notifications@pikko.site}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@pikko.site}
-      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
       AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-pikko_session}
       API_ADDR: ":8080"
-      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://127.0.0.1:9090,http://43.163.99.95:9090}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-https://app.pikko.site,https://pikko.site,https://shop.pikko.site}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_PATH: /data/storage
     ports:
@@ -50,9 +50,9 @@ services:
     build:
       args:
         NEXT_PUBLIC_APP_ENV: production
-        NEXT_PUBLIC_MARKETING_URL: ${NEXT_PUBLIC_MARKETING_URL:-http://127.0.0.1:9090}
-        NEXT_PUBLIC_DASHBOARD_URL: ${NEXT_PUBLIC_DASHBOARD_URL:-http://127.0.0.1:9090}
-        NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:-http://127.0.0.1:9090}
+        NEXT_PUBLIC_MARKETING_URL: ${NEXT_PUBLIC_MARKETING_URL:-https://pikko.site}
+        NEXT_PUBLIC_DASHBOARD_URL: ${NEXT_PUBLIC_DASHBOARD_URL:-https://app.pikko.site}
+        NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:-https://shop.pikko.site}
         NEXT_PUBLIC_API_BASE_URL: ""
     environment:
       NODE_ENV: production
