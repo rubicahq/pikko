@@ -3,7 +3,9 @@
 **Date:** 2026-11-25 (Asia/Jakarta)  
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-08-customer-portal-af34`  
-**Prior:** Agent 07 main tip `97a9276` (PR #20/#21) + Friendly Commerce Workspace `bf346e2` (PR #22)  
+**Prior:** Agent 07 main tip `97a9276` (PR #20/#21) + Friendly Commerce Workspace `bf346e2` (PR #22)
+**Feature merge SHA:** `bd002b793e8ff814c0d25e05af5a834e78ec4a7b` (PR #23)
+**Merged main SHA:** `bd002b793e8ff814c0d25e05af5a834e78ec4a7b`  
 
 ---
 
