@@ -8,6 +8,9 @@ import {
 import { ProductForm } from "@/components/catalog/product-form";
 import { urls } from "@/lib/urls";
 
+const PRODUCT_ID_UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export default async function EditProductPage({
   params,
 }: {
@@ -18,6 +21,11 @@ export default async function EditProductPage({
   if (!session) redirect(urls.auth());
   const store = await getStore(storeId);
   if (!store) redirect(urls.stores());
+  // Product IDs are UUIDs. If a static catalog segment (new/import/flipbook)
+  // ever lands here, bounce to the catalog index instead of calling the API.
+  if (!PRODUCT_ID_UUID.test(productId)) {
+    redirect(urls.storeCatalog(storeId));
+  }
   const [product, categories] = await Promise.all([
     getProduct(storeId, productId),
     getStoreCategories(storeId),
