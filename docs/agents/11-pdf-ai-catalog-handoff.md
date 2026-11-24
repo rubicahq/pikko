@@ -4,7 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-11-pdf-ai-catalog-84b7`  
 **Prior:** Agent 10 feature merge `983c67a` (WhatsApp); main tip includes handoff PR #28  
-**Merged main SHA:** _(filled after merge)_
+**Feature merge SHA:** `6a51005d55196e76aebae5d0d519061647d32fef` (PR #29)  
+**Merged main SHA:** `6a51005d55196e76aebae5d0d519061647d32fef`
 
 ---
 
