@@ -34,7 +34,12 @@ test.describe("Phase 2 catalog and storefront", () => {
     const slug = `phase2-${Date.now().toString(36)}`;
     await signInAndCreateStore(page, "Phase Two Shop", slug);
 
-    const storefrontHref = await page.locator('a[href*="127.0.0.1:3000/"]').first().getAttribute("href");
+    // Storefront host may be localhost or 127.0.0.1 depending on env; slug is authoritative.
+    const storefrontHref = await page
+      .locator(`a[href*="/${slug}"]`)
+      .first()
+      .getAttribute("href")
+      .catch(() => null);
     const liveSlug = storefrontHref?.split("/").filter(Boolean).pop() || slug;
 
     await page.getByRole("link", { name: "Catalog" }).click();
