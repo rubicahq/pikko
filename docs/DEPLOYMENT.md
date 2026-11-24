@@ -126,6 +126,12 @@ Never commit `.env`. On the VPS: `~/pikko/.env` mode `600`.
 - `POSTGRES_PASSWORD` / DB URL
 - `BREVO_API_KEY` only when switching `EMAIL_MODE=brevo`
 - storage credentials when using S3
+- AI gateway (OpenAI-compatible; server `.env` only):
+  - `AI_API_KEY`
+  - `AI_BASE_URL` (use `…/v1` chat/completions + models under that base)
+  - `AI_MODEL` (production currently uses `gemini/gemini-3.5-flash`)
+
+Do not put AI keys in the repo, docs with real values, logs, or agent stores. Changing AI env alone does not require a container restart until the app reads these vars.
 
 ## Migrations
 
