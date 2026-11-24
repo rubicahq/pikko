@@ -309,7 +309,7 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | ORD-07 | Spreadsheet / bulk order entry | Done |
 | ORD-08 | CSV order export/import | Done (order CSV import; catalog CSV preserved) |
 | ORD-09 | Historical revisions / immutable change log beyond status history | Done (`order_revisions` + status history) |
-| ORD-10 | Deposit + final payment schedules | Missing |
+| ORD-10 | Deposit + final payment schedules | Done (policies + payment kinds; schedule UX lite) |
 | ORD-11 | Cart groups ready-stock vs per-batch; one group per submit | Done |
 
 ---
@@ -331,9 +331,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UNAV-01 | Mark item unavailable; adjust payable | Done (hooks + revisions; refunds Agent 07) |
+| UNAV-01 | Mark item unavailable; adjust payable | Done (hooks + revisions + finance ledger) |
 | UNAV-02 | Customer-visible availability on portal | Missing (tracking shows order, not item-level portal) |
-| UNAV-03 | Automatic financial adjustment proposals | Missing |
+| UNAV-03 | Automatic financial adjustment proposals | Done (impact + financial_adjustments on apply) |
 
 ---
 
@@ -344,11 +344,11 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | FIN-01 | Integer IDR only; no floats | Done |
 | FIN-02 | Payment methods (bank accounts) per store | Done |
 | FIN-03 | Evidence verify/reject; payment status dimension | Done |
-| FIN-04 | Order payable = goods + fees − unavailable − credits | Partial (handling/shipping fees; no credit ledger) |
-| FIN-05 | Reconciliation workspace (expected vs received vs refundable) | Missing |
-| FIN-06 | Scenario: Rp300k / 250k / 110k → 190k payable, 60k refund | Missing (E2E-F target) |
-| FIN-07 | Idempotent payment mutations; concurrency-safe | Partial |
-| FIN-08 | Immutable financial event history | Partial |
+| FIN-04 | Order payable = goods + fees − unavailable − credits | Done |
+| FIN-05 | Reconciliation workspace (expected vs received vs refundable) | Done |
+| FIN-06 | Scenario: Rp300k / 250k / 110k → 190k payable, 60k refund | Done (E2E-F API test) |
+| FIN-07 | Idempotent payment mutations; concurrency-safe | Done |
+| FIN-08 | Immutable financial event history | Done |
 
 ---
 
@@ -356,10 +356,10 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| REF-01 | Record refunds (full/partial); payment_status refunded states exist | Partial (status enums; no refund workflow UI/API) |
-| REF-02 | Store credit ledger per customer per store | Missing |
-| REF-03 | Apply store credit at checkout / admin order | Missing |
-| REF-04 | Refund evidence and audit | Missing |
+| REF-01 | Record refunds (full/partial); payment_status refunded states exist | Done |
+| REF-02 | Store credit ledger per customer per store | Done (feature-flagged) |
+| REF-03 | Apply store credit at checkout / admin order | Done (admin finance apply; checkout wire optional later) |
+| REF-04 | Refund evidence and audit | Done (evidence_file_id + financial_events) |
 
 ---
 
@@ -618,9 +618,9 @@ Do not skip acceptance gates.
 | E2E-C | Admin order entry | 1 | Missing |
 | E2E-D | Purchasing aggregation | 2 | Done (API + workspace; Playwright deferred) |
 | E2E-E | Partial availability allocation | 2 | Partial |
-| E2E-F | Financial reconciliation (300k/250k/110k → 190k payable, 60k refund) | 2 | Missing |
-| E2E-G | Store credit apply | 2 | Missing |
-| E2E-H | Consolidated payment | 2 | Missing |
+| E2E-F | Financial reconciliation (300k/250k/110k → 190k payable, 60k refund) | 2 | Done (API) |
+| E2E-G | Store credit apply | 2 | Done (API, flag) |
+| E2E-H | Consolidated payment | 2 | Done (API) |
 | E2E-I | Packing flow | 2 | Missing |
 | E2E-J | Address change | 2 | Missing |
 | E2E-K | Live shopping session | 3 | Missing |

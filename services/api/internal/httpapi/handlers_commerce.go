@@ -46,8 +46,12 @@ func (h *CommerceHandlers) mapErr(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, r, http.StatusConflict, "invalid_transition", "This status change is not allowed.")
 	case errors.Is(err, commerce.ErrAlreadyVerified):
 		writeError(w, r, http.StatusConflict, "already_verified", "Payment is already verified.")
-	case errors.Is(err, commerce.ErrConflict):
+	case errors.Is(err, commerce.ErrConflict), errors.Is(err, commerce.ErrVersionConflict):
 		writeError(w, r, http.StatusConflict, "conflict", "Request conflicts with current state.")
+	case errors.Is(err, commerce.ErrStoreCreditDisabled):
+		writeError(w, r, http.StatusConflict, "store_credit_disabled", "Store credit is not enabled.")
+	case errors.Is(err, commerce.ErrInsufficientCredit):
+		writeError(w, r, http.StatusConflict, "insufficient_credit", "Insufficient store credit balance.")
 	case errors.Is(err, commerce.ErrRateLimited):
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited", "Too many requests. Try again later.")
 	default:

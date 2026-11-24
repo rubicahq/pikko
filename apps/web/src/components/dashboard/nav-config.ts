@@ -58,7 +58,7 @@ export const MERCHANT_NAV: NavGroup[] = [
       { href: "purchasing", label: "Purchasing", icon: ClipboardList, implemented: true },
       { href: "packing", label: "Packing", icon: Boxes, implemented: false },
       { href: "shipments", label: "Shipments", icon: Truck, implemented: false },
-      { href: "finance", label: "Payments", icon: Wallet, implemented: false },
+      { href: "finance", label: "Payments", icon: Wallet, implemented: true },
     ],
   },
   {

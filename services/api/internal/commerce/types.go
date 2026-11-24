@@ -279,23 +279,28 @@ type AdminOrderDraft struct {
 }
 
 type Payment struct {
-	ID                      uuid.UUID  `json:"id"`
-	StoreID                 uuid.UUID  `json:"store_id"`
-	OrderID                 uuid.UUID  `json:"order_id"`
-	PaymentMethodID         *uuid.UUID `json:"payment_method_id,omitempty"`
-	MethodType              string     `json:"method_type"`
-	AmountIDR               int64      `json:"amount_idr"`
-	Status                  string     `json:"status"`
-	BankNameSnapshot        *string    `json:"bank_name_snapshot,omitempty"`
-	AccountHolderSnapshot   *string    `json:"account_holder_snapshot,omitempty"`
-	AccountNumberSnapshot   *string    `json:"account_number_snapshot,omitempty"`
-	InstructionsSnapshot    *string    `json:"instructions_snapshot,omitempty"`
-	VerifiedAt              *time.Time `json:"verified_at,omitempty"`
-	RejectedAt              *time.Time `json:"rejected_at,omitempty"`
-	RejectReason            *string    `json:"reject_reason,omitempty"`
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at"`
-	Evidence                []Evidence `json:"evidence,omitempty"`
+	ID                      uuid.UUID           `json:"id"`
+	StoreID                 uuid.UUID           `json:"store_id"`
+	OrderID                 uuid.UUID           `json:"order_id"`
+	PaymentMethodID         *uuid.UUID          `json:"payment_method_id,omitempty"`
+	MethodType              string              `json:"method_type"`
+	AmountIDR               int64               `json:"amount_idr"`
+	Status                  string              `json:"status"`
+	BankNameSnapshot        *string             `json:"bank_name_snapshot,omitempty"`
+	AccountHolderSnapshot   *string             `json:"account_holder_snapshot,omitempty"`
+	AccountNumberSnapshot   *string             `json:"account_number_snapshot,omitempty"`
+	InstructionsSnapshot    *string             `json:"instructions_snapshot,omitempty"`
+	VerifiedAt              *time.Time          `json:"verified_at,omitempty"`
+	RejectedAt              *time.Time          `json:"rejected_at,omitempty"`
+	RejectReason            *string             `json:"reject_reason,omitempty"`
+	CreatedAt               time.Time           `json:"created_at"`
+	UpdatedAt               time.Time           `json:"updated_at"`
+	Evidence                []Evidence          `json:"evidence,omitempty"`
+	PaymentKind             string              `json:"payment_kind,omitempty"`
+	IdempotencyKey          *string             `json:"idempotency_key,omitempty"`
+	Note                    *string             `json:"note,omitempty"`
+	Version                 int                 `json:"version,omitempty"`
+	Allocations             []PaymentAllocation `json:"allocations,omitempty"`
 }
 
 type Evidence struct {

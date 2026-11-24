@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000010`  
+**Baseline migrations:** `000001`–`000011`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -19,8 +19,9 @@
 | 000008 | `campaign_catalog` | Campaigns + brands/vendors/attrs; link preorder batches |
 | 000009 | `order_management` | Order source/campaign, item availability cols, revisions, drafts |
 | 000010 | `purchasing_allocation` | Vendor splits on purchasing records, version, receiving foundation |
+| 000011 | `payments_finance` | Deposits, payment allocations, financial events/adjustments, refunds, store credit |
 
-Next free version: **`000011_…`** (Agents 07+).
+Next free version: **`000012_…`** (Agents 08+).
 
 ---
 
@@ -126,13 +127,17 @@ preorder_item_allocations: allocated_qty CHECK widened to >= 0
 receiving_records / receiving_lines → purchasing handoff + partial discrepancy notes
 ```
 
-### 3.4 Finance (Agent 07)
+### 3.4 Finance (`000011` — Agent 07) ✅
 
 ```text
-financial_events (store_id, customer_id?, order_id?, type, amount_idr, direction, idempotency_key)
-refunds (order_id, amount_idr, reason, status, evidence_file_id?)
-store_credits (customer_id, balance_idr) + store_credit_ledger (append-only)
-reconciliation_snapshots (optional materialized view / table)
+orders: + original_total_idr, unavailable_delta_idr, credit_applied_idr, payable_idr, settlement_status
+store_deposit_policies (percent_bps | fixed)
+payments: + payment_kind, idempotency_key, note, version
+payment_allocations (multi-order / consolidated)
+financial_events (append-only, store+idempotency unique)
+financial_adjustments (unavailable/manual/credit)
+refunds (+ evidence_file_id, version concurrency)
+stores.store_credit_enabled + store_credits + store_credit_ledger (FEATURE_STORE_CREDIT)
 ```
 
 **Never** mutate historical `payments.amount_idr` after verify; issue compensating events.
