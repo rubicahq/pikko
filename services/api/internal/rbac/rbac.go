@@ -104,6 +104,7 @@ var roleMatrix = map[string][]Permission{
 		PermCatalogRead, PermCatalogWrite,
 		PermCampaignRead, PermCampaignWrite,
 		PermStorefrontRead, PermStorefrontWrite,
+		PermPurchasingRead, // list vendors when linking products
 		PermNotificationsRead,
 	},
 	RolePurchasing: {

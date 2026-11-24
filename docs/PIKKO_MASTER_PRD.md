@@ -321,9 +321,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | PUR-01 | Consolidated purchasing list per batch (required vs unpaid demand) | Done |
 | PUR-02 | Record purchased / unavailable quantities | Done |
 | PUR-03 | Allocate purchased qty to order items; notify on unavailable | Done |
-| PUR-04 | Multi-vendor purchasing splits | Missing |
-| PUR-05 | Cross-batch / store-wide purchasing views | Missing |
-| PUR-06 | Purchasing → receiving handoff | Missing |
+| PUR-04 | Multi-vendor purchasing splits | Done |
+| PUR-05 | Cross-batch / store-wide purchasing views | Done |
+| PUR-06 | Purchasing → receiving handoff | Done (foundation) |
 
 ---
 
@@ -331,7 +331,7 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UNAV-01 | Mark item unavailable; adjust payable | Partial (allocation unavailable qty + email) |
+| UNAV-01 | Mark item unavailable; adjust payable | Done (hooks + revisions; refunds Agent 07) |
 | UNAV-02 | Customer-visible availability on portal | Missing (tracking shows order, not item-level portal) |
 | UNAV-03 | Automatic financial adjustment proposals | Missing |
 
@@ -400,9 +400,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| VEN-01 | Vendor entities (name, contacts, notes) | Missing |
-| VEN-02 | Link products/SKUs to preferred vendors | Missing |
-| VEN-03 | Purchasing lists grouped by vendor | Missing |
+| VEN-01 | Vendor entities (name, contacts, notes) | Done |
+| VEN-02 | Link products/SKUs to preferred vendors | Done |
+| VEN-03 | Purchasing lists grouped by vendor | Done |
 
 ---
 
@@ -410,9 +410,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| RCV-01 | Record goods received against purchasing | Missing |
-| RCV-02 | Partial receiving; discrepancy notes | Missing |
-| RCV-03 | Trigger availability → packing eligibility | Missing |
+| RCV-01 | Record goods received against purchasing | Done (foundation) |
+| RCV-02 | Partial receiving; discrepancy notes | Done |
+| RCV-03 | Trigger availability → packing eligibility | Partial (status nudge; packing Agent 09) |
 
 ---
 
@@ -616,7 +616,7 @@ Do not skip acceptance gates.
 | E2E-A | Multi-store isolation | 1 | Covered (Playwright multi-store) |
 | E2E-B | PDF catalog → products → flipbook hotspot checkout | 3 | Partial (import+flipbook+checkout exist; full chain test) |
 | E2E-C | Admin order entry | 1 | Missing |
-| E2E-D | Purchasing aggregation | 2 | Partial API |
+| E2E-D | Purchasing aggregation | 2 | Done (API + workspace; Playwright deferred) |
 | E2E-E | Partial availability allocation | 2 | Partial |
 | E2E-F | Financial reconciliation (300k/250k/110k → 190k payable, 60k refund) | 2 | Missing |
 | E2E-G | Store credit apply | 2 | Missing |

@@ -184,9 +184,9 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/brands", storePerm(rbac.PermCatalogRead, p2.ListBrands))
 	mux.Handle("POST /api/v1/stores/{storeID}/brands", storePerm(rbac.PermCatalogWrite, p2.CreateBrand))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/brands/{brandID}", storePerm(rbac.PermCatalogWrite, p2.UpdateBrand))
-	mux.Handle("GET /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermCatalogRead, p2.ListVendors))
-	mux.Handle("POST /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermCatalogWrite, p2.CreateVendor))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/vendors/{vendorID}", storePerm(rbac.PermCatalogWrite, p2.UpdateVendor))
+	mux.Handle("GET /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermPurchasingRead, p2.ListVendors))
+	mux.Handle("POST /api/v1/stores/{storeID}/vendors", storePerm(rbac.PermPurchasingWrite, p2.CreateVendor))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/vendors/{vendorID}", storePerm(rbac.PermPurchasingWrite, p2.UpdateVendor))
 	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}/vendors", storePerm(rbac.PermCatalogRead, p2.ListProductVendors))
 	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/vendors", storePerm(rbac.PermCatalogWrite, p2.LinkProductVendor))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/products/{productID}/vendors/{vendorID}", storePerm(rbac.PermCatalogWrite, p2.UnlinkProductVendor))
@@ -280,6 +280,16 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storePerm(rbac.PermPurchasingWrite, commerceH.UpdateBatchPurchasing))
 	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storePerm(rbac.PermPurchasingWrite, commerceH.AllocateBatchItem))
 	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/orders", storePerm(rbac.PermOrdersRead, commerceH.ListBatchOrders))
+
+	// Agent 06: store-wide purchasing workspace, unavailable impact, receiving
+	mux.Handle("GET /api/v1/stores/{storeID}/purchasing", storePerm(rbac.PermPurchasingRead, commerceH.StorePurchasing))
+	mux.Handle("GET /api/v1/stores/{storeID}/purchasing/eligibility", storePerm(rbac.PermPurchasingRead, commerceH.PurchasingEligibility))
+	mux.Handle("POST /api/v1/stores/{storeID}/purchasing/unavailable-impact", storePerm(rbac.PermPurchasingRead, commerceH.UnavailableImpact))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/items/{itemID}/unavailable", storePerm(rbac.PermPurchasingWrite, commerceH.MarkOrderItemUnavailable))
+	mux.Handle("GET /api/v1/stores/{storeID}/receiving", storePerm(rbac.PermPurchasingRead, commerceH.ListReceiving))
+	mux.Handle("POST /api/v1/stores/{storeID}/receiving", storePerm(rbac.PermPurchasingWrite, commerceH.CreateReceiving))
+	mux.Handle("GET /api/v1/stores/{storeID}/receiving/{receivingID}", storePerm(rbac.PermPurchasingRead, commerceH.GetReceiving))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/receiving/{receivingID}/lines/{lineID}", storePerm(rbac.PermPurchasingWrite, commerceH.UpdateReceivingLine))
 
 	// Phase 4: business rules
 	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesRead, commerceH.ListRules))

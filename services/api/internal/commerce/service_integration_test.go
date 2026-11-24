@@ -48,6 +48,7 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 		         analytics_events, notifications, notification_preferences,
 		         outbox_events, job_queue,
 		         order_rule_applications, business_rule_versions, business_rules,
+		         receiving_lines, receiving_records,
 		         preorder_item_allocations, preorder_purchasing_records,
 		         inventory_adjustments, inventory_reservations,
 		         payment_evidence, payments, order_tracking_tokens, order_status_history, order_item_events, order_revisions, admin_order_drafts, order_items, orders,

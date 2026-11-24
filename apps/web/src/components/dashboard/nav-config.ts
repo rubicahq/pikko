@@ -55,7 +55,7 @@ export const MERCHANT_NAV: NavGroup[] = [
       { href: "orders", label: "Orders", icon: ShoppingBag, implemented: true },
       { href: "customers", label: "Customers", icon: Users, implemented: true },
       // Deferred — Agents 06–09 / finance
-      { href: "purchasing", label: "Purchasing", icon: ClipboardList, implemented: false },
+      { href: "purchasing", label: "Purchasing", icon: ClipboardList, implemented: true },
       { href: "packing", label: "Packing", icon: Boxes, implemented: false },
       { href: "shipments", label: "Shipments", icon: Truck, implemented: false },
       { href: "finance", label: "Payments", icon: Wallet, implemented: false },
@@ -71,8 +71,7 @@ export const MERCHANT_NAV: NavGroup[] = [
       { href: "storefront", label: "Storefront", icon: Store, implemented: true },
       { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal, implemented: true },
       { href: "settings", label: "Settings", icon: Settings, implemented: true },
-      // Deferred — Agents 06 / 03+10
-      { href: "vendors", label: "Vendors", icon: Building2, implemented: false },
+      { href: "vendors", label: "Vendors", icon: Building2, implemented: true },
       { href: "team", label: "Team", icon: UserCog, implemented: true },
     ],
   },

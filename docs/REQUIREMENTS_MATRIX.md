@@ -86,14 +86,14 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | ORD-01–04,11 | Checkout, bank transfer, tracking, dimensions | done | `commerce/*` | phase3/4 e2e | — |
-| ORD-05 | Item-level operations | partial | qty adjust + item events + availability cols; allocations | commerce admin tests | Split/unavailable full finance → later |
+| ORD-05 | Item-level operations | partial | qty adjust + item events + availability + unavailable hooks | commerce admin + allocation tests | Full refunds → Agent 07 |
 | ORD-06–07 | Admin / spreadsheet entry | done | `admin_orders.go`, order-entry UI | commerce admin tests | Draft autosave + keyboard grid |
 | ORD-08 | Order CSV | done | `order_csv.go`, import UI | commerce admin tests | Template + preview match + import |
 | ORD-09 | Full revisions | done | `order_revisions` + status history | commerce admin tests | Non-destructive append-only |
 | ORD-10 | Deposit/final payments | missing | — | — | Agent 07 |
-| PUR-01–03 | Purchasing + allocate | done | `purchasing.go` | phase4 integration | UI depth varies |
-| PUR-04–06 | Multi-vendor / receiving | missing | — | — | Agent 06 |
-| UNAV-01 | Unavailable adjust | partial | allocations + email | phase4 | No full finance adjust |
+| PUR-01–03 | Purchasing + allocate | done | `purchasing.go` + workspace | allocation concurrency test | Concurrent FOR UPDATE |
+| PUR-04–06 | Multi-vendor / receiving | done | `000010`, workspace UI, `receiving.go` | allocation + receiving tests | Packing eligibility nudge only |
+| UNAV-01 | Unavailable adjust | done (hooks) | impact API + mark unavailable + revisions | allocation test | Ledger/refunds → Agent 07 |
 | UNAV-02–03 | Portal visibility / auto proposals | missing | — | — | 07/08 |
 
 ---
@@ -119,8 +119,8 @@
 
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
-| VEN-01–03 | Vendors | partial | `vendors` + product links (Agent 04) | campaigns integration | Purchasing splits / UI → Agent 06 |
-| RCV-01–03 | Receiving | missing | — | — | Agent 06 |
+| VEN-01–03 | Vendors | done | vendors UI + purchasing splits by vendor | catalog + purchasing tests | — |
+| RCV-01–03 | Receiving | done (foundation) | `receiving_records` / lines + UI | allocation test | Full packing gate → Agent 09 |
 | PACK-01–03 | Packing | missing | fulfillment status manual | — | Agent 09 |
 | SHIP-01–03 | Shipments | missing/partial | emails only | — | Agent 09 |
 | WA-* | WhatsApp templates | missing | email templates exist | — | Agent 10 |
@@ -151,7 +151,7 @@
 | E2E-A Multi-store | done | Playwright |
 | E2E-B PDF→checkout | partial | Pieces exist |
 | E2E-C Admin entry | partial (API+UI; Playwright deferred) | Stage 1 |
-| E2E-D Purchasing | partial | Stage 2 |
+| E2E-D Purchasing | done (API + workspace) | Stage 2 |
 | E2E-E Partial availability | partial | Stage 2 |
 | E2E-F Reconciliation math | missing | Stage 2 |
 | E2E-G Store credit | missing | Stage 2 |

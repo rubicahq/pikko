@@ -55,6 +55,10 @@ export const urls = {
   storeCampaigns: (storeId: string) => `/stores/${storeId}/campaigns`,
   storeCampaign: (storeId: string, campaignId: string) => `/stores/${storeId}/campaigns/${campaignId}`,
   storeCampaignNew: (storeId: string) => `/stores/${storeId}/campaigns/new`,
+  storePurchasing: (storeId: string) => `/stores/${storeId}/purchasing`,
+  storeVendors: (storeId: string) => `/stores/${storeId}/vendors`,
+  storeReceiving: (storeId: string, receivingId: string) =>
+    `/stores/${storeId}/purchasing/receiving/${receivingId}`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
   storefrontCart: (slug: string) => `/${slug}/cart`,

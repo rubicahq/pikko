@@ -142,7 +142,25 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 06)
+## 3f. Agent 06 status (Purchasing & Allocation)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000010_purchasing_allocation` | Done |
+| Store-wide aggregation (campaign/vendor/brand/variant) | Done |
+| Purchasing eligibility + workspace UI | Done |
+| Multi-vendor purchase records + version concurrency | Done |
+| Allocation FOR UPDATE + concurrency test | Done |
+| Unavailable impact + order adjustment hooks (revisions) | Done |
+| Receiving foundation + UI | Done |
+| Nav Purchasing + Vendors with RBAC | Done |
+| `docs/agents/06-purchasing-allocation-handoff.md` | Done |
+| Checkout / admin orders preserved | Yes |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 07)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
