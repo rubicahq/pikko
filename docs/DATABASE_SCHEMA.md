@@ -1,87 +1,183 @@
-# Database Schema (Phase 0–5)
+# Database Schema — Current + Target (PRD v3.0)
 
-Migrations:
+**Baseline migrations:** `000001`–`000006`  
+**Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
-- `000001_phase1_auth_stores.up.sql` — auth / stores
-- `000002_phase2_storefront_catalog.up.sql` — products / storefront
-- `000003_ai_pdf_import.up.sql` — import jobs, job queue, catalog pages/hotspots
-- `000004_phase3_orders_payments.up.sql` — checkout, orders, payments, tracking
-- `000005_phase4_preorder_rules.up.sql` — preorder batches / business rules
-- `000006_phase5_merchant_efficiency.up.sql` — notifications, CSV import, analytics events
+---
 
-## Phase 1 tables
+## 1. Migration inventory (current)
 
-`users`, `authentication_tokens`, `sessions`, `user_preferences`, `stores`, `store_memberships`, `store_slug_aliases`, `onboarding_drafts`, `auth_rate_limits`, `email_jobs`, `audit_logs`
+| Version | File | Purpose |
+| --- | --- | --- |
+| 000001 | `phase1_auth_stores` | Users, auth tokens, sessions, stores, memberships, onboarding, email_jobs, audit_logs |
+| 000002 | `phase2_storefront_catalog` | Files, storefront, products, variants, collections, featured |
+| 000003 | `ai_pdf_import` | job_queue, outbox_events, catalog_import_*, catalog_pages/hotspots |
+| 000004 | `phase3_orders_payments` | Customers, orders, items, payments, evidence, inventory, counters |
+| 000005 | `phase4_preorder_rules` | Preorder batches, purchasing, allocations, business rules |
+| 000006 | `phase5_merchant_efficiency` | Notifications, analytics_events, CSV import columns |
 
-## Phase 2 tables
+Next free version: **`000007_…`** (Agents 03+).
 
-| Table | Purpose |
+---
+
+## 2. Current schema summary
+
+### 2.1 Identity & tenancy
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `users` | email (unique normalized), display_name, last_store_id | |
+| `authentication_tokens` | token_hash, expires_at, consumed_at | Magic links |
+| `sessions` | session_hash, user_id, expires_at, revoked_at | |
+| `user_preferences` | locale, timezone | |
+| `stores` | slug unique, selling_model, theme, publication_status, checkout_enabled, archived_at | |
+| `store_memberships` | role **CHECK (`owner` only)**, status active/revoked | **Target:** widen roles |
+| `store_slug_aliases` | historical slugs | |
+| `onboarding_drafts` | step JSON progress | |
+| `auth_rate_limits` | email/IP windows | |
+| `email_jobs` | idempotency, attempts, status | |
+| `audit_logs` | actor, action, payload | |
+
+### 2.2 Catalog & storefront
+
+`stored_files`, `storefront_configs` (channel draft|published), `storefront_banners`, `categories`, `products`, `product_images`, `product_options`, `product_option_values`, `product_variants`, `variant_option_values`, `collections`, `collection_products`, `storefront_featured_products`, `storefront_featured_collections`.
+
+Money on products/variants: integer IDR. Status: draft/published/archived.
+
+### 2.3 Import & flipbook
+
+`job_queue`, `outbox_events`, `catalog_import_jobs` (+ `source_type`, `csv_file_id`), `catalog_import_items`, `catalog_pages`, `catalog_page_hotspots`.
+
+### 2.4 Commerce
+
+| Table | Notes |
 | --- | --- |
-| `stored_files` | Store-scoped uploads (`stores/{storeId}/{purpose}/…`) |
-| `storefront_configs` | Draft vs published branding/theme/colors/assets |
-| `storefront_banners` | Banner rows per channel (API scaffolding) |
-| `storefront_featured_products` | Up to 8 featured (draft/published) |
-| `storefront_featured_collections` | Up to 4 featured |
-| `categories` | Store-scoped product categories |
-| `products` | Catalog masters; `status` draft/published/archived; optional `sku`; integer IDR prices |
-| `product_images` | Ordered images → `stored_files` |
-| `product_options` / `product_option_values` | Variant option definitions |
-| `product_variants` / `variant_option_values` | Combinations + price overrides |
-| `collections` / `collection_products` | Merchandising collections |
+| `store_payment_methods` | Bank transfer accounts |
+| `store_fulfillment_settings` | Shipping / free / pickup |
+| `customers` / `customer_addresses` | Store-scoped |
+| `orders` | Multi-dimension statuses; immutable fee totals; optional `preorder_batch_id` + snapshots |
+| `order_items` | Immutable name/price snapshots; optional `batch_id` |
+| `order_status_history` | dimension order\|payment\|fulfillment |
+| `order_tracking_tokens` | SHA-256 only |
+| `payments` / `payment_evidence` | Manual transfer + private files |
+| `inventory_reservations` / `inventory_adjustments` | Finite stock + batch quotas |
+| `public_rate_limits` / `store_order_counters` | |
 
-## AI import & flipbook (`000003`)
+### 2.5 Preorder & rules
 
-| Table | Purpose |
-| --- | --- |
-| `job_queue` | PostgreSQL job queue with idempotency + SKIP LOCKED claims |
-| `outbox_events` | Transactional outbox |
-| `catalog_import_jobs` / `catalog_import_items` | PDF import |
-| `catalog_pages` / `catalog_page_hotspots` | Flipbook |
+`preorder_batches`, `preorder_batch_products`, `preorder_batch_variants`, `preorder_purchasing_records`, `preorder_item_allocations`, `business_rules`, `business_rule_versions`, `order_rule_applications`.
 
-## Phase 3 commerce (`000004`)
+### 2.6 Merchant efficiency
 
-| Table | Purpose |
-| --- | --- |
-| `store_payment_methods` | Per-store bank transfer accounts |
-| `store_fulfillment_settings` | Shipping / free shipping / pickup |
-| `customers` / `customer_addresses` | Store-scoped customers from orders |
-| `orders` / `order_items` | Orders with immutable price snapshots |
-| `order_status_history` | Audit of order/payment/fulfillment transitions |
-| `order_tracking_tokens` | SHA-256 hashes only (≥256-bit raw tokens) |
-| `payments` / `payment_evidence` | Manual transfer + private proof files |
-| `inventory_reservations` / `inventory_adjustments` | Finite stock reservations |
-| `public_rate_limits` | Checkout/tracking/evidence rate limits |
-| `store_order_counters` | Sequential order numbers per store |
+`notifications`, `notification_preferences`, `analytics_events`.
 
-`stored_files.purpose` also allows `payment_evidence`.
+### 2.7 Conventions
 
-Timestamps are `TIMESTAMPTZ` (UTC). Display timezone default Asia/Jakarta.
+- PKs: UUID `gen_random_uuid()`
+- Timestamps: `TIMESTAMPTZ` UTC
+- Tenant: `store_id` FK on business tables
+- Soft archive preferred over hard delete for stores/products
 
-## Phase 4 preorder + rules (`000005`)
+---
 
-| Table | Purpose |
-| --- | --- |
-| `preorder_batches` | Batch window, ETA, publication + operational status |
-| `preorder_batch_products` | Product assignment, batch price override, quota |
-| `preorder_batch_variants` | Optional variant-level overrides |
-| `preorder_purchasing_records` | Purchased / unavailable quantities per SKU |
-| `preorder_item_allocations` | Allocate purchased qty to order items |
-| `business_rules` | Enabled rules by type + scope (store / selling_model / batch) |
-| `business_rule_versions` | Immutable published configs (versioned) |
-| `order_rule_applications` | Per-order snapshots of applied rule versions |
+## 3. Target schema (additive — do not implement in Agent 01)
 
-Also: `orders.preorder_batch_id` + batch name/slug/ETA snapshots + `requires_approval`; `order_items.batch_id`; `inventory_reservations.batch_id` for quotas; `stored_files.purpose` includes `preorder_cover`.
+Mark each as **planned additive migration**. Exact DDL owned by implementing agents; this section locks intent.
 
-## Phase 5 merchant efficiency (`000006`)
+### 3.1 Team RBAC (`000007` candidate — Agent 03)
 
-| Table / change | Purpose |
-| --- | --- |
-| `notifications` | Store-scoped in-app notifications |
-| `notification_preferences` | Optional operational email/in-app prefs |
-| `analytics_events` | Lightweight event sink (dashboards mainly query orders) |
-| `catalog_import_jobs.source_type` / `csv_file_id` | PDF or CSV import jobs |
-| `stored_files.purpose` | Adds `catalog_csv` |
+```text
+ALTER store_memberships: widen role CHECK to
+  ('owner','admin','cs','catalog','purchasing','packing','finance')
++ team_invites (store_id, email, role, token_hash, expires_at, accepted_at)
++ optional permission_overrides (defer if role matrix sufficient)
+```
 
-## Defaults on store create
+### 3.2 Order item operations & revisions (Agent 05)
 
-Theme `pikko_signature`, draft `storefront_configs` row, currency IDR, timezone Asia/Jakarta, locale id-ID, publication draft, checkout false until payment + fulfillment configured.
+```text
+order_items: + availability_status, allocated_qty, packed_qty, adjusted_line_total_idr
+order_item_events / order_revisions: append-only change log (who/when/why/before/after)
+admin_order_drafts (optional): spreadsheet entry staging
+```
+
+### 3.3 Vendors & receiving (Agent 06)
+
+```text
+vendors (store_id, name, contacts, notes)
+product_vendors (product_id, vendor_id, preference)
+purchase_orders / purchase_order_lines (optional MVP-lite: purchasing_records + vendor_id)
+receiving_records / receiving_lines → link purchasing + inventory adjustments
+```
+
+### 3.4 Finance (Agent 07)
+
+```text
+financial_events (store_id, customer_id?, order_id?, type, amount_idr, direction, idempotency_key)
+refunds (order_id, amount_idr, reason, status, evidence_file_id?)
+store_credits (customer_id, balance_idr) + store_credit_ledger (append-only)
+reconciliation_snapshots (optional materialized view / table)
+```
+
+**Never** mutate historical `payments.amount_idr` after verify; issue compensating events.
+
+### 3.5 Customer portal (Agent 08)
+
+```text
+customer_identities / customer_sessions (email magic link scoped to customer+store)
+OR reuse users with customer_store_links — choose one model; prefer separate customer auth to avoid conflating merchant users
+portal_address_change_requests
+```
+
+### 3.6 Packing & shipments (Agent 09)
+
+```text
+packing_tasks (order_id, status, assigned_user_id?)
+packing_task_items (order_item_id, qty_packed)
+shipments (carrier, tracking_number, status, shipped_at)
+shipment_items (shipment_id, order_item_id, qty)
+```
+
+### 3.7 Live shopping (Agent 12)
+
+```text
+live_sessions (store_id, title, opens_at, closes_at, status)
+live_session_products
+live_quick_adds / tie into orders
+```
+
+### 3.8 WhatsApp (Agent 10)
+
+```text
+whatsapp_templates (code V01–V08, C01–C18, body, variables)
+whatsapp_sends (optional log; deep-link only in MVP — no WhatsApp Business API required)
+```
+
+---
+
+## 4. Migration safety checklist
+
+For every new migration:
+
+1. **Up** is additive (`CREATE TABLE`, `ADD COLUMN` nullable or with default, widen CHECKs carefully)
+2. Backfill in same migration only if online-safe
+3. **No** `DROP COLUMN` / type-narrowing on live data without approval
+4. Indexes concurrent where needed on large tables (orders)
+5. Update this doc + `REQUIREMENTS_MATRIX.md`
+6. Integration tests against migrated schema
+
+---
+
+## 5. ER mental model (simplified)
+
+```
+users ──< store_memberships >── stores
+stores ──< products ──< variants
+stores ──< customers ──< orders ──< order_items
+orders ──< payments ──< payment_evidence
+stores ──< preorder_batches ──< purchasing_records
+                           └──< item_allocations → order_items
+stores ──< business_rules ──< versions → order_rule_applications
+```
+
+Target adds vendors/receiving/finance/packing/shipments/portal around the same `stores` hub.

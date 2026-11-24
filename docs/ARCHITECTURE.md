@@ -1,65 +1,200 @@
-# Architecture
+# Architecture — Pikko Modular Monolith (PRD v3.0)
 
-## Overview
+**Owner:** Agent 01 (Lead Architect)  
+**Baseline:** `main` @ `353498a`, migrations `000001`–`000006`  
+**Rule:** Additive evolution only. No greenfield rewrite. No destructive production migrations.
 
-Modular monolith (PRD §31). Phase 6 adds the public marketing site (SEO, legal, solutions) and production readiness (health/ready probes, access logs, coarse API rate limits, backup scripts, runbook) on the Phase 0–5 foundation.
+---
+
+## 1. Overview
 
 ```
 pikko/
-  apps/web              Next.js — marketing, auth, dashboard, storefront, checkout, tracking
-  services/api          Go — auth, stores, storefront, catalog, commerce, files, imports, flipbook
-  packages/design-tokens
-  database/migrations
-  docs/
+  apps/web                 Next.js — marketing, auth, dashboard, storefront, checkout, tracking
+  services/api             Go modular monolith — REST /api/v1
+  packages/design-tokens   CSS + Tailwind preset
+  packages/ui              Shared package stub (primary UI lives in apps/web/src/components/ui)
+  packages/shared-types
+  database/migrations      Numbered SQL up/down
+  infrastructure/          nginx examples, backup, ops
+  scripts/                 deploy.sh, smoke.sh
+  docs/                    PRD + architecture + contracts
 ```
 
-## Runtime
-
-| Service | Role |
+| Runtime | Role |
 | --- | --- |
-| `web` | Dashboard + public `/{slug}` storefront + cart/checkout + `/track/{token}` |
-| `api` | Auth, account, stores, storefront, catalog, commerce, files, workers |
-| `postgres` | System of record |
-| `migrate` | SQL migrations |
+| `web` | All browser surfaces (host-routed via nginx) |
+| `api` | Business logic + in-process job worker |
+| `postgres` | System of record (`pikko-postgres` on VPS) |
+| `migrate` | One-shot migration job |
 
-## Multi-tenancy
+---
 
-Store is the tenant. Every catalog/storefront/file row carries `store_id`. Routes are `/api/v1/stores/{storeId}/…` with auth + membership middleware. Storage keys: `stores/{storeId}/{purpose}/{uuid}{ext}`.
+## 2. Modular monolith boundaries
 
-## Storefront draft vs published
+Packages under `services/api/internal/` are **logical modules**, not separate deployables. Cross-module calls are in-process Go imports. HTTP is the only external boundary.
 
-`storefront_configs` has `channel` `draft` \| `published`. Editing draft never changes live. Publish copies draft (+ featured/banners) atomically and sets `stores.publication_status=published`.
+### 2.1 Current modules (preserve)
 
-## Catalog / flipbook readiness
+| Module | Responsibility |
+| --- | --- |
+| `auth` / `account` | Magic link, sessions, account profile |
+| `stores` | Store CRUD, onboarding, membership (owner) |
+| `storefront` | Draft/published branding, themes, featured |
+| `catalog` | Products, variants, categories, collections |
+| `files` / `storage` | Store-scoped uploads |
+| `imports` / `ai` / `pdfutil` / `flipbook` | PDF/CSV import + flipbook |
+| `commerce` | Checkout, orders, payments, preorders, purchasing, rules, customers |
+| `notifications` / `analytics` | In-app notifications + overview metrics |
+| `email` / `jobs` | Email jobs + job_queue + outbox worker |
+| `money` / `urls` / `config` / `httpapi` | Cross-cutting |
 
-Products expose stable UUIDs, store-scoped slugs, optional SKU, images, and draft/published status. Public `link_ref` is the contract for flipbook hotspots. See `docs/CATALOG_LINK_CONTRACT.md`.
+### 2.2 Target modules (additive; do not invent microservices)
 
-## Commerce (Phase 3–4)
+| Module | Introduced by | Notes |
+| --- | --- | --- |
+| `team` | Agent 03/10 | RBAC roles, invites |
+| `campaigns` | Agent 04 | Unify preorder + live under campaign facade (or keep preorders + add live) |
+| `vendors` | Agent 06 | Vendor master data |
+| `receiving` | Agent 06 | Goods receipt |
+| `finance` | Agent 07 | Ledger, refunds, store credit, reconciliation |
+| `portal` | Agent 08 | Customer-authenticated portal |
+| `packing` / `shipments` | Agent 09 | Pack queues + carrier tracking |
+| `whatsapp` | Agent 10 | Template registry + deep links |
+| `live` | Agent 12 | Live shopping sessions |
 
-- Cart lines are client-persisted (store-scoped); checkout preview/submit revalidate prices and stock on the server.
-- Cart groups separate ready-stock from each preorder batch; one group per checkout submit.
-- Orders store immutable line snapshots; statuses: order / payment / fulfillment (separate dimensions).
-- Preorder batches: open/close by absolute UTC timestamps; batch price overrides + quotas; purchasing aggregation.
-- Business rules: handling fee / minimum / approval with scope precedence (batch > selling model > store) and version snapshots on orders.
-- Manual bank transfer only in MVP; evidence files use purpose `payment_evidence` (private).
-- Tracking tokens are ≥256-bit; only SHA-256 hashes are stored.
-- `stores.checkout_enabled` flips on when payment methods + fulfillment are configured.
-- Money is integer IDR with deterministic half-up helpers for percentage fees.
+**Integration rule:** New modules own tables + service methods; `httpapi` registers routes; shared types stay thin. Prefer extending `commerce` only when the concept is already inseparable (e.g. order item allocation).
 
-## Jobs
+---
 
-`email_jobs` table persists delivery attempts. Auth emails send immediately via `SendNow`. Transactional commerce emails are enqueued with idempotency keys and drained by the in-process worker (`DrainPending`).
+## 3. Tenancy
 
-Catalog PDF import uses a PostgreSQL `job_queue` + `outbox_events` with idempotency keys. The API process runs an in-process worker that claims jobs (`FOR UPDATE SKIP LOCKED`), renders PDF pages, calls the AI extractor adapter, and writes review items. Outbox rows are marked published by the same worker loop.
+- **Tenant = store.** Every business row includes `store_id`.
+- Routes: `/api/v1/stores/{storeID}/…` with `AuthMiddleware` + `StoreAuthMiddleware`.
+- Public surfaces use store **slug**, then resolve to `store_id` server-side; still filter by store.
+- Storage keys: `stores/{storeId}/{purpose}/{uuid}{ext}`.
+- **Never** trust client-supplied store id without membership check.
+- Multi-tab: store id is in the URL path, not a single global cookie.
 
-## AI adapter
+### 3.1 Membership evolution
 
-`internal/ai.CatalogExtractor` with:
-- `MockExtractor` — default when `AI_API_KEY` is empty (tests/CI)
-- `OpenAICompatClient` — SumoPod OpenAI-compatible gateway (`AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY`)
+Today: `store_memberships.role CHECK (role IN ('owner'))`.
 
-Keys are env-only; never logged. Empty AI responses are retried (max tokens 65536).
+Target: widen CHECK **additively** to include admin/CS/catalog/purchasing/packing/finance. Migration must:
 
-## URL generation
+1. Drop/replace CHECK without deleting rows
+2. Default existing rows remain `owner`
+3. Introduce permission helpers; keep owner as superset
 
-Centralized in Go `internal/urls` and web `lib/urls.ts`. No hardcoded production domains in business logic.
+---
+
+## 4. Money
+
+| Rule | Implementation |
+| --- | --- |
+| Currency | IDR only in MVP |
+| Representation | `BIGINT` integer rupiah (not cents-of-cents) |
+| No floats | Enforced in Go (`internal/money`) and SQL CHECKs `>= 0` |
+| Fees | Deterministic half-up percentage helpers (`money.Round`) |
+| Display | `money.FormatIDR` / UI thousand separators; timezone Asia/Jakarta for dates |
+
+Financial features (Agent 07) must add an **append-only ledger** (or event table) for refunds/credits; never rewrite historical `order_items.unit_price_idr` snapshots.
+
+---
+
+## 5. Outbox & jobs
+
+| Mechanism | Use |
+| --- | --- |
+| `email_jobs` | Auth SendNow + commerce DrainPending with idempotency keys |
+| `job_queue` | Long work: PDF import, preorder batch status sync (`FOR UPDATE SKIP LOCKED`) |
+| `outbox_events` | Transactional side-effects after commits |
+
+**Target events (document for later agents):** `order.placed`, `payment.verified`, `item.unavailable`, `allocation.updated`, `refund.issued`, `credit.applied`, `shipment.created`, `packing.completed`.
+
+Worker runs in-process inside `api` (see `httpapi.NewRouter`). Do not introduce Redis/Kafka for MVP.
+
+---
+
+## 6. Status dimensions
+
+Statuses are **independent dimensions**, never collapsed into one enum.
+
+### 6.1 Order-level (live)
+
+```
+order_status        pending_confirmation | confirmed | completed | cancelled
+payment_status      unpaid | awaiting_verification | paid | failed | refunded | partially_refunded
+fulfillment_status  unfulfilled | purchasing | awaiting_arrival | ready_to_ship |
+                    ready_for_pickup | shipped | delivered | collected | cancelled
+```
+
+History: `order_status_history(dimension, from_status, to_status, actor, reason)`.
+
+### 6.2 Target item-level (Agents 05–09)
+
+Documented for schema planning (additive columns/tables):
+
+| Dimension | Example values |
+| --- | --- |
+| Item availability | available / partially_unavailable / unavailable |
+| Item allocation | unallocated / partial / allocated |
+| Item packing | unpacked / packed |
+| Item settlement | open / adjusted / settled |
+
+Order-level fulfillment may aggregate from items but must not erase item history.
+
+### 6.3 Publication vs checkout vs operational
+
+Keep separate:
+
+- Store `publication_status` (draft/published)
+- `checkout_enabled` (payments + fulfillment configured)
+- Batch publication vs operational open/closed
+- Financial settlement (future) vs `payment_status`
+
+---
+
+## 7. Frontend surfaces
+
+| Host | App routes (conceptual) |
+| --- | --- |
+| `pikko.site` | Marketing `(marketing)/*` |
+| `app.pikko.site` | Auth, onboarding, `/stores/{id}/*` dashboard |
+| `shop.pikko.site` | `/{storeSlug}/*` storefront, cart, checkout; future portal |
+| Shared | `/track/{token}`, `/api/v1/*` proxy |
+
+Web proxies API via `apps/web/src/app/api/v1/[...path]` so session cookies can be host-friendly.
+
+---
+
+## 8. Security architecture
+
+1. AuthN: session cookie validated on API
+2. AuthZ: membership (+ future RBAC permissions)
+3. Public endpoints: rate-limited; no private evidence without token/membership
+4. Secrets: env only (Brevo, AI, DB, storage)
+5. Headers: CSP, HSTS, nosniff, frame deny
+6. CORS: allowlist from surface URLs (+ legacy domain when set)
+
+---
+
+## 9. Deployment topology
+
+VPS Docker Compose project `pikko` beside Emplicon. Emplicon nginx terminates TLS and routes hosts. See `DEPLOYMENT_RUNBOOK.md`.
+
+Domains today: `*.pikko.site`. `pikko.id` cutover is **manual owner action**, not automatic.
+
+---
+
+## 10. Acceptance gate (Agent 01)
+
+This architecture documents support for:
+
+- Multi-store tenancy — **implemented**
+- Order-item operations — **partial; target model defined**
+- Purchasing allocations — **implemented for preorder batches**
+- Historical revisions — **status history live; full revision model planned additive**
+- Financial reconciliation — **payments live; ledger/refund/credit planned for Agent 07**
+
+No application feature code in Agent 01 scope.

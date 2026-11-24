@@ -1,4 +1,8 @@
-# PIKKO - Master PRD v4.0 (condensed transcription of the user's PRD; this is the source of truth)
+# PIKKO - Master PRD v4.0 (historical)
+
+> **Superseded for new work by PRD v3.0:** see `docs/PIKKO_MASTER_PRD.md`. This v4 document remains as the record of the phased build already live on `pikko.site`.
+
+# PIKKO - Master PRD v4.0 (condensed transcription of the user's PRD; historical source for phases 0–7)
 
 Condensed for hand-off: every requirement, list, table value, route, token and acceptance rule is kept; only prose filler is trimmed. Section numbers match the original. Copy this file to `docs/PRODUCT_REQUIREMENTS.md` in the repo.
 
