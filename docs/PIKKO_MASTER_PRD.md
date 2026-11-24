@@ -485,9 +485,9 @@ Email transactional templates exist for magic link, order, payment, unavailable,
 | ID | Requirement | Status |
 | --- | --- | --- |
 | DASH-01 | Overview metrics from real data; never fabricate | Done |
-| DASH-02 | Operational task list (confirm, verify payment, fulfill, batch deadlines) | Partial |
+| DASH-02 | Operational task list (confirm, verify payment, fulfill, batch deadlines) | Done (MVP via analytics ops + overview attention) |
 | DASH-03 | Setup checklist from persisted state | Done |
-| DASH-04 | Purchasing / packing / finance widgets | Missing |
+| DASH-04 | Purchasing / packing / finance widgets | Done (MVP packing/live/finance/refund counts) |
 
 ---
 
@@ -566,10 +566,10 @@ Store is the tenant boundary. All business rows carry `store_id`. Storage keys: 
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| AN-01 | North star (v3): successfully fulfilled order items per active merchant store | Partial (order-level overview exists) |
-| AN-02 | Activation / engagement / operational / retention metrics | Partial |
-| AN-03 | `analytics_events` sink + overview API | Done (lightweight) |
-| AN-04 | Never fabricate production metrics | Done |
+| AN-01 | North star (v3): successfully fulfilled order items per active merchant store | Done (item qty + value; all-time + range) |
+| AN-02 | Activation / engagement / operational / retention metrics | Done (MVP depth on overview API) |
+| AN-03 | `analytics_events` sink + overview API | Done (RecordEvent + emit from payment/fulfillment/live) |
+| AN-04 | Never fabricate production metrics | Done (empty states when no rows) |
 
 ---
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/rubicahq/pikko/services/api/internal/analytics"
 )
 
 type ListOrdersFilter struct {
@@ -279,6 +281,7 @@ func (s *Service) UpdateOrder(ctx context.Context, storeID, orderID, actorID uui
 		}
 	}
 
+	fulfillmentChanged := false
 	if in.FulfillmentStatus != nil && *in.FulfillmentStatus != o.FulfillmentStatus {
 		if o.OrderStatus == OrderCancelled {
 			return nil, ErrInvalidTransition
@@ -301,6 +304,7 @@ func (s *Service) UpdateOrder(ctx context.Context, storeID, orderID, actorID uui
 			VALUES ($1,$2,'fulfillment',$3,$4,$5)
 		`, storeID, orderID, o.FulfillmentStatus, *in.FulfillmentStatus, actorID)
 		o.FulfillmentStatus = *in.FulfillmentStatus
+		fulfillmentChanged = true
 	}
 
 	if in.InternalNotes != nil {
@@ -314,6 +318,14 @@ func (s *Service) UpdateOrder(ctx context.Context, storeID, orderID, actorID uui
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	if fulfillmentChanged {
+		switch o.FulfillmentStatus {
+		case FulfillmentShipped, FulfillmentDelivered, FulfillmentCollected:
+			analytics.Emit(ctx, s.DB, storeID, "fulfillment."+o.FulfillmentStatus, &actorID, map[string]any{
+				"order_id": orderID.String(),
+			})
+		}
 	}
 	return s.GetOrder(ctx, storeID, orderID)
 }

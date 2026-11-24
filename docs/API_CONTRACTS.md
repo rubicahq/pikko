@@ -229,7 +229,8 @@ Source `live_quick_add`; campaign quota + finite stock enforced under row locks.
 | POST | `/stores/{storeID}/notifications/read-all` |
 | POST | `/stores/{storeID}/notifications/{notificationID}/read` |
 | GET/PATCH | `/stores/{storeID}/notification-preferences` |
-| GET | `/stores/{storeID}/analytics` |
+| GET | `/stores/{storeID}/analytics` | `?from=&to=&tz=` — north-star fulfilled items + activation/engagement/ops/retention + events |
+| POST | `/stores/{storeID}/analytics/events` | Record `analytics_events` row (`event_name` required; `analytics.read`) |
 
 ### 2.9 Preorders + purchasing + rules
 

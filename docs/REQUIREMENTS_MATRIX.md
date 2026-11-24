@@ -138,9 +138,9 @@
 | STAT-01,04 | Multi-dimension order statuses | done | orders schema | commerce tests | — |
 | STAT-02–03 | Item + settlement dimensions | done (settlement_status) | orders.settlement_status + finance | finance tests | Portal item UX → 08 |
 | DASH-01,03 | Overview + checklist | done | overview UI | — | — |
-| DASH-02,04 | Rich ops tasks / widgets | partial/missing | — | — | Later agents |
+| DASH-02,04 | Rich ops tasks / widgets | done (MVP) | overview + analytics ops rows | analytics test | — |
 | RULE-01–05 | Business rules | done | `rules.go` | rules_test + e2e | — |
-| AN-01–04 | Analytics | partial | `analytics/` | phase5 | North-star item metric incomplete |
+| AN-01–04 | Analytics | done | `analytics/` + analytics/overview UI | `TestAnalyticsNorthStarAndEmptyStates` | No fabricated metrics |
 | SEC-01–05,07–08 | Tenant + tokens + headers + limits | done | middleware, auth | security_test | Continuous |
 | SEC-06 | PDPA retention policy | partial | privacy page | — | Owner/counsel |
 

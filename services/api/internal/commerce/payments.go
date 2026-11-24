@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/money"
 )
@@ -208,6 +209,9 @@ func (s *Service) VerifyPayment(ctx context.Context, storeID, orderID, paymentID
 	}
 
 	s.notifyPaymentVerified(ctx, storeID, o)
+	analytics.Emit(ctx, s.DB, storeID, "payment.verified", &actorID, map[string]any{
+		"order_id": orderID.String(), "payment_id": paymentID.String(),
+	})
 
 	return s.GetLatestPayment(ctx, storeID, orderID)
 }

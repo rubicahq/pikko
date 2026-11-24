@@ -55,7 +55,7 @@
 | --- | --- | --- | --- |
 | **11 PDF/AI Catalog** | Reliability, limits, review UX | PDF-01–05 | **Done** — hardened import + E2E-B API; no schema destruction |
 | **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | **Done** — LIVE-01–03 + E2E-K API |
-| **13 Analytics** | North-star fulfilled items metric | analytics | AN-01 satisfied |
+| **13 Analytics** | North-star fulfilled items metric | analytics | **Done** — AN-01–04 + DASH ops widgets |
 | **14 Security/QA** | Threat pass, TEST_REPORT, E2E A–N | all e2e | Matrix accurate; critical gaps ticketed |
 | **15 Integration/Deploy** | Runbook validation; smoke; **no auto cutover** | deploy scripts | DEPLOYMENT_RUNBOOK current; owner checklist only for pikko.id |
 

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/money"
 )
@@ -307,6 +308,11 @@ func (s *Service) CreateShipment(ctx context.Context, storeID, actorID uuid.UUID
 			"carrier":     carrier,
 			"tracking":    tracking,
 		}, fmt.Sprintf("shipment.created:%s", shipmentID.String()))
+	}
+	if fullyShipped {
+		analytics.Emit(ctx, s.DB, storeID, "fulfillment.shipped", &actorID, map[string]any{
+			"order_id": in.OrderID.String(), "shipment_id": shipmentID.String(),
+		})
 	}
 
 	sh, err := s.GetShipment(ctx, storeID, shipmentID)

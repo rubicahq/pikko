@@ -33,6 +33,27 @@ type OrderRow = {
   created_at: string;
 };
 
+type AnalyticsOverview = {
+  verified_payment_value_idr: number;
+  unpaid_order_value_idr: number;
+  paid_orders: number;
+  total_orders: number;
+  fulfilled_order_items: number;
+  fulfilled_order_items_all_time: number;
+  fulfilled_order_item_value_idr: number;
+  from: string;
+  to: string;
+  operational: {
+    awaiting_payment_verification: number;
+    pending_confirmation: number;
+    ready_to_ship: number;
+    ready_for_pickup: number;
+    packing_queue_orders: number;
+    open_refunds: number;
+    live_sessions_open: number;
+  };
+};
+
 function greetingForHour(hour: number): string {
   if (hour < 11) return "Good morning";
   if (hour < 17) return "Good afternoon";
@@ -53,21 +74,17 @@ export default async function StoreOverviewPage({
   const ordersData = await serverFetch<{ orders: OrderRow[]; total: number }>(
     `/api/v1/stores/${storeId}/orders`,
   );
+  const analyticsData = await serverFetch<{ analytics: AnalyticsOverview }>(
+    `/api/v1/stores/${storeId}/analytics?tz=Asia/Jakarta`,
+  );
+  const a = analyticsData?.analytics;
   const orders = ordersData?.orders || [];
   const recent = orders.slice(0, 5);
-  const salesTotal = orders.reduce((sum, o) => sum + (o.total_idr || 0), 0);
-  const awaitingPayment = orders.filter((o) =>
-    ["pending", "awaiting_payment", "unpaid"].includes(o.payment_status),
-  ).length;
-  const openOrders = orders.filter((o) =>
-    !["completed", "cancelled", "canceled"].includes(o.order_status),
-  ).length;
 
   const firstName =
     session.user.display_name?.split(/\s+/)[0] ||
     session.user.email.split("@")[0] ||
     "there";
-  // Asia/Jakarta greeting without relying on server TZ
   const jakartaHour = Number(
     new Intl.DateTimeFormat("en-GB", {
       hour: "numeric",
@@ -78,22 +95,68 @@ export default async function StoreOverviewPage({
   const greeting = greetingForHour(jakartaHour);
   const storefrontHref = store.storefront_url || urls.storefront(store.slug);
 
-  const attention: { label: string; href: string; done?: boolean }[] = [];
+  const attention: { label: string; href: string }[] = [];
+  if (a) {
+    if (a.operational.awaiting_payment_verification > 0) {
+      attention.push({
+        label: `${a.operational.awaiting_payment_verification} payment${
+          a.operational.awaiting_payment_verification === 1 ? "" : "s"
+        } awaiting verification`,
+        href: urls.storeOrders(storeId),
+      });
+    }
+    if (a.operational.pending_confirmation > 0) {
+      attention.push({
+        label: `${a.operational.pending_confirmation} order${
+          a.operational.pending_confirmation === 1 ? "" : "s"
+        } pending confirmation`,
+        href: urls.storeOrders(storeId),
+      });
+    }
+    if (a.operational.packing_queue_orders > 0) {
+      attention.push({
+        label: `${a.operational.packing_queue_orders} order${
+          a.operational.packing_queue_orders === 1 ? "" : "s"
+        } in packing queue`,
+        href: urls.storePacking(storeId),
+      });
+    }
+    if (a.operational.ready_to_ship > 0) {
+      attention.push({
+        label: `${a.operational.ready_to_ship} ready to ship`,
+        href: urls.storeShipments(storeId),
+      });
+    }
+    if (a.operational.open_refunds > 0) {
+      attention.push({
+        label: `${a.operational.open_refunds} open refund${
+          a.operational.open_refunds === 1 ? "" : "s"
+        }`,
+        href: urls.storeFinance(storeId),
+      });
+    }
+    if (a.operational.live_sessions_open > 0) {
+      attention.push({
+        label: `${a.operational.live_sessions_open} live session${
+          a.operational.live_sessions_open === 1 ? "" : "s"
+        } open`,
+        href: urls.storeLive(storeId),
+      });
+    }
+  }
   for (const item of CHECKLIST_LABELS) {
     if (checklist[item.key]) continue;
     if (!item.href) continue;
     attention.push({ label: item.label, href: item.href(storeId) });
   }
-  if (awaitingPayment > 0) {
-    attention.unshift({
-      label: `${awaitingPayment} order${awaitingPayment === 1 ? "" : "s"} awaiting payment review`,
-      href: urls.storeOrders(storeId),
-    });
-  }
+
+  const hasSalesSignal = Boolean(
+    a && (a.paid_orders > 0 || a.fulfilled_order_items_all_time > 0 || a.total_orders > 0),
+  );
 
   return (
     <div className="mx-auto max-w-overview space-y-6">
-      {/* A) Store + business summary — one card, not four KPI cards */}
+      {/* A) Store + business summary — one card, vertical hierarchy */}
       <Card className="overflow-hidden p-0">
         <div className="flex flex-wrap items-start justify-between gap-4 p-6">
           <div className="min-w-0">
@@ -127,27 +190,50 @@ export default async function StoreOverviewPage({
           </div>
         </div>
         <div className="border-t border-border px-6 py-5">
-          <div className="flex flex-wrap items-end gap-8">
+          {!a ? (
+            <p className="text-sm text-foreground-secondary">
+              Metrics unavailable right now. Open Analytics when the connection is back.
+            </p>
+          ) : !hasSalesSignal ? (
             <div>
-              <p className="text-label text-foreground-muted">Sales (all orders)</p>
-              <p className="mt-1 text-metric tabular-nums text-foreground">
-                {formatIDR(salesTotal)}
+              <p className="text-label text-foreground-muted">Fulfilled order items</p>
+              <p className="mt-1 text-metric tabular-nums text-foreground">0</p>
+              <p className="mt-3 text-caption text-foreground-muted">
+                No sales data yet — empty on purpose, never fabricated.
               </p>
             </div>
-            <div>
-              <p className="text-label text-foreground-muted">Open orders</p>
-              <p className="mt-1 text-metric-secondary tabular-nums text-foreground">{openOrders}</p>
-            </div>
-            <div>
-              <p className="text-label text-foreground-muted">Awaiting payment</p>
-              <p className="mt-1 text-metric-secondary tabular-nums text-foreground">
-                {awaitingPayment}
+          ) : (
+            <>
+              <div className="flex flex-wrap items-end gap-8">
+                <div>
+                  <p className="text-label text-foreground-muted">
+                    Fulfilled items ({a.from} → {a.to})
+                  </p>
+                  <p className="mt-1 text-metric tabular-nums text-foreground">
+                    {a.fulfilled_order_items}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-label text-foreground-muted">Verified payments</p>
+                  <p className="mt-1 text-metric-secondary tabular-nums text-foreground">
+                    {formatIDR(a.verified_payment_value_idr)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-label text-foreground-muted">All-time fulfilled</p>
+                  <p className="mt-1 text-metric-secondary tabular-nums text-foreground">
+                    {a.fulfilled_order_items_all_time}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-caption text-foreground-muted">
+                Unpaid order value {formatIDR(a.unpaid_order_value_idr)} is not revenue.{" "}
+                <Link href={urls.storeAnalytics(storeId)} className="font-semibold text-brand">
+                  Open analytics
+                </Link>
               </p>
-            </div>
-          </div>
-          <p className="mt-3 text-caption text-foreground-muted">
-            Metrics reflect live order records — never fabricated totals.
-          </p>
+            </>
+          )}
         </div>
       </Card>
 
@@ -155,7 +241,7 @@ export default async function StoreOverviewPage({
       <section>
         <h2 className="text-section font-bold text-foreground">Needs attention</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Setup gaps and payment reviews that need a decision.
+          Ops tasks and setup gaps from live store data.
         </p>
         <Card className="mt-4 p-0">
           {attention.length === 0 ? (

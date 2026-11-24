@@ -103,6 +103,27 @@ func (h *Phase5Handlers) AnalyticsOverview(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"analytics": ov})
 }
 
+func (h *Phase5Handlers) RecordAnalyticsEvent(w http.ResponseWriter, r *http.Request) {
+	var in analytics.EventInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+		return
+	}
+	if in.EventName == "" {
+		writeError(w, r, http.StatusBadRequest, "invalid_input", "event_name is required.")
+		return
+	}
+	if u := UserID(r); u != uuid.Nil {
+		uid := u
+		in.UserID = &uid
+	}
+	if err := h.Analytics.RecordEvent(r.Context(), StoreID(r), in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_input", "Unable to record analytics event.")
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
+}
+
 func (h *Phase5Handlers) GetCustomer(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("customerID"))
 	if err != nil {

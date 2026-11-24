@@ -302,6 +302,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/notification-preferences", storePerm(rbac.PermNotificationsRead, p5.GetNotificationPreferences))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/notification-preferences", storePerm(rbac.PermNotificationsWrite, p5.PatchNotificationPreferences))
 	mux.Handle("GET /api/v1/stores/{storeID}/analytics", storePerm(rbac.PermAnalyticsRead, p5.AnalyticsOverview))
+	mux.Handle("POST /api/v1/stores/{storeID}/analytics/events", storePerm(rbac.PermAnalyticsRead, p5.RecordAnalyticsEvent))
 
 	// Phase 4: preorder batches (kept; gated by campaign.* — still synced into campaigns)
 	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCampaignRead, commerceH.ListBatches))
