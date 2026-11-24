@@ -1,14 +1,17 @@
 import { Reveal } from "@/components/marketing/reveal";
 import { marketingMetadata } from "@/lib/marketing-seo";
+import { appBaseDomain, supportEmail } from "@/lib/site";
 
 export const metadata = marketingMetadata({
   title: "Terms",
   description:
-    "Pikko terms of use for controlled pilots on pikko.site. Merchant and customer responsibilities during early access.",
+    "Pikko terms of use. Merchant and customer responsibilities for the commerce platform.",
   path: "/terms",
 });
 
 export default function TermsPage() {
+  const domain = appBaseDomain() === "localhost" ? "pikko.id" : appBaseDomain();
+  const support = supportEmail();
   return (
     <article className="mx-auto max-w-reading px-4 py-16 md:px-8 md:py-24">
       <Reveal>
@@ -16,8 +19,8 @@ export default function TermsPage() {
         <h1 className="mt-3 font-display text-4xl font-medium tracking-[-0.03em]">Terms</h1>
         <p className="mt-4 text-sm text-foreground-muted">
           Last updated: 24 November 2026 (Asia/Jakarta). These terms govern use of
-          Pikko during controlled pilots. They are a working notice, not a final
-          commercial contract for pikko.id launch.
+          Pikko on {domain}. They are a working notice and may be replaced by a
+          counsel-approved commercial contract when published.
         </p>
       </Reveal>
 
@@ -29,8 +32,8 @@ export default function TermsPage() {
           <p className="mt-3">
             Pikko provides merchant tools to publish a storefront, accept orders
             (ready stock and preorder), verify bank-transfer evidence, and manage
-            fulfillment. The service runs on pikko.site for pilots and may change
-            as we learn from real use.
+            fulfillment. The service runs on {domain} and related subdomains and
+            may change as we learn from real use.
           </p>
         </section>
 
@@ -81,11 +84,12 @@ export default function TermsPage() {
 
         <section>
           <h2 className="font-display text-xl font-medium tracking-[-0.02em] text-foreground">
-            6. Availability and pilots
+            6. Availability
           </h2>
           <p className="mt-3">
-            Pilots are provided as-is. Features may change; downtime may occur for
-            maintenance. Commercial SLAs and paid plans are not part of this notice.
+            The service is provided as-is during early access. Features may change;
+            downtime may occur for maintenance. Commercial SLAs and paid plans are
+            not part of this notice until published separately.
           </p>
         </section>
 
@@ -96,9 +100,9 @@ export default function TermsPage() {
           <p className="mt-3">
             To the extent permitted by law, Rubica HQ is not liable for indirect
             losses, lost profits, or merchant–customer disputes arising from sales on
-            the platform. Aggregate liability for pilot use is limited to amounts
-            paid to us for the service in the prior three months (currently zero for
-            unpaid pilots).
+            the platform. Aggregate liability for early-access use is limited to
+            amounts paid to us for the service in the prior three months (currently
+            zero for unpaid early access).
           </p>
         </section>
 
@@ -108,8 +112,8 @@ export default function TermsPage() {
           </h2>
           <p className="mt-3">
             Questions:{" "}
-            <a className="underline underline-offset-2" href="mailto:support@pikko.site">
-              support@pikko.site
+            <a className="underline underline-offset-2" href={`mailto:${support}`}>
+              {support}
             </a>
             . Privacy practices are described at /privacy.
           </p>

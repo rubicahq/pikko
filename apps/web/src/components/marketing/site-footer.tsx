@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Wordmark } from "@/components/brand/wordmark";
+import { appBaseDomain } from "@/lib/site";
 
 const columns = [
   {
@@ -27,6 +28,7 @@ const columns = [
 ];
 
 export function SiteFooter() {
+  const domain = appBaseDomain() === "localhost" ? "pikko.id" : appBaseDomain();
   return (
     <footer className="border-t border-border bg-background-subtle">
       <div className="mx-auto grid max-w-marketing gap-10 px-4 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
@@ -60,7 +62,7 @@ export function SiteFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-marketing flex-col gap-2 px-4 py-6 text-sm text-foreground-muted md:flex-row md:items-center md:justify-between md:px-8">
           <span>Pikko. Sell your way.</span>
-          <span>© {new Date().getFullYear()} Rubica HQ · Controlled pilots on pikko.site</span>
+          <span>© {new Date().getFullYear()} Rubica HQ · {domain}</span>
         </div>
       </div>
     </footer>

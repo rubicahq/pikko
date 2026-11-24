@@ -1,0 +1,84 @@
+# Permanent redirect: pikko.site → pikko.id (Phase 7 cutover)
+# Installed on the VPS as: ~/emplicon/deploy/nginx.d/pikko.site-redirect.conf
+#
+# Replace (or disable) the previous serving vhost pikko.site.conf so traffic
+# no longer proxies to the app on the legacy host — only redirects.
+#
+# Preserve ACME on :80 so the legacy cert can still renew until retired.
+# Never forward query tokens blindly via open redirects at the app layer;
+# nginx host+path rewrite keeps the path/query for bookmarks, while magic-link
+# confirm pages should be re-requested on app.pikko.id after cutover.
+#
+# Apply after pikko.id vhost + TLS + env switch are verified:
+#   sudo docker exec emplicon-nginx nginx -t && sudo docker exec emplicon-nginx nginx -s reload
+
+server {
+    listen 80;
+    server_name pikko.site app.pikko.site shop.pikko.site api.pikko.site www.pikko.site;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/acme;
+        default_type "text/plain";
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# Apex + www → https://pikko.id
+server {
+    listen 443 ssl;
+    server_name pikko.site www.pikko.site;
+    ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/acme;
+        default_type "text/plain";
+    }
+
+    location / {
+        return 301 https://pikko.id$request_uri;
+    }
+}
+
+# app.pikko.site → app.pikko.id
+server {
+    listen 443 ssl;
+    server_name app.pikko.site;
+    ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        return 301 https://app.pikko.id$request_uri;
+    }
+}
+
+# shop.pikko.site → shop.pikko.id
+server {
+    listen 443 ssl;
+    server_name shop.pikko.site;
+    ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        return 301 https://shop.pikko.id$request_uri;
+    }
+}
+
+# api.pikko.site → api.pikko.id
+server {
+    listen 443 ssl;
+    server_name api.pikko.site;
+    ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    location / {
+        return 301 https://api.pikko.id$request_uri;
+    }
+}

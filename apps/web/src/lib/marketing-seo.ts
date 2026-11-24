@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
+import { marketingOrigin } from "@/lib/site";
 
 const siteName = "Pikko";
 const defaultDescription =
   "Sell your way. Create a beautiful online store, give customers a better shopping experience, and manage orders the way your business works.";
 
 export function marketingURL(path = "/"): string {
-  const base = (process.env.NEXT_PUBLIC_MARKETING_URL || "https://pikko.site").replace(/\/$/, "");
+  const base = marketingOrigin();
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p === "/" ? "/" : p}`;
 }

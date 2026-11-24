@@ -2,38 +2,40 @@
 
 ## Scope
 
-Phase 6 Marketing and Production Readiness: final marketing site for pikko.site (landing, solutions, pricing, FAQ, legal), SEO (sitemap, robots, OG), accessibility polish, and production ops (health, logging, rate limits, security headers, scheduled backups, runbook, light load smoke, dependency audit). Built on Phase 0–5 (`main` @ `b963682+`).
+Phase 7 Official Go-to-Market **prep** (code + docs only): domain-agnostic configuration so pikko.site → pikko.id is env/nginx cutover, legacy redirect templates, launch runbook, and QA against PRD launch criteria. **No production DNS/VPS cutover executed.** Built on Phase 0–6 (`main` @ `2cfca6e+`). Also includes VPS backup script `sudo docker` fallback from `cursor/fix-backup-sudo-docker-86c4`.
 
 ## Completed
 
-### Phase 0–5 (prior)
+### Phase 0–6 (prior)
 
-- Auth, multi-store, storefront, catalog, AI PDF/CSV import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, notifications, analytics
+- Auth, multi-store, storefront, catalog, AI PDF/CSV import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, notifications, analytics, marketing site, production ops
 
-### Phase 6
+### Phase 7 (this release)
 
-- Marketing routes: `/`, `/pricing`, `/faq`, `/privacy`, `/terms`, `/solutions`, `/solutions/jastip`, `/solutions/social-sellers`
-- Marketing layout (header/footer), Plus Jakarta Sans display + Inter body, design tokens only
-- SEO: `sitemap.xml`, `robots.txt`, Open Graph image, per-page canonicals; auth/dashboard remain noindex
-- API: `/livez`, `/healthz`, `/readyz`; structured access logs; coarse IP rate limit; hardened security headers
-- Ops: `infrastructure/backup/*`, `infrastructure/ops/load-smoke.sh`, `dependency-audit.sh`, `docs/RUNBOOK.md`
-- Nginx example edge headers; Playwright Phase 6 smoke; docs matrix updated
-- **No DB migration** in Phase 6
+- Domain-agnostic: `APP_URL` alias, `LEGACY_BASE_DOMAIN`, `AUTH_COOKIE_DOMAIN`, email From defaults from `APP_BASE_DOMAIN`, redirect allowlist includes base+legacy, CORS defaults from surface URLs in prod/staging
+- Web: `lib/site.ts` for marketing/canonical/sitemap/support/storefront host; middleware 308 legacy host map (strips `token`); marketing copy uses env domain
+- Nginx: `emplicon-nginx.d-pikko.id.conf.example`, `emplicon-nginx.d-pikko.site-redirect.conf.example`
+- Compose/Docker build args for `NEXT_PUBLIC_APP_BASE_DOMAIN`, legacy, support email
+- `.env.production.pikko.id.example` + updated `.env.example`
+- `docs/LAUNCH.md` ordered cutover + owner checklist (rotate keys, SPF, Full strict, magic-link test)
+- Playwright Phase 7 domain smoke; Go URL/config tests for pikko.id
+- Backup scripts: prefer `docker`, fall back to `sudo docker` (merged from fix branch)
+- **No DB migration** for Phase 7
 
 ## Not in this release (by design)
 
-- Phase 7 pikko.id migration / commercial GTM (needs explicit approval)
-- Invented subscription prices (open business decision — pilot framing only)
+- **Executing** DNS/TLS/env cutover to pikko.id (owner-only; needs explicit approval)
+- Brevo sender domain authentication on pikko.id (owner)
+- Invented subscription prices / counsel-final legal contracts
 - Payment gateway / refunds money movement
-- VPS deploy execution (documented for operator; agent does not SSH)
+- VPS SSH deploy by agent
 
 ## Production requirements
 
 - No new migration
-- Optional new env: `API_RATE_LIMIT_IP_PER_HOUR` (default 1200)
-- Install backup cron from `infrastructure/backup/crontab.example`
-- Reload nginx if adopting updated `pikko.site.conf` header snippets
-- Set `NEXT_PUBLIC_APP_ENV=production` so marketing is indexable
+- New optional env: `APP_URL`, `LEGACY_BASE_DOMAIN`, `AUTH_COOKIE_DOMAIN`, `NEXT_PUBLIC_APP_BASE_DOMAIN`, `NEXT_PUBLIC_LEGACY_BASE_DOMAIN`, `NEXT_PUBLIC_SUPPORT_EMAIL`
+- Cutover only via `docs/LAUNCH.md` after owner approval
+- Current production may remain on pikko.site until that approval
 
 ## Test results
 
@@ -47,12 +49,13 @@ Phase 6 Marketing and Production Readiness: final marketing site for pikko.site 
 
 ## Decisions / open questions for product
 
-1. Final commercial pricing (carry-over; legal pages are working notices)
-2. Confirm VPS: pull main, install backup cron, optional nginx header reload
-3. Brevo sender domain readiness (carry-over)
+1. Explicit approval + date for pikko.id cutover
+2. Brevo pikko.id authentication + SPF
+3. Final commercial pricing and counsel legal pages
+4. Confirm VPS pull of main (includes backup sudo docker fix)
 
 ## Known limitations
 
-- Pricing page describes pilot access — not a paid plan catalog
-- Legal pages are operational notices for pilots, not counsel-approved launch contracts
-- Light load smoke is a probe script, not a full capacity benchmark
+- Pricing remains early-access framing until business decision
+- Legal pages are working notices until counsel replaces them
+- Legacy magic-link emails pointing at pikko.site require a new link after redirect (tokens not forwarded)

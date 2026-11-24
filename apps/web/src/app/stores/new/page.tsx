@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getOnboardingDraft, getSession, getStores } from "@/lib/server-api";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
+import { storefrontHost } from "@/lib/site";
 import { urls } from "@/lib/urls";
 
 export default async function NewStorePage() {
@@ -16,9 +17,7 @@ export default async function NewStorePage() {
     <OnboardingWizard
       draft={{ ...draft, is_first_store: stores.length === 0 }}
       hasExistingStores={stores.length > 0}
-      storefrontBase={
-        process.env.NEXT_PUBLIC_STOREFRONT_URL?.replace(/^https?:\/\//, "") || "shop.pikko.site"
-      }
+      storefrontBase={storefrontHost()}
     />
   );
 }

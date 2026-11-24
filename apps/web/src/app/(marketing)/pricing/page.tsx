@@ -2,26 +2,32 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/marketing/reveal";
 import { marketingMetadata } from "@/lib/marketing-seo";
+import { appBaseDomain, supportEmail } from "@/lib/site";
+
+const domainLabel = () =>
+  appBaseDomain() === "localhost" ? "pikko.id" : appBaseDomain();
 
 export const metadata = marketingMetadata({
   title: "Pricing",
   description:
-    "Pikko pricing for controlled pilots on pikko.site. Commercial plans are not finalized — join the pilot to start selling.",
+    "Pikko pricing. Commercial plans are not finalized — join early access to start selling.",
   path: "/pricing",
 });
 
 export default function PricingPage() {
+  const domain = domainLabel();
+  const support = supportEmail();
   return (
     <div className="mx-auto max-w-marketing px-4 py-16 md:px-8 md:py-24">
       <Reveal>
         <p className="text-sm font-medium text-brand-dark">Pricing</p>
         <h1 className="mt-3 max-w-3xl font-display text-4xl font-medium tracking-[-0.03em] text-foreground md:text-5xl">
-          Start on the pilot. Pricing follows when we launch.
+          Start early. Pricing follows when plans are final.
         </h1>
         <p className="mt-5 max-w-reading text-lg leading-relaxed text-foreground-secondary">
           Subscription tiers, store limits, and AI import commercial limits are
-          still open business decisions. During controlled pilots on{" "}
-          <span className="text-foreground">pikko.site</span>, invited merchants
+          still open business decisions. On{" "}
+          <span className="text-foreground">{domain}</span>, invited merchants
           get full MVP access so we can learn from real selling — not invent
           prices ahead of product–market fit.
         </p>
@@ -30,7 +36,7 @@ export default function PricingPage() {
       <div className="mt-14 grid gap-8 border-t border-border pt-14 md:grid-cols-[1.2fr_0.8fr]">
         <Reveal>
           <h2 className="font-display text-2xl font-medium tracking-[-0.02em]">
-            What the pilot includes
+            What early access includes
           </h2>
           <ul className="mt-6 space-y-4 text-base leading-relaxed text-foreground-secondary">
             <li className="border-l-2 border-brand pl-4">
@@ -47,15 +53,14 @@ export default function PricingPage() {
             </li>
           </ul>
           <p className="mt-8 text-sm leading-relaxed text-foreground-muted">
-            Official commercial pricing will be published with the pikko.id
-            launch (Phase 7) after explicit approval. Nothing here is a quote or
-            a paid plan claim.
+            Official commercial pricing will be published on {domain} after
+            explicit approval. Nothing here is a quote or a paid plan claim.
           </p>
         </Reveal>
         <Reveal delayMs={80}>
           <div className="rounded-xl border border-border bg-background-subtle p-8">
             <p className="font-display text-xl font-medium tracking-[-0.02em] text-foreground">
-              Controlled pilot
+              Early access
             </p>
             <p className="mt-3 text-sm leading-relaxed text-foreground-secondary">
               Access by invitation / early access signup. No payment gateway
@@ -68,8 +73,8 @@ export default function PricingPage() {
             </div>
             <p className="mt-4 text-center text-xs text-foreground-muted">
               Questions?{" "}
-              <a className="underline underline-offset-2" href="mailto:support@pikko.site">
-                support@pikko.site
+              <a className="underline underline-offset-2" href={`mailto:${support}`}>
+                {support}
               </a>
             </p>
           </div>
