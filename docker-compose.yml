@@ -1,5 +1,9 @@
 services:
   postgres:
+    # Fixed hostname so DATABASE_URL can use pikko-postgres (not the service
+    # alias "postgres", which collides with emplicon-postgres when api joins
+    # emplicon_emplicon on the VPS).
+    container_name: pikko-postgres
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-pikko}
