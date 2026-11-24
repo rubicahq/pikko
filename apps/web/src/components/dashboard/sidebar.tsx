@@ -29,7 +29,7 @@ export function DashboardSidebar({
   return (
     <aside
       className={cn(
-        "flex h-full w-sidebar flex-col border-r border-border bg-background",
+        "flex h-full w-sidebar flex-col border-r border-border/70 bg-white/80 backdrop-blur-sm",
         className,
       )}
     >

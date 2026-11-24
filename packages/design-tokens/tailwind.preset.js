@@ -10,7 +10,12 @@ module.exports = {
           dark: "var(--brand-accessible-dark)",
           soft: "var(--brand-soft)",
           border: "var(--brand-border)",
+          orange: "var(--brand-soft-orange)",
+          peach: "var(--brand-warm-peach)",
         },
+        mist: "var(--cool-mist)",
+        cloud: "var(--cloud-white)",
+        ink: "var(--ink)",
         background: {
           DEFAULT: "var(--background)",
           subtle: "var(--background-subtle)",
@@ -57,6 +62,12 @@ module.exports = {
           border: "var(--neutral-border)",
         },
       },
+      backgroundImage: {
+        ambient: "var(--gradient-ambient)",
+        "warm-feature": "var(--gradient-warm)",
+        "brand-gradient": "var(--gradient-brand)",
+        "chart-soft": "var(--gradient-chart)",
+      },
       borderRadius: {
         xs: "var(--radius-xs)",
         sm: "var(--radius-sm)",
@@ -72,7 +83,16 @@ module.exports = {
         overlay: "var(--shadow-overlay)",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "Inter", "Arial", "sans-serif"],
+        // Plus Jakarta Sans primary; Inter remains loaded for gradual migration
+        sans: [
+          "var(--font-jakarta)",
+          "Plus Jakarta Sans",
+          "var(--font-inter)",
+          "Inter",
+          "Arial",
+          "sans-serif",
+        ],
+        inter: ["var(--font-inter)", "Inter", "Arial", "sans-serif"],
         display: [
           "var(--font-jakarta)",
           "Plus Jakarta Sans",
@@ -114,7 +134,7 @@ module.exports = {
         ],
       },
       spacing: {
-        // 4px base scale (PRD §4) — Tailwind default 4px units; prefer 1/2/3/4/5/6/8/10/12/16/20/24/32
+        // 4px base scale — Tailwind default 4px units; prefer 1/2/3/4/5/6/8/10/12/16/20/24/32
         gutter: "var(--content-gutter)",
       },
       maxWidth: {

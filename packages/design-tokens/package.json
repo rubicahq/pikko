@@ -2,7 +2,7 @@
   "name": "@pikko/design-tokens",
   "version": "0.1.0",
   "private": true,
-  "description": "Pikko design tokens (PRD §13)",
+  "description": "Pikko design tokens — soft-gradient SaaS",
   "main": "tokens.css",
-  "files": ["tokens.css", "tailwind.preset.js"]
+  "files": ["tokens.css", "design-tokens.css", "tailwind.preset.js"]
 }
