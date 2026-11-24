@@ -23,6 +23,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
 	"github.com/rubicahq/pikko/services/api/internal/notifications"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
+	"github.com/rubicahq/pikko/services/api/internal/portal"
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
@@ -95,6 +96,10 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	campaignH := &CampaignHandlers{Campaigns: campaignSvc}
 	commerceH := &CommerceHandlers{Commerce: commerceSvc, Campaigns: campaignSvc, URLs: urlGen, Cfg: d.Cfg}
 	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc}
+	portalSvc := &portal.Service{
+		DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger, Commerce: commerceSvc,
+	}
+	portalH := &PortalHandlers{Portal: portalSvc, Cfg: d.Cfg}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -275,6 +280,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersRead, commerceH.ListCustomers))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersRead, p5.GetCustomer))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersWrite, p5.PatchCustomer))
+	mux.Handle("GET /api/v1/stores/{storeID}/address-change-requests", storePerm(rbac.PermCustomersRead, portalH.MerchantListAddressChanges))
+	mux.Handle("POST /api/v1/stores/{storeID}/address-change-requests/{requestID}/review", storePerm(rbac.PermCustomersWrite, portalH.MerchantReviewAddressChange))
 
 	// Phase 5: notifications + analytics
 	mux.Handle("GET /api/v1/stores/{storeID}/notifications", storePerm(rbac.PermNotificationsRead, p5.ListNotifications))
@@ -335,6 +342,25 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}", commerceH.TrackingGet)
 	mux.HandleFunc("POST /api/v1/public/tracking/{token}/evidence", commerceH.TrackingEvidenceUpload)
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}/evidence/{evidenceID}/file", commerceH.TrackingEvidenceFile)
+
+	// Agent 08: customer portal (separate auth from merchant; preserve guest tracking)
+	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/magic-link/request", portalH.RequestMagicLink)
+	mux.HandleFunc("GET /api/v1/portal/{storeSlug}/auth/magic-link/peek", portalH.PeekMagicLink)
+	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/magic-link/verify", portalH.VerifyMagicLink)
+	mux.HandleFunc("GET /api/v1/portal/{storeSlug}/auth/session", portalH.Session)
+	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/logout", portalH.Logout)
+	mux.Handle("GET /api/v1/portal/{storeSlug}/dashboard", portalH.Require(portalH.Dashboard))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/orders", portalH.Require(portalH.ListOrders))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/orders/{orderID}", portalH.Require(portalH.GetOrder))
+	mux.Handle("POST /api/v1/portal/{storeSlug}/orders/{orderID}/address-change", portalH.Require(portalH.RequestAddressChange))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/refund-preference", portalH.Require(portalH.GetRefundPreference))
+	mux.Handle("PUT /api/v1/portal/{storeSlug}/refund-preference", portalH.Require(portalH.PutRefundPreference))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/credit", portalH.Require(portalH.GetCredit))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/addresses", portalH.Require(portalH.ListAddresses))
+	mux.Handle("POST /api/v1/portal/{storeSlug}/addresses", portalH.Require(portalH.CreateAddress))
+	mux.Handle("PATCH /api/v1/portal/{storeSlug}/addresses/{addressID}", portalH.Require(portalH.UpdateAddress))
+	mux.Handle("DELETE /api/v1/portal/{storeSlug}/addresses/{addressID}", portalH.Require(portalH.DeleteAddress))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/address-change-requests", portalH.Require(portalH.ListAddressChanges))
 
 	worker := &jobs.Worker{
 		Queue: queue, Outbox: outbox, Email: mailSvc, BatchSync: commerceSvc,

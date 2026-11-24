@@ -44,6 +44,7 @@ type Config struct {
 	CookieDomain       string // empty = host-only (preferred when Next proxies /api)
 	CookieSecure       bool
 	CookieSameSite     string
+	PortalCookieName   string // customer portal session (separate from merchant)
 	RedirectAllowlist  []string
 	RateLimitEmailHour int
 	RateLimitIPHour    int
@@ -104,10 +105,11 @@ func Load() (*Config, error) {
 		EmailNotificationFrom: getenv("EMAIL_NOTIFICATION_FROM", "notifications@"+emailDomain),
 		EmailReplyTo:          getenv("EMAIL_REPLY_TO", "support@"+emailDomain),
 
-		CookieName:     getenv("AUTH_COOKIE_NAME", "pikko_session"),
-		CookieDomain:   getenv("AUTH_COOKIE_DOMAIN", ""),
-		CookieSecure:   getenvBool("AUTH_COOKIE_SECURE", false),
-		CookieSameSite: getenv("AUTH_COOKIE_SAMESITE", "lax"),
+		CookieName:       getenv("AUTH_COOKIE_NAME", "pikko_session"),
+		CookieDomain:     getenv("AUTH_COOKIE_DOMAIN", ""),
+		CookieSecure:     getenvBool("AUTH_COOKIE_SECURE", false),
+		CookieSameSite:   getenv("AUTH_COOKIE_SAMESITE", "lax"),
+		PortalCookieName: getenv("PORTAL_COOKIE_NAME", "pikko_portal_session"),
 
 		APIAddr: getenv("API_ADDR", ":8080"),
 	}

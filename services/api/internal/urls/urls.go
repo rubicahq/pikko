@@ -66,6 +66,18 @@ func (g *Generator) Tracking(token string) string {
 	return fmt.Sprintf("%s/track/%s", g.StorefrontBase, url.PathEscape(token))
 }
 
+func (g *Generator) PortalHome(storeSlug string) string {
+	return fmt.Sprintf("%s/portal/%s", g.StorefrontBase, url.PathEscape(storeSlug))
+}
+
+func (g *Generator) PortalConfirm(storeSlug, token string) string {
+	return fmt.Sprintf("%s/portal/%s/confirm?token=%s", g.StorefrontBase, url.PathEscape(storeSlug), url.QueryEscape(token))
+}
+
+func (g *Generator) PortalDashboard(storeSlug string) string {
+	return fmt.Sprintf("%s/portal/%s/dashboard", g.StorefrontBase, url.PathEscape(storeSlug))
+}
+
 func (g *Generator) MagicLink(token string) string {
 	return g.AuthConfirm(token)
 }

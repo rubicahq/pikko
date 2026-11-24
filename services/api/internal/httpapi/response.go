@@ -47,4 +47,7 @@ const (
 	ctxKeySession          ctxKey = "session_raw"
 	ctxKeyStoreID          ctxKey = "store_id"
 	ctxKeyMembershipRole   ctxKey = "membership_role"
+	ctxKeyPortalCustomerID ctxKey = "portal_customer_id"
+	ctxKeyPortalSession    ctxKey = "portal_session_raw"
+	ctxKeyPortalStoreID    ctxKey = "portal_store_id"
 )
