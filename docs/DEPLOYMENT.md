@@ -33,6 +33,13 @@ Checkout path on the server: `~/pikko` (separate from `~/emplicon`).
 | TLS files | `~/emplicon/deploy/ssl/pikko/{fullchain,privkey}.pem` (from Let’s Encrypt) |
 | ACME webroot | `~/emplicon/deploy/acme-webroot` (mounted at `/var/www/acme`) |
 | Renew hook | `/etc/letsencrypt/renewal-hooks/deploy/pikko.sh` |
+| DB hostname | Compose `DATABASE_URL` must use host **`pikko-postgres`** (container_name), never bare `postgres` |
+
+### Why `DATABASE_URL` pins `pikko-postgres`
+
+On the VPS, `pikko-api` is also attached to `emplicon_emplicon` so nginx can reach it. That shared network already has Emplicon’s Postgres advertised as hostname **`postgres`**. If Pikko’s `DATABASE_URL` uses `@postgres:5432`, Docker DNS can resolve to **emplicon-postgres** instead of Pikko’s DB — auth and email jobs then fail against the wrong database.
+
+**Fix:** set `container_name: pikko-postgres` and use `@pikko-postgres:5432` in compose `DATABASE_URL` for `migrate` and `api` (`docker-compose.yml` + `docker-compose.deploy.yml`). Compose service key can remain `postgres`; only the connection hostname is pinned. Do not put a bare `postgres` host into server `.env` `DATABASE_URL` for the containers.
 
 Repo examples (kept in sync with production intent):
 
