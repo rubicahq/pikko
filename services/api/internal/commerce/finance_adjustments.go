@@ -128,6 +128,33 @@ func (s *Service) ApplyFinancialAdjustment(ctx context.Context, storeID, actorID
 	return full, nil
 }
 
+// ListOrderAdjustments returns financial adjustments for an order (portal transparency).
+func (s *Service) ListOrderAdjustments(ctx context.Context, storeID, orderID uuid.UUID) ([]FinancialAdjustment, error) {
+	rows, err := s.DB.Query(ctx, `
+		SELECT id, store_id, order_id, order_item_id, revision_id, financial_event_id,
+		       adjustment_type, amount_idr, reason, actor_user_id, idempotency_key, created_at
+		FROM financial_adjustments
+		WHERE store_id=$1 AND order_id=$2
+		ORDER BY created_at ASC
+	`, storeID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FinancialAdjustment
+	for rows.Next() {
+		var a FinancialAdjustment
+		if err := rows.Scan(
+			&a.ID, &a.StoreID, &a.OrderID, &a.OrderItemID, &a.RevisionID, &a.FinancialEventID,
+			&a.AdjustmentType, &a.AmountIDR, &a.Reason, &a.ActorUserID, &a.IdempotencyKey, &a.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
 // ApplyUnavailableFinanceAdjustment is the Agent 06 hook: emit ledger from unavailable delta without rewriting snapshots.
 func (s *Service) ApplyUnavailableFinanceAdjustment(
 	ctx context.Context, storeID, orderID, itemID, actorID uuid.UUID, deltaIDR int64, revisionID *uuid.UUID, reason *string, idemKey string,

@@ -259,6 +259,29 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | POST | `/public/tracking/{token}/evidence` |
 | GET | `/public/tracking/{token}/evidence/{evidenceID}/file` |
 
+### 2.11 Customer portal (Agent 08)
+
+Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from merchant auth. Tokens hashed (SHA-256); raw ≥256-bit.
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| POST | `/portal/{storeSlug}/auth/magic-link/request` | public |
+| GET | `/portal/{storeSlug}/auth/magic-link/peek` | public |
+| POST | `/portal/{storeSlug}/auth/magic-link/verify` | public |
+| GET | `/portal/{storeSlug}/auth/session` | portal cookie |
+| POST | `/portal/{storeSlug}/auth/logout` | portal cookie |
+| GET | `/portal/{storeSlug}/dashboard` | portal |
+| GET | `/portal/{storeSlug}/orders` | portal |
+| GET | `/portal/{storeSlug}/orders/{orderID}` | portal (own orders only) |
+| POST | `/portal/{storeSlug}/orders/{orderID}/address-change` | portal |
+| GET/PUT | `/portal/{storeSlug}/refund-preference` | portal |
+| GET | `/portal/{storeSlug}/credit` | portal (feature-flagged) |
+| GET/POST | `/portal/{storeSlug}/addresses` | portal |
+| PATCH/DELETE | `/portal/{storeSlug}/addresses/{addressID}` | portal |
+| GET | `/portal/{storeSlug}/address-change-requests` | portal |
+| GET | `/stores/{storeID}/address-change-requests` | `customers.read` |
+| POST | `/stores/{storeID}/address-change-requests/{requestID}/review` | `customers.write` |
+
 ---
 
 ## 3. Gaps vs v3 (contract-level)
@@ -268,7 +291,7 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | Admin create/edit order | **Shipped Agent 05** — `POST /orders` + `/order-entry/*` |
 | Order item patch / revision list | **Shipped Agent 05** — revisions + item-events + qty PATCH |
 | Refunds + store credit | **Shipped Agent 07** — `/finance/*` + deposit/refund/credit |
-| Customer portal auth + orders | Agent 08 `/portal/*` |
+| Customer portal auth + orders | **Shipped Agent 08** — `/portal/{storeSlug}/*` + merchant address-change review |
 | Packing + shipments | Agent 09 |
 | Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |
 | Vendors / receiving | **Shipped Agent 06** — vendors RBAC + `/purchasing/*` + `/receiving/*` |

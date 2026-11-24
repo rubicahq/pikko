@@ -244,6 +244,30 @@ func NewSender(mode, apiKey string, logger *slog.Logger) Sender {
 	}
 }
 
+func PortalMagicLinkContent(fromName, storeName, confirmURL string, ttlMinutes int) (subject, html, text string) {
+	subject = fmt.Sprintf("Your %s order portal link", storeName)
+	text = fmt.Sprintf(
+		"Access your orders at %s.\n\nUse the link below to securely open your customer portal:\n%s\n\nThis link expires in %d minutes and can only be used once.\nIf you did not request this email, you can safely ignore it.\n",
+		storeName, confirmURL, ttlMinutes,
+	)
+	html = fmt.Sprintf(`<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#FFFFFF;font-family:'Plus Jakarta Sans',Arial,sans-serif;color:#15191E;">
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="600" style="max-width:600px;width:100%%;border:1px solid #E5E7EB;border-radius:14px;">
+<tr><td style="padding:32px;">
+<p style="margin:0 0 8px;font-size:14px;color:#626975;">%s</p>
+<h1 style="margin:0 0 16px;font-size:24px;font-weight:700;letter-spacing:-0.02em;">Your %s orders.</h1>
+<p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#626975;">Use the button below to securely open your customer portal.</p>
+<p style="margin:0 0 24px;"><a href="%s" style="display:inline-block;background:#15191E;color:#FFFFFF;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600;font-size:14px;">Open portal.</a></p>
+<div style="background:#F5F6FA;border:1px solid #E5E7EB;border-radius:10px;padding:16px;">
+<p style="margin:0;font-size:14px;line-height:1.5;color:#626975;">This link expires in %d minutes and can only be used once.<br/>If you did not request this email, you can safely ignore it.</p>
+</div>
+</td></tr></table>
+</td></tr></table>
+</body></html>`, fromName, storeName, confirmURL, ttlMinutes)
+	return subject, html, text
+}
+
 func MagicLinkContent(fromName, confirmURL string, ttlMinutes int) (subject, html, text string) {
 	subject = "Your Pikko sign-in link"
 	text = fmt.Sprintf(

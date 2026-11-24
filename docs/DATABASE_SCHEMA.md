@@ -142,13 +142,17 @@ stores.store_credit_enabled + store_credits + store_credit_ledger (FEATURE_STORE
 
 **Never** mutate historical `payments.amount_idr` after verify; issue compensating events.
 
-### 3.5 Customer portal (Agent 08)
+### 3.5 Customer portal (Agent 08) — shipped `000012`
 
 ```text
-customer_identities / customer_sessions (email magic link scoped to customer+store)
-OR reuse users with customer_store_links — choose one model; prefer separate customer auth to avoid conflating merchant users
-portal_address_change_requests
+customer_portal_tokens (store+email magic link; SHA-256 only; ≥256-bit raw)
+customer_portal_sessions (store+customer; separate from merchant sessions)
+customer_refund_preferences (bank_transfer | store_credit + bank details)
+customer_addresses.updated_at
+portal_address_change_requests (pending unique per order; merchant review)
 ```
+
+Separate customer auth (not merchant `users`) to avoid conflating roles.
 
 ### 3.6 Packing & shipments (Agent 09)
 

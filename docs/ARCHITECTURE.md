@@ -58,7 +58,7 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 | `vendors` | Agent 04 foundation / 06 expand | Vendor master + product links in catalog; purchasing Agent 06 |
 | `receiving` | Agent 06 | Goods receipt |
 | `finance` | Agent 07 | Ledger, refunds, store credit, reconciliation |
-| `portal` | Agent 08 | Customer-authenticated portal |
+| `portal` | Agent 08 (done) | Customer-authenticated portal (separate sessions) |
 | `packing` / `shipments` | Agent 09 | Pack queues + carrier tracking |
 | `whatsapp` | Agent 10 | Template registry + deep links |
 | `live` | Agent 12 | Live shopping sessions |
