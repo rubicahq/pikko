@@ -105,6 +105,18 @@ export default async function OrderDetailPage({
                 <dd>{o.customer_phone}</dd>
               </div>
             ) : null}
+            <div className="pt-2">
+              <Link
+                href={urls.storeMessages(storeId, {
+                  audience: "customer",
+                  code: "WA-C02",
+                  order_id: o.id,
+                })}
+                className="text-sm font-medium text-foreground hover:underline"
+              >
+                WhatsApp templates →
+              </Link>
+            </div>
             {o.customer_notes ? (
               <div>
                 <dt className="text-foreground-secondary">Notes</dt>

@@ -17,6 +17,7 @@ import {
   Wallet,
   Building2,
   UserCog,
+  MessageCircle,
 } from "lucide-react";
 
 export type NavItem = {
@@ -44,6 +45,7 @@ export const MERCHANT_NAV: NavGroup[] = [
     items: [
       { href: "overview", label: "Overview", icon: LayoutDashboard, implemented: true },
       { href: "notifications", label: "Notifications", icon: Bell, implemented: true },
+      { href: "messages", label: "Messages", icon: MessageCircle, implemented: true },
       { href: "analytics", label: "Analytics", icon: BarChart3, implemented: true },
     ],
   },
@@ -102,6 +104,7 @@ export function liveNavGroups(
 const NAV_PERM: Record<string, string> = {
   overview: "stores.read",
   notifications: "notifications.read",
+  messages: "notifications.read",
   analytics: "analytics.read",
   orders: "orders.read",
   customers: "customers.read",

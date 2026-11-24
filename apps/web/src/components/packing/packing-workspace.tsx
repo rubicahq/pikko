@@ -347,6 +347,16 @@ export function PackingWorkspace({ storeId }: { storeId: string }) {
                 <Button type="button" disabled={busy || !checklist.packing_eligible} onClick={() => void completePacking()}>
                   Mark packed
                 </Button>
+                <Link
+                  href={urls.storeMessages(storeId, {
+                    audience: "customer",
+                    code: "WA-C10",
+                    order_id: checklist.order_id,
+                  })}
+                  className="inline-flex h-10 items-center rounded-[10px] border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-surface-hover"
+                >
+                  WhatsApp packing update
+                </Link>
               </div>
             </>
           )}

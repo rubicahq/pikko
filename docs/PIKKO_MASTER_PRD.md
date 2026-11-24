@@ -440,11 +440,11 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| WA-V01…V08 | Vendor-facing templates | Missing (out of MVP email path; document only until Stage 2 Agent 10) |
-| WA-C01…C18 | Customer-facing templates | Missing |
-| WA-01 | Template registry + copy variables; deep-link to WhatsApp | Missing |
+| WA-V01…V08 | Vendor-facing templates | Done (registry + Messages UI + vendor/purchasing deep-links) |
+| WA-C01…C18 | Customer-facing templates | Done (registry + Messages UI + order/packing/shipment deep-links) |
+| WA-01 | Template registry + copy variables; deep-link to WhatsApp | Done (`wa.me` + copy; no Meta Business API) |
 
-Email transactional templates exist for magic link, order, payment, unavailable — preserve.
+Email transactional templates exist for magic link, order, payment, unavailable, shipped — preserve.
 
 ---
 

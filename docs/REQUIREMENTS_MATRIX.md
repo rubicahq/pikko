@@ -123,7 +123,9 @@
 | RCV-01–03 | Receiving | done (foundation) | `receiving_records` / lines + UI | allocation test | Packing reads available/allocated qty |
 | PACK-01–03 | Packing | done | `packing_tasks` + `/packing` UI | packing_shipment_test | — |
 | SHIP-01–03 | Shipments | done | `shipments` + email + portal/track | packing_shipment_test | — |
-| WA-* | WhatsApp templates | missing | email templates exist | — | Agent 10 |
+| WA-01 | Template registry + variables + wa.me deep-link | done | `whatsapp/`, `/messages`, `000014` | whatsapp unit + integration | No Meta API |
+| WA-V01…V08 | Vendor-facing templates | done | registry + vendors/purchasing surfaces | whatsapp tests | — |
+| WA-C01…C18 | Customer-facing templates | done | registry + orders/packing/shipments | whatsapp tests | tracking_url uses portal (hashed tokens) |
 | RBAC-01–03 | Team RBAC | done | `rbac/`, `team/`, permission middleware, invites | team tests + e2e | Agent 10 may polish WA copy |
 | RBAC-04 | Audit membership | done | invite/member audit_logs actions | team integration | — |
 

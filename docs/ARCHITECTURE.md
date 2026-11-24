@@ -60,7 +60,7 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 | `finance` | Agent 07 | Ledger, refunds, store credit, reconciliation |
 | `portal` | Agent 08 (done) | Customer-authenticated portal (separate sessions) |
 | `packing` / `shipments` | Agent 09 | Pack queues + carrier tracking |
-| `whatsapp` | Agent 10 | Template registry + deep links |
+| `whatsapp` | Agent 10 (done) | Template registry + deep links (`wa.me`); send log |
 | `live` | Agent 12 | Live shopping sessions |
 
 **Integration rule:** New modules own tables + service methods; `httpapi` registers routes; shared types stay thin. Prefer extending `commerce` only when the concept is already inseparable (e.g. order item allocation).

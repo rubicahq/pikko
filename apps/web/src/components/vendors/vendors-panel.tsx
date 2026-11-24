@@ -15,6 +15,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { WAQuickAction } from "@/components/whatsapp/wa-quick-action";
+import Link from "next/link";
+import { urls } from "@/lib/urls";
 
 type Vendor = {
   id: string;
@@ -153,17 +156,39 @@ export function VendorsPanel({ storeId }: { storeId: string }) {
                   <StatusBadge status={v.status} />
                 </TableCell>
                 <TableCell className="text-right">
-                  {v.status === "active" ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void archiveVendor(v.id)}
-                    >
-                      Archive
-                    </Button>
-                  ) : null}
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {v.contact_phone ? (
+                      <WAQuickAction
+                        storeId={storeId}
+                        code="WA-V01"
+                        label="Cek stok"
+                        vendorId={v.id}
+                        phone={v.contact_phone}
+                      />
+                    ) : (
+                      <Link
+                        className="text-sm text-foreground-secondary underline-offset-2 hover:underline"
+                        href={urls.storeMessages(storeId, {
+                          audience: "vendor",
+                          vendor_id: v.id,
+                          code: "WA-V02",
+                        })}
+                      >
+                        Messages
+                      </Link>
+                    )}
+                    {v.status === "active" ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void archiveVendor(v.id)}
+                      >
+                        Archive
+                      </Button>
+                    ) : null}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

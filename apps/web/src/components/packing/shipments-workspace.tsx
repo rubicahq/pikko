@@ -281,6 +281,7 @@ export function ShipmentsWorkspace({ storeId }: { storeId: string }) {
                 <TableHead>Tracking</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -306,6 +307,18 @@ export function ShipmentsWorkspace({ storeId }: { storeId: string }) {
                     {new Date(sh.created_at).toLocaleString("id-ID", {
                       timeZone: "Asia/Jakarta",
                     })}
+                  </TableCell>
+                  <TableCell>
+                    <Link
+                      href={urls.storeMessages(storeId, {
+                        audience: "customer",
+                        code: "WA-C12",
+                        order_id: sh.order_id,
+                      })}
+                      className="text-sm font-medium text-foreground hover:underline"
+                    >
+                      WhatsApp
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}

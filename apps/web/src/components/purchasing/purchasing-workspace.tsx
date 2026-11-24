@@ -188,6 +188,16 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         actions={
           <Button asChild variant="outline">
             <Link href={urls.storeVendors(storeId)}>Vendors</Link>
+            {" · "}
+            <Link
+              href={urls.storeMessages(storeId, {
+                audience: "vendor",
+                code: "WA-V02",
+                ...(vendorId ? { vendor_id: vendorId } : {}),
+              })}
+            >
+              WhatsApp vendor
+            </Link>
           </Button>
         }
       />
