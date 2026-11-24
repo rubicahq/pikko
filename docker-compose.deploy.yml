@@ -14,7 +14,7 @@ services:
 
   migrate:
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@pikko-postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
 
   api:
     container_name: pikko-api
@@ -28,7 +28,7 @@ services:
       DASHBOARD_URL: ${DASHBOARD_URL:-https://app.pikko.site}
       STOREFRONT_URL: ${STOREFRONT_URL:-https://shop.pikko.site}
       API_BASE_URL: ${API_BASE_URL:-https://api.pikko.site}
-      DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@pikko-postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
       EMAIL_MODE: ${EMAIL_MODE:-log}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Pikko}
