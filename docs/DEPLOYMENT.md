@@ -124,14 +124,33 @@ curl -sk --resolve emplicon.com:443:127.0.0.1 https://emplicon.com/ -o /dev/null
 Never commit `.env`. On the VPS: `~/pikko/.env` mode `600`.
 
 - `POSTGRES_PASSWORD` / DB URL
-- `BREVO_API_KEY` only when switching `EMAIL_MODE=brevo`
+- Brevo (transactional magic-link email):
+  - `BREVO_API_KEY` (server `.env` only)
+  - `EMAIL_MODE=brevo` when a verified sender exists; otherwise keep `log`
+  - `EMAIL_FROM_NAME`, `EMAIL_ACCOUNT_FROM`, `EMAIL_NOTIFICATION_FROM`, `EMAIL_REPLY_TO`
+  - Production uses verified sender `account@pikko.site` (from-name `Pikko`)
+  - Recreate **only** `pikko-api` after changing Brevo/email env (`docker compose … up -d --no-deps --force-recreate api`), then re-attach to `emplicon_emplicon` if needed
 - storage credentials when using S3
 - AI gateway (OpenAI-compatible; server `.env` only):
   - `AI_API_KEY`
   - `AI_BASE_URL` (use `…/v1` chat/completions + models under that base)
   - `AI_MODEL` (production currently uses `gemini/gemini-3.5-flash`)
 
-Do not put AI keys in the repo, docs with real values, logs, or agent stores. Changing AI env alone does not require a container restart until the app reads these vars.
+Do not put API keys in the repo, docs with real values, logs, or agent stores.
+
+### Brevo domain DNS (Cloudflare DNS-only)
+
+`pikko.site` is authenticated in Brevo. Expected records (names relative to `pikko.site`):
+
+| Type | Name | Value |
+| --- | --- | --- |
+| TXT | `@` | `brevo-code:…` (Brevo domain verification code) |
+| CNAME | `brevo1._domainkey` | `b1.pikko-site.dkim.brevo.com` |
+| CNAME | `brevo2._domainkey` | `b2.pikko-site.dkim.brevo.com` |
+| TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` |
+| TXT | `@` | `v=spf1 include:spf.brevo.com ~all` |
+
+DKIM / DMARC / Brevo code were present at cutover. **SPF was missing** on the apex — add the SPF TXT above (DNS-only) so all `@pikko.site` senders stay SPF-clean. Do not invent unverified From addresses.
 
 ## Migrations
 
