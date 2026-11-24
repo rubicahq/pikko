@@ -1,0 +1,138 @@
+package httpapi
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"github.com/google/uuid"
+
+	"github.com/rubicahq/pikko/services/api/internal/auth"
+	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/stores"
+)
+
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("X-Request-ID")
+		if id == "" {
+			id = uuid.NewString()
+		}
+		w.Header().Set("X-Request-ID", id)
+		ctx := context.WithValue(r.Context(), ctxKeyRequestID, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func CORSMiddleware(cfg *config.Config) func(http.Handler) http.Handler {
+	allowed := map[string]struct{}{}
+	for _, o := range cfg.CORSOrigins {
+		allowed[o] = struct{}{}
+	}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if _, ok := allowed[origin]; ok {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-CSRF-Token")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func SecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		next.ServeHTTP(w, r)
+	})
+}
+
+type AuthMiddleware struct {
+	Auth *auth.Service
+	Cfg  *config.Config
+}
+
+func (m *AuthMiddleware) sessionRaw(r *http.Request) string {
+	if c, err := r.Cookie(m.Cfg.CookieName); err == nil && c.Value != "" {
+		return c.Value
+	}
+	h := r.Header.Get("Authorization")
+	if strings.HasPrefix(strings.ToLower(h), "bearer ") {
+		return strings.TrimSpace(h[7:])
+	}
+	return ""
+}
+
+func (m *AuthMiddleware) Require(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw := m.sessionRaw(r)
+		user, _, err := m.Auth.Authenticate(r.Context(), raw)
+		if err != nil {
+			writeError(w, r, http.StatusUnauthorized, "unauthorized", "Authentication required.")
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxKeyUserID, user.ID)
+		ctx = context.WithValue(ctx, ctxKeySession, raw)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func UserID(r *http.Request) uuid.UUID {
+	id, _ := r.Context().Value(ctxKeyUserID).(uuid.UUID)
+	return id
+}
+
+func SessionRaw(r *http.Request) string {
+	s, _ := r.Context().Value(ctxKeySession).(string)
+	return s
+}
+
+type StoreAuthMiddleware struct {
+	Stores *stores.Service
+}
+
+func (m *StoreAuthMiddleware) Require(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		storeIDStr := r.PathValue("storeID")
+		storeID, err := uuid.Parse(storeIDStr)
+		if err != nil {
+			writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
+			return
+		}
+		userID := UserID(r)
+		if err := m.Stores.AssertMember(r.Context(), userID, storeID); err != nil {
+			// Indistinguishable not-found vs forbidden for cross-store probes
+			writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxKeyStoreID, storeID)
+		_ = m.Stores.TouchLastAccessed(r.Context(), userID, storeID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func StoreID(r *http.Request) uuid.UUID {
+	id, _ := r.Context().Value(ctxKeyStoreID).(uuid.UUID)
+	return id
+}
+
+func ClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	host := r.RemoteAddr
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		return host[:i]
+	}
+	return host
+}

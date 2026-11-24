@@ -1,0 +1,8 @@
+{
+  "name": "@pikko/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pikko design tokens (PRD §13)",
+  "main": "tokens.css",
+  "files": ["tokens.css", "tailwind.preset.js"]
+}

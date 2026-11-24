@@ -1,0 +1,38 @@
+FROM node:22-bookworm AS deps
+WORKDIR /app
+COPY apps/web/package.json apps/web/package-lock.json ./apps/web/
+COPY packages/design-tokens ./packages/design-tokens
+COPY packages/ui ./packages/ui
+WORKDIR /app/apps/web
+RUN npm ci
+
+FROM node:22-bookworm AS build
+WORKDIR /app
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY packages ./packages
+COPY apps/web ./apps/web
+WORKDIR /app/apps/web
+ARG NEXT_PUBLIC_APP_ENV=production
+ARG NEXT_PUBLIC_API_BASE_URL=
+ARG NEXT_PUBLIC_MARKETING_URL=https://pikko.site
+ARG NEXT_PUBLIC_DASHBOARD_URL=https://app.pikko.site
+ARG NEXT_PUBLIC_STOREFRONT_URL=https://shop.pikko.site
+ENV NEXT_PUBLIC_APP_ENV=$NEXT_PUBLIC_APP_ENV \
+    NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
+    NEXT_PUBLIC_MARKETING_URL=$NEXT_PUBLIC_MARKETING_URL \
+    NEXT_PUBLIC_DASHBOARD_URL=$NEXT_PUBLIC_DASHBOARD_URL \
+    NEXT_PUBLIC_STOREFRONT_URL=$NEXT_PUBLIC_STOREFRONT_URL \
+    API_BASE_URL=http://api:8080
+RUN npm run build
+
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+COPY --from=build /app/apps/web/public ./apps/web/public
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+EXPOSE 3000
+USER node
+CMD ["node", "apps/web/server.js"]

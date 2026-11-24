@@ -1,0 +1,71 @@
+/**
+ * Pikko design tokens — PRD §13.
+ * Source of truth for brand colors, radii, shadows, and type.
+ * Map to Tailwind via apps/web/tailwind.config.ts.
+ */
+:root {
+  /* Brand */
+  --brand-primary: #ff3d00;
+  --brand-hover: #eb3800;
+  --brand-pressed: #d63200;
+  --brand-accessible-dark: #c83200;
+  --brand-soft: #fff1eb;
+  --brand-border: #ffd2c2;
+
+  /* Surfaces */
+  --background: #ffffff;
+  --background-subtle: #f9f9fb;
+  --surface: #f3f3f7;
+  --surface-strong: #e8e9ee;
+
+  /* Foreground */
+  --foreground: #15191e;
+  --foreground-secondary: #60646c;
+  --foreground-muted: #8b8d98;
+  --foreground-subtle: #b9bbc6;
+  --foreground-inverse: #fcfcfd;
+  --dark: #000710;
+
+  /* Borders */
+  --border: #e1e3e8;
+  --border-strong: #c7cad2;
+
+  /* Semantic */
+  --success: #166534;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #92400e;
+  --warning-bg: #fffbeb;
+  --warning-border: #fde68a;
+  --error: #b91c1c;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --info: #1d4ed8;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+  --neutral: #4b5563;
+  --neutral-bg: #f3f4f6;
+  --neutral-border: #e5e7eb;
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* Shadows (use sparingly; borders define boundaries) */
+  --shadow-xs: 0 1px 2px rgba(0, 7, 16, 0.04);
+  --shadow-sm: 0 2px 6px rgba(0, 7, 16, 0.05), 0 1px 2px rgba(0, 7, 16, 0.03);
+  --shadow-md: 0 8px 24px rgba(0, 7, 16, 0.08), 0 2px 6px rgba(0, 7, 16, 0.04);
+  --shadow-overlay: 0 16px 48px rgba(0, 7, 16, 0.12);
+
+  /* Typography */
+  --font-sans: "Inter", Arial, sans-serif;
+
+  /* Layout */
+  --sidebar-width: 248px;
+  --sidebar-collapsed: 64px;
+  --topbar-height: 64px;
+}
