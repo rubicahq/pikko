@@ -735,12 +735,13 @@ func (s *Service) enqueueOrderEmails(ctx context.Context, st *publicStoreMeta, o
 			key = "email:order_confirm_needed:" + order.ID.String()
 			tmpl = "order_needs_confirmation"
 		}
-		_ = s.Email.Enqueue(ctx, email.Message{
-			TemplateKey: tmpl, To: st.OwnerEmail,
-			From: from, FromName: s.Cfg.EmailFromName, ReplyTo: s.Cfg.EmailReplyTo,
-			Subject: mSubject, HTML: mHTML, Text: mText,
-			IdempotencyKey: key,
-		})
+	_ = s.Email.Enqueue(ctx, email.Message{
+		TemplateKey: tmpl, To: st.OwnerEmail,
+		From: from, FromName: s.Cfg.EmailFromName, ReplyTo: s.Cfg.EmailReplyTo,
+		Subject: mSubject, HTML: mHTML, Text: mText,
+		IdempotencyKey: key,
+	})
 	}
+	s.notifyNewOrderInApp(ctx, st.ID, order)
 	_ = pay
 }

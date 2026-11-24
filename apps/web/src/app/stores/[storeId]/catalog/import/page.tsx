@@ -34,10 +34,10 @@ export default async function CatalogImportPage({
             Catalog
           </Link>
           <span className="mx-1.5">/</span>
-          Import PDF
+          Import
         </p>
         <h1 className="mt-2 text-[30px] font-medium tracking-tight text-foreground">
-          AI catalog import
+          Catalog import
         </h1>
       </div>
 

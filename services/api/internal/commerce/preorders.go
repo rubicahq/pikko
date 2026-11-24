@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/validate"
 )
 
@@ -87,6 +88,7 @@ type PatchBatchInput struct {
 	Slug              *string    `json:"slug,omitempty"`
 	Description       *string    `json:"description,omitempty"`
 	CoverFileID       *uuid.UUID `json:"cover_file_id,omitempty"`
+	ClearCover        bool       `json:"clear_cover,omitempty"`
 	OpensAt           *time.Time `json:"opens_at,omitempty"`
 	ClosesAt          *time.Time `json:"closes_at,omitempty"`
 	PurchasingDate    *string    `json:"purchasing_date,omitempty"`
@@ -422,7 +424,9 @@ func (s *Service) UpdateBatch(ctx context.Context, storeID, batchID uuid.UUID, i
 		notes = in.MerchantNotes
 	}
 	cover := b.CoverFileID
-	if in.CoverFileID != nil {
+	if in.ClearCover {
+		cover = nil
+	} else if in.CoverFileID != nil {
 		cover = in.CoverFileID
 	}
 
@@ -463,6 +467,32 @@ func (s *Service) UpdateBatch(ctx context.Context, storeID, batchID uuid.UUID, i
 			return nil, ErrConflict
 		}
 		return nil, err
+	}
+	if in.OperationalStatus != nil && *in.OperationalStatus == BatchClosed && b.OperationalStatus == BatchOpen {
+		s.notifyBatchClosedInApp(ctx, storeID, batchID, name)
+		if s.Email != nil && s.Cfg != nil {
+			var ownerEmail, storeName string
+			_ = s.DB.QueryRow(ctx, `
+				SELECT u.email, st.name FROM stores st
+				JOIN store_memberships sm ON sm.store_id=st.id AND sm.role='owner' AND sm.status='active'
+				JOIN users u ON u.id=sm.user_id
+				WHERE st.id=$1
+				LIMIT 1
+			`, storeID).Scan(&ownerEmail, &storeName)
+			if ownerEmail != "" {
+				dash := ""
+				if s.URLs != nil {
+					dash = fmt.Sprintf("%s/stores/%s/preorders/%s", strings.TrimRight(s.Cfg.DashboardURL, "/"), storeID, batchID)
+				}
+				subj, html, text := email.BatchClosedMerchantContent(storeName, name, dash)
+				_ = s.Email.Enqueue(ctx, email.Message{
+					TemplateKey: "batch_closed_merchant", To: ownerEmail,
+					From: s.Cfg.EmailNotificationFrom, FromName: s.Cfg.EmailFromName, ReplyTo: s.Cfg.EmailReplyTo,
+					Subject: subj, HTML: html, Text: text,
+					IdempotencyKey: "email:batch_closed:" + batchID.String(),
+				})
+			}
+		}
 	}
 	if s.Outbox != nil {
 		_ = s.Outbox.Write(ctx, &storeID, "preorder.preorder_batch_status_updated", map[string]any{

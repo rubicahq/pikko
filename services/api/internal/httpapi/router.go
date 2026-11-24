@@ -10,6 +10,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/account"
 	"github.com/rubicahq/pikko/services/api/internal/ai"
+	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/auth"
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
@@ -19,6 +20,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/flipbook"
 	"github.com/rubicahq/pikko/services/api/internal/imports"
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
+	"github.com/rubicahq/pikko/services/api/internal/notifications"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
@@ -77,11 +79,15 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	impH := &ImportHandlers{Imports: importSvc}
 	flipSvc := &flipbook.Service{DB: d.DB}
 	flipH := &FlipbookHandlers{Flipbook: flipSvc, Catalog: catalogSvc, URLs: urlGen}
+	notifSvc := &notifications.Service{DB: d.DB}
+	analyticsSvc := &analytics.Service{DB: d.DB}
 	commerceSvc := &commerce.Service{
 		DB: d.DB, Cfg: d.Cfg, Files: filesSvc, Storage: d.Storage,
 		Email: mailSvc, Outbox: outbox, URLs: urlGen, Logger: d.Logger,
+		Notifier: notifSvc,
 	}
 	commerceH := &CommerceHandlers{Commerce: commerceSvc, URLs: urlGen, Cfg: d.Cfg}
+	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -158,9 +164,10 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/collections", storeAuthed(p2.ListCollections))
 	mux.Handle("POST /api/v1/stores/{storeID}/collections", storeAuthed(p2.CreateCollection))
 
-	// AI catalog PDF import (PRD §18)
+	// Catalog import PDF + CSV (PRD §18)
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.Start))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.List))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/csv-template", storeAuthed(impH.CSVTemplate))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}", storeAuthed(impH.Get))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}/items", storeAuthed(impH.ListItems))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storeAuthed(impH.PatchItem))
@@ -190,6 +197,17 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject", storeAuthed(commerceH.RejectPayment))
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/evidence/{evidenceID}/file", storeAuthed(commerceH.MerchantEvidenceFile))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers", storeAuthed(commerceH.ListCustomers))
+	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storeAuthed(p5.GetCustomer))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storeAuthed(p5.PatchCustomer))
+
+	// Phase 5: notifications + analytics
+	mux.Handle("GET /api/v1/stores/{storeID}/notifications", storeAuthed(p5.ListNotifications))
+	mux.Handle("GET /api/v1/stores/{storeID}/notifications/unread-count", storeAuthed(p5.UnreadCount))
+	mux.Handle("POST /api/v1/stores/{storeID}/notifications/read-all", storeAuthed(p5.MarkAllNotificationsRead))
+	mux.Handle("POST /api/v1/stores/{storeID}/notifications/{notificationID}/read", storeAuthed(p5.MarkNotificationRead))
+	mux.Handle("GET /api/v1/stores/{storeID}/notification-preferences", storeAuthed(p5.GetNotificationPreferences))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/notification-preferences", storeAuthed(p5.PatchNotificationPreferences))
+	mux.Handle("GET /api/v1/stores/{storeID}/analytics", storeAuthed(p5.AnalyticsOverview))
 
 	// Phase 4: preorder batches
 	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storeAuthed(commerceH.ListBatches))
@@ -198,6 +216,9 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storeAuthed(commerceH.PatchBatch))
 	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storeAuthed(commerceH.AssignBatchProduct))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storeAuthed(commerceH.RemoveBatchProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storeAuthed(p5.ListBatchVariants))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storeAuthed(p5.AssignBatchVariant))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants/{variantID}", storeAuthed(p5.RemoveBatchVariant))
 	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.BatchPurchasing))
 	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.UpdateBatchPurchasing))
 	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storeAuthed(commerceH.AllocateBatchItem))

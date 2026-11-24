@@ -18,14 +18,15 @@ import (
 )
 
 type Service struct {
-	DB      *pgxpool.Pool
-	Cfg     *config.Config
-	Files   *files.Service
-	Storage storage.ObjectStore
-	Email   *email.Service
-	Outbox  *jobs.Outbox
-	URLs    *urls.Generator
-	Logger  *slog.Logger
+	DB       *pgxpool.Pool
+	Cfg      *config.Config
+	Files    *files.Service
+	Storage  storage.ObjectStore
+	Email    *email.Service
+	Outbox   *jobs.Outbox
+	URLs     *urls.Generator
+	Logger   *slog.Logger
+	Notifier Notifier
 }
 
 func (s *Service) refreshCheckoutEnabled(ctx context.Context, storeID uuid.UUID) error {

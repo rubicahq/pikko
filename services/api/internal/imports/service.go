@@ -48,7 +48,9 @@ func DefaultLimits() Limits {
 type Job struct {
 	ID             uuid.UUID  `json:"id"`
 	StoreID        uuid.UUID  `json:"store_id"`
-	PDFFileID      uuid.UUID  `json:"pdf_file_id"`
+	SourceType     string     `json:"source_type"`
+	PDFFileID      *uuid.UUID `json:"pdf_file_id,omitempty"`
+	CSVFileID      *uuid.UUID `json:"csv_file_id,omitempty"`
 	ExtractImages  bool       `json:"extract_images"`
 	Status         string     `json:"status"`
 	PageCount      *int       `json:"page_count,omitempty"`
@@ -59,6 +61,28 @@ type Job struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 	CompletedAt    *time.Time `json:"completed_at,omitempty"`
+}
+
+const jobSelectCols = `
+	id, store_id, COALESCE(source_type,'pdf'), pdf_file_id, csv_file_id, extract_images, status, page_count,
+	item_count, progress_pct, error_message, idempotency_key, created_at, updated_at, completed_at
+`
+
+func scanJob(row interface {
+	Scan(dest ...any) error
+}) (*Job, error) {
+	var j Job
+	err := row.Scan(
+		&j.ID, &j.StoreID, &j.SourceType, &j.PDFFileID, &j.CSVFileID, &j.ExtractImages, &j.Status, &j.PageCount,
+		&j.ItemCount, &j.ProgressPct, &j.ErrorMessage, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if j.SourceType == "" {
+		j.SourceType = "pdf"
+	}
+	return &j, nil
 }
 
 type Item struct {
@@ -155,28 +179,19 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 		idem = "import-" + storeID.String() + "-" + uuid.NewString()
 	}
 
-	var existing Job
-	err = s.DB.QueryRow(ctx, `
-		SELECT id, store_id, pdf_file_id, extract_images, status, page_count, item_count, progress_pct,
-		       error_message, idempotency_key, created_at, updated_at, completed_at
-		FROM catalog_import_jobs WHERE store_id=$1 AND idempotency_key=$2
-	`, storeID, idem).Scan(
-		&existing.ID, &existing.StoreID, &existing.PDFFileID, &existing.ExtractImages, &existing.Status,
-		&existing.PageCount, &existing.ItemCount, &existing.ProgressPct, &existing.ErrorMessage,
-		&existing.IdempotencyKey, &existing.CreatedAt, &existing.UpdatedAt, &existing.CompletedAt,
-	)
+	existing, err := s.getJobByIdem(ctx, storeID, idem)
 	if err == nil {
-		return &existing, nil
+		return existing, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 
 	var jobID uuid.UUID
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO catalog_import_jobs (
-			store_id, created_by, pdf_file_id, extract_images, status, page_count, idempotency_key
-		) VALUES ($1,$2,$3,$4,'pending',$5,$6)
+			store_id, created_by, source_type, pdf_file_id, extract_images, status, page_count, idempotency_key
+		) VALUES ($1,$2,'pdf',$3,$4,'pending',$5,$6)
 		RETURNING id
 	`, storeID, userID, f.ID, in.ExtractImages, pages, idem).Scan(&jobID)
 	if err != nil {
@@ -197,20 +212,24 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	return s.GetJob(ctx, storeID, jobID)
 }
 
-func (s *Service) GetJob(ctx context.Context, storeID, jobID uuid.UUID) (*Job, error) {
-	var j Job
-	err := s.DB.QueryRow(ctx, `
-		SELECT id, store_id, pdf_file_id, extract_images, status, page_count, item_count, progress_pct,
-		       error_message, idempotency_key, created_at, updated_at, completed_at
-		FROM catalog_import_jobs WHERE id=$1 AND store_id=$2
-	`, jobID, storeID).Scan(
-		&j.ID, &j.StoreID, &j.PDFFileID, &j.ExtractImages, &j.Status, &j.PageCount, &j.ItemCount, &j.ProgressPct,
-		&j.ErrorMessage, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
-	)
+func (s *Service) getJobByIdem(ctx context.Context, storeID uuid.UUID, idem string) (*Job, error) {
+	j, err := scanJob(s.DB.QueryRow(ctx, `
+		SELECT `+jobSelectCols+` FROM catalog_import_jobs WHERE store_id=$1 AND idempotency_key=$2
+	`, storeID, idem))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return &j, err
+	return j, err
+}
+
+func (s *Service) GetJob(ctx context.Context, storeID, jobID uuid.UUID) (*Job, error) {
+	j, err := scanJob(s.DB.QueryRow(ctx, `
+		SELECT `+jobSelectCols+` FROM catalog_import_jobs WHERE id=$1 AND store_id=$2
+	`, jobID, storeID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	return j, err
 }
 
 func (s *Service) ListJobs(ctx context.Context, storeID uuid.UUID, limit int) ([]Job, error) {
@@ -218,9 +237,7 @@ func (s *Service) ListJobs(ctx context.Context, storeID uuid.UUID, limit int) ([
 		limit = 20
 	}
 	rows, err := s.DB.Query(ctx, `
-		SELECT id, store_id, pdf_file_id, extract_images, status, page_count, item_count, progress_pct,
-		       error_message, idempotency_key, created_at, updated_at, completed_at
-		FROM catalog_import_jobs WHERE store_id=$1 ORDER BY created_at DESC LIMIT $2
+		SELECT `+jobSelectCols+` FROM catalog_import_jobs WHERE store_id=$1 ORDER BY created_at DESC LIMIT $2
 	`, storeID, limit)
 	if err != nil {
 		return nil, err
@@ -228,16 +245,13 @@ func (s *Service) ListJobs(ctx context.Context, storeID uuid.UUID, limit int) ([
 	defer rows.Close()
 	var out []Job
 	for rows.Next() {
-		var j Job
-		if err := rows.Scan(
-			&j.ID, &j.StoreID, &j.PDFFileID, &j.ExtractImages, &j.Status, &j.PageCount, &j.ItemCount, &j.ProgressPct,
-			&j.ErrorMessage, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
-		); err != nil {
+		j, err := scanJob(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, j)
+		out = append(out, *j)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 func (s *Service) ListItems(ctx context.Context, storeID, jobID uuid.UUID) ([]Item, error) {
@@ -549,7 +563,13 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		return err
 	}
 
-	f, rc, err := s.Files.Open(ctx, storeID, job.PDFFileID)
+	if job.SourceType == "csv" {
+		return s.failJob(ctx, storeID, jobID, fmt.Errorf("csv jobs are processed synchronously"))
+	}
+	if job.PDFFileID == nil {
+		return s.failJob(ctx, storeID, jobID, fmt.Errorf("missing pdf file"))
+	}
+	f, rc, err := s.Files.Open(ctx, storeID, *job.PDFFileID)
 	if err != nil {
 		return s.failJob(ctx, storeID, jobID, err)
 	}

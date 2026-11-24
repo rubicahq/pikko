@@ -41,6 +41,13 @@ export const urls = {
   storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
   storeOrders: (storeId: string) => `/stores/${storeId}/orders`,
   storeOrder: (storeId: string, orderId: string) => `/stores/${storeId}/orders/${orderId}`,
+  storeCustomers: (storeId: string) => `/stores/${storeId}/customers`,
+  storeCustomer: (storeId: string, customerId: string) =>
+    `/stores/${storeId}/customers/${customerId}`,
+  storeAnalytics: (storeId: string) => `/stores/${storeId}/analytics`,
+  storeNotifications: (storeId: string) => `/stores/${storeId}/notifications`,
+  storePreorders: (storeId: string) => `/stores/${storeId}/preorders`,
+  storePreorder: (storeId: string, batchId: string) => `/stores/${storeId}/preorders/${batchId}`,
   storefront: (slug: string) => `${storefront()}/${slug}`,
   storefrontPath: (slug: string) => `/${slug}`,
   storefrontCart: (slug: string) => `/${slug}/cart`,

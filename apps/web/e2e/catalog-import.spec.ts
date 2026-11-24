@@ -63,8 +63,9 @@ test.describe("AI PDF catalog import", () => {
 
     await page.getByRole("link", { name: "Catalog" }).click();
     await expect(page.getByRole("heading", { name: "Catalog" })).toBeVisible();
-    await page.getByRole("link", { name: "Import PDF" }).click();
-    await expect(page.getByRole("heading", { name: "AI catalog import" })).toBeVisible();
+    await page.getByRole("link", { name: "Import", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /catalog import/i })).toBeVisible();
+    await page.getByRole("button", { name: "PDF", exact: true }).click();
 
     const pdfPath = minimalPdfPath();
     await page.locator("#pdf").setInputFiles(pdfPath);

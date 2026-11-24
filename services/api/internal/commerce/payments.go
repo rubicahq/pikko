@@ -138,6 +138,9 @@ func (s *Service) SubmitEvidenceByTracking(
 			"order_id": orderID.String(), "payment_id": pay.ID.String(),
 		}, "evidence:"+pay.ID.String()+":"+f.ID.String())
 	}
+	if o2, err := s.GetOrder(ctx, storeID, orderID); err == nil {
+		s.notifyPaymentEvidenceInApp(ctx, storeID, o2)
+	}
 	return s.GetLatestPayment(ctx, storeID, orderID)
 }
 

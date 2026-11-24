@@ -176,7 +176,20 @@ func (s *Service) AllocatePurchased(ctx context.Context, storeID, batchID uuid.U
 			updated_at=now()
 	`, storeID, batchID, orderID, in.OrderItemID, productID, variantID,
 		in.AllocatedQty, in.UnavailableQty, in.Resolution)
-	return err
+	if err != nil {
+		return err
+	}
+	if in.UnavailableQty > 0 {
+		var productName string
+		_ = s.DB.QueryRow(ctx, `
+			SELECT product_name FROM order_items WHERE id=$1 AND store_id=$2
+		`, in.OrderItemID, storeID).Scan(&productName)
+		if productName == "" {
+			productName = "Item"
+		}
+		s.notifyUnavailableAllocation(ctx, storeID, orderID, productName, in.UnavailableQty)
+	}
+	return nil
 }
 
 func (s *Service) ListBatchOrders(ctx context.Context, storeID, batchID uuid.UUID, limit, offset int) ([]Order, int, error) {
