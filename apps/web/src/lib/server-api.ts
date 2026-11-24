@@ -142,3 +142,48 @@ export async function getPublicProduct(slug: string, productSlug: string) {
     link_ref: Record<string, unknown>;
   }>(`/api/v1/public/stores/${slug}/products/${productSlug}`, false);
 }
+
+export async function getPublicBatches(slug: string) {
+  const data = await serverFetch<{
+    batches: {
+      id: string;
+      name: string;
+      slug: string;
+      operational_status: string;
+      closes_at: string;
+      eta_start?: string | null;
+      eta_end?: string | null;
+    }[];
+  }>(`/api/v1/public/stores/${slug}/preorders`, false);
+  return data?.batches || [];
+}
+
+export async function getPublicBatch(slug: string, batchSlug: string) {
+  return serverFetch<{
+    batch: {
+      id: string;
+      name: string;
+      slug: string;
+      description?: string | null;
+      operational_status: string;
+      closes_at: string;
+      eta_start?: string | null;
+      eta_end?: string | null;
+      products?: {
+        product_id: string;
+        product_name: string;
+        product_slug: string;
+        effective_price_idr: number;
+        quantity_limit?: number | null;
+        reserved_qty?: number;
+      }[];
+    };
+  }>(`/api/v1/public/stores/${slug}/preorders/${batchSlug}`, false);
+}
+
+export async function getPublicProductBatches(slug: string, productSlug: string) {
+  const data = await serverFetch<{
+    batches: { id: string; name: string; slug: string; closes_at: string }[];
+  }>(`/api/v1/public/stores/${slug}/products/${productSlug}/preorders`, false);
+  return data?.batches || [];
+}

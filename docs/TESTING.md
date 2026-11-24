@@ -15,6 +15,8 @@ Coverage highlights:
 - Integration: auth, store create, catalog CRUD, cross-store 404 on products, storefront publish → public product + `link_ref`
 - Integration: PDF import (mock AI); flipbook publish + public hotspots
 - Integration (Phase 3): checkout → evidence → verify; idempotent submit; tracking token hash-only; cross-store order isolation; email jobs enqueued
+- Unit (Phase 4): rule precedence, percent rounding, cart group isolation
+- Integration (Phase 4): batch pricing/quota, closed-batch reject, approval + rule snapshots, cross-store batch isolation, concurrent oversell protection
 
 ## Playwright
 
@@ -31,6 +33,7 @@ Suites:
 - AI PDF catalog import (mock extractor)
 - Flipbook editor smoke
 - Phase 3: bank/fulfillment setup → cart → checkout → evidence → merchant verify
+- Phase 4: preorder batch → cart group → checkout → merchant confirm
 
 ## Manual checks
 

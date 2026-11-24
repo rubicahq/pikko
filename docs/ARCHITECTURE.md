@@ -2,7 +2,7 @@
 
 ## Overview
 
-Modular monolith (PRD §31). Phase 3 adds checkout, orders, manual bank transfer, tracking, and transactional emails on the Phase 0–2 + import/flipbook foundation.
+Modular monolith (PRD §31). Phase 4 adds preorder batches, business rules (handling fee / minimum / approval with precedence + versioning), and multi-group carts on the Phase 0–3 foundation.
 
 ```
 pikko/
@@ -34,14 +34,17 @@ Store is the tenant. Every catalog/storefront/file row carries `store_id`. Route
 
 Products expose stable UUIDs, store-scoped slugs, optional SKU, images, and draft/published status. Public `link_ref` is the contract for flipbook hotspots. See `docs/CATALOG_LINK_CONTRACT.md`.
 
-## Commerce (Phase 3)
+## Commerce (Phase 3–4)
 
 - Cart lines are client-persisted (store-scoped); checkout preview/submit revalidate prices and stock on the server.
+- Cart groups separate ready-stock from each preorder batch; one group per checkout submit.
 - Orders store immutable line snapshots; statuses: order / payment / fulfillment (separate dimensions).
+- Preorder batches: open/close by absolute UTC timestamps; batch price overrides + quotas; purchasing aggregation.
+- Business rules: handling fee / minimum / approval with scope precedence (batch > selling model > store) and version snapshots on orders.
 - Manual bank transfer only in MVP; evidence files use purpose `payment_evidence` (private).
 - Tracking tokens are ≥256-bit; only SHA-256 hashes are stored.
 - `stores.checkout_enabled` flips on when payment methods + fulfillment are configured.
-- Money is integer IDR with deterministic half-up helpers for future percentage fees.
+- Money is integer IDR with deterministic half-up helpers for percentage fees.
 
 ## Jobs
 

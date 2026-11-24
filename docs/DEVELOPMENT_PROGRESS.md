@@ -2,36 +2,41 @@
 
 ## Scope
 
-Phase 3 First Transaction: cart, guest checkout, ready-stock orders, manual bank transfer, evidence, verification, order management, tracking, essential emails (PRD §20–26, §28, §40). Built on Phase 0–2 + AI import + flipbook (merged on `main`).
+Phase 4 Flexible Commerce: preorder batches, batch pricing/quotas, preorder-aware checkout with cart groups, business rules (handling fee, minimum, approval) with precedence + versioning, purchasing list, extended fulfillment (PRD §21–22, §27, §40). Built on Phase 0–3 (live on `pikko.site`).
 
 ## Completed
 
-### Phase 0–2 + accelerators (prior)
+### Phase 0–3 (prior)
 
-- Auth, multi-store, storefront, catalog, AI PDF import, flipbook
+- Auth, multi-store, storefront, catalog, AI import, flipbook, ready-stock checkout, bank transfer, tracking, emails
 
-### Phase 3
+### Phase 4
 
-- Migration `000004`: payment methods, fulfillment settings, customers, orders/items/history, tracking tokens (hash-only), payments, evidence, inventory reservations, public rate limits, order counters
-- Real cart module (`apps/web/src/lib/cart.ts`) — store-scoped localStorage lines; server revalidates on preview/submit
-- Public checkout preview/submit with integer IDR totals, price-change guard, idempotency
-- Manual bank transfer + private evidence upload (`payment_evidence`) with tracking/merchant file access
-- Merchant payment verify/reject; order list/detail + fulfillment transitions
-- Public tracking page `/track/{token}` (noindex); token ≥256-bit, hash stored only
-- Transactional emails via Brevo adapter + `email_jobs` drain (order confirmation customer, new order merchant; payment verified/rejected)
-- Customers auto-created store-scoped from checkout
-- Stock reservations for finite inventory under transaction
-- Checkout enabled only when ≥1 bank account and ≥1 fulfillment method configured
-- Go unit/integration tests; Playwright Phase 3 buy → evidence → verify
+- Migration `000005`: preorder batches/products/variants, purchasing + allocations, business rules + versions + order rule applications, order/batch snapshots, quota reservations via `inventory_reservations.batch_id`
+- Merchant APIs: preorder CRUD, product assign, purchasing, allocations, batch orders; business rules CRUD + preview
+- Public APIs: list/get batches, product open batches; checkout preview/submit preorder-aware (batch price, quota, rules, approval)
+- Cart groups (`pikko_cart_v3`): ready-stock vs per-batch preorder checked out separately
+- Storefront: active preorders section, batch page, PDP batch selector/labels
+- Merchant UI: Preorders + Business Rules (sidebar live); order confirm/reject; preorder fulfillment chain
+- Rules: precedence batch > selling model > store; versioned snapshots on each order; deterministic IDR percent rounding
+- Batch auto open/close via timestamp sync (checkout + worker tick)
+- Emails: order needs confirmation; existing Brevo/outbox idempotency retained
+- Tests: Go unit (rules/precedence/cart groups) + integration (quota, closed batch, cross-store, approval); Playwright Phase 4 flow
 - Docs updated
 
 ## Not in this release (by design)
 
-- Preorder batches / multi-group carts / handling fees / approval rules (Phase 4)
-- Gateway payments, refunds money movement, deposits
-- In-app notification center
-- VPS deploy / Emplicon (separate after merge)
-- Live Brevo domain verification
+- Full CSV purchasing export polish / unavailable-item customer notification UX depth
+- Variant-level batch assignment UI (API table exists)
+- Customers dashboard UI (API list exists)
+- Payment gateway / refunds money movement
+- VPS deploy / Emplicon (out of scope for this agent)
+
+## Production requirements
+
+- Run migration `000005` (idempotent migrate up from empty or existing)
+- No new required secrets; Brevo + existing env remain
+- Optional: ensure worker process runs so batch open/close sync ticks periodically (checkout still enforces timestamps)
 
 ## Test results
 
@@ -39,24 +44,21 @@ Phase 3 First Transaction: cart, guest checkout, ready-stock orders, manual bank
 
 `cd services/api && go test ./... -count=1 -p 1`
 
-Includes commerce checkout + payment verification + cross-store isolation; money rounding; prior suites.
-
 ### Playwright
 
 `cd apps/web && npx playwright test`
 
-Phase 3: configure bank/fulfillment → publish product/storefront → cart → checkout → upload proof → merchant verify.
+Includes Phase 4: batch → cart group → checkout → merchant confirm.
 
 ## Decisions / open questions for product
 
 1. Brevo sender domain readiness (carry-over)
-2. Whether payment evidence signed URLs should use time-limited HMAC in addition to tracking-token auth (MVP uses tracking-scoped + merchant-auth file routes)
-3. Paid-order cancellation / refund UX when merchants need to unwind verified payments
-4. SSH key / VPS deploy (out of scope here)
+2. Paid-order cancel/refund UX when merchants need to unwind verified payments
+3. Whether unavailable preorder allocations should auto-email customers in MVP or stay merchant-driven
+4. Confirm merge → then separate deploy
 
 ## Known limitations
 
-- Cart lines persist client-side; inventory is not reserved until order submit
-- Handling fees / minimum order / approval rules deferred to Phase 4
-- S3 signed URLs still stubbed; private evidence served via authorized API routes
-- Customer list UI is API-ready; dedicated customers dashboard page still later-phase polish
+- Batch cover image upload purpose supported (`preorder_cover`); merchant UI uses defaults without cover editor yet
+- Purchasing allocation UI is API-backed; list save is primary merchant path in this release
+- Multi-batch product on PDP requires selecting one open batch at add-to-cart

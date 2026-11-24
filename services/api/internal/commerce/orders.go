@@ -66,7 +66,8 @@ func (s *Service) ListOrders(ctx context.Context, storeID uuid.UUID, f ListOrder
 		       shipping_city, shipping_province, shipping_postal_code, shipping_country,
 		       customer_notes, internal_notes, cancel_reason,
 		       payment_deadline_at, confirmed_at, completed_at, cancelled_at,
-		       created_at, updated_at
+		       created_at, updated_at,
+		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval
 		FROM orders WHERE `+w+`
 		ORDER BY created_at DESC
 		LIMIT $`+fmt.Sprint(n)+` OFFSET $`+fmt.Sprint(n+1), args...)
@@ -101,11 +102,17 @@ func scanOrder(row scannable) (*Order, error) {
 		&o.CustomerNotes, &o.InternalNotes, &o.CancelReason,
 		&o.PaymentDeadlineAt, &o.ConfirmedAt, &o.CompletedAt, &o.CancelledAt,
 		&o.CreatedAt, &o.UpdatedAt,
+		&o.PreorderBatchID, &o.BatchNameSnapshot, &o.BatchSlugSnapshot, &o.RequiresApproval,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return &o, nil
+}
+
+// scanOrderExtended is an alias used by batch order lists.
+func scanOrderExtended(row scannable) (*Order, error) {
+	return scanOrder(row)
 }
 
 func (s *Service) GetOrder(ctx context.Context, storeID, orderID uuid.UUID) (*Order, error) {
@@ -118,7 +125,8 @@ func (s *Service) GetOrder(ctx context.Context, storeID, orderID uuid.UUID) (*Or
 		       shipping_city, shipping_province, shipping_postal_code, shipping_country,
 		       customer_notes, internal_notes, cancel_reason,
 		       payment_deadline_at, confirmed_at, completed_at, cancelled_at,
-		       created_at, updated_at
+		       created_at, updated_at,
+		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval
 		FROM orders WHERE id=$1 AND store_id=$2
 	`, orderID, storeID)
 	o, err := scanOrder(row)
@@ -138,7 +146,7 @@ func (s *Service) GetOrder(ctx context.Context, storeID, orderID uuid.UUID) (*Or
 
 func (s *Service) listOrderItems(ctx context.Context, storeID, orderID uuid.UUID) ([]OrderItem, error) {
 	rows, err := s.DB.Query(ctx, `
-		SELECT id, product_id, variant_id, product_name, product_slug, sku, variant_label,
+		SELECT id, product_id, variant_id, batch_id, product_name, product_slug, sku, variant_label,
 		       unit_price_idr, quantity, line_total_idr
 		FROM order_items WHERE order_id=$1 AND store_id=$2 ORDER BY created_at
 	`, orderID, storeID)
@@ -150,7 +158,7 @@ func (s *Service) listOrderItems(ctx context.Context, storeID, orderID uuid.UUID
 	for rows.Next() {
 		var it OrderItem
 		if err := rows.Scan(
-			&it.ID, &it.ProductID, &it.VariantID, &it.ProductName, &it.ProductSlug, &it.SKU, &it.VariantLabel,
+			&it.ID, &it.ProductID, &it.VariantID, &it.BatchID, &it.ProductName, &it.ProductSlug, &it.SKU, &it.VariantLabel,
 			&it.UnitPriceIDR, &it.Quantity, &it.LineTotalIDR,
 		); err != nil {
 			return nil, err
@@ -308,10 +316,14 @@ func canTransitionOrder(from, to string) bool {
 
 func canTransitionFulfillment(from, to, method string) bool {
 	allowed := map[string][]string{
-		FulfillmentUnfulfilled: {FulfillmentReadyToShip, FulfillmentReadyForPickup, FulfillmentCancelled},
-		FulfillmentReadyToShip: {FulfillmentShipped, FulfillmentCancelled},
-		FulfillmentReadyForPickup: {FulfillmentCollected, FulfillmentCancelled},
-		FulfillmentShipped:     {FulfillmentDelivered, FulfillmentCancelled},
+		FulfillmentUnfulfilled: {
+			FulfillmentPurchasing, FulfillmentReadyToShip, FulfillmentReadyForPickup, FulfillmentCancelled,
+		},
+		FulfillmentPurchasing:      {FulfillmentAwaitingArrival, FulfillmentCancelled},
+		FulfillmentAwaitingArrival: {FulfillmentReadyToShip, FulfillmentReadyForPickup, FulfillmentCancelled},
+		FulfillmentReadyToShip:     {FulfillmentShipped, FulfillmentCancelled},
+		FulfillmentReadyForPickup:  {FulfillmentCollected, FulfillmentCancelled},
+		FulfillmentShipped:         {FulfillmentDelivered, FulfillmentCancelled},
 	}
 	for _, a := range allowed[from] {
 		if a == to {

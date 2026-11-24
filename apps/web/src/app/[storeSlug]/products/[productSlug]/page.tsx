@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPublicProduct, getPublicStore } from "@/lib/server-api";
+import { getPublicProduct, getPublicProductBatches, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
@@ -42,9 +42,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicProductPage({ params }: Props) {
   const { storeSlug, productSlug } = await params;
   if (RESERVED_STOREFRONT_SLUGS.has(storeSlug)) notFound();
-  const [storeData, productData] = await Promise.all([
+  const [storeData, productData, openBatches] = await Promise.all([
     getPublicStore(storeSlug),
     getPublicProduct(storeSlug, productSlug),
+    getPublicProductBatches(storeSlug, productSlug),
   ]);
   if (!storeData || !productData) notFound();
   const store = storeData.store;
@@ -74,8 +75,14 @@ export default async function PublicProductPage({ params }: Props) {
           <h1 className="text-3xl font-medium">{p.name}</h1>
           {p.sku && <p className="mt-2 text-sm opacity-60">SKU {p.sku}</p>}
           <p className="mt-4 text-xl tabular-nums">{formatIDR(p.base_price_idr)}</p>
+          {p.preorder_eligible && openBatches.length > 0 ? (
+            <p className="mt-3 text-sm opacity-80">
+              Available for preorder
+              {openBatches.length === 1 ? ` · ${openBatches[0].name}` : ` · ${openBatches.length} open batches`}
+            </p>
+          ) : null}
           {p.description && <p className="mt-6 text-base opacity-80 whitespace-pre-wrap">{p.description}</p>}
-          <div className="mt-8 flex flex-wrap items-center gap-3">
+          <div className="mt-8 flex flex-wrap items-start gap-3">
             <AddToCartButton
               storeSlug={storeSlug}
               productId={p.id}
@@ -85,10 +92,13 @@ export default async function PublicProductPage({ params }: Props) {
               primaryColor={sf.primary_color}
               buttonFg={sf.button_foreground || "#FCFCFD"}
               disabled={p.availability === "unavailable" || !store.checkout_enabled}
+              batches={openBatches}
+              preorderEligible={p.preorder_eligible}
+              readyStockEligible={p.ready_stock_eligible}
             />
             <Link
               href={`/${storeSlug}/cart`}
-              className="text-sm underline-offset-2 hover:underline"
+              className="mt-2 text-sm underline-offset-2 hover:underline"
               style={{ color: sf.primary_color }}
             >
               View cart

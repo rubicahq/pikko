@@ -1,4 +1,4 @@
-# API Reference (Phase 0–3)
+# API Reference (Phase 0–4)
 
 Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
@@ -44,6 +44,23 @@ Unchanged from Phase 1: magic-link request/peek/verify, session, logout, account
 
 Checkout enables (`stores.checkout_enabled=true`) only when ≥1 enabled bank account and ≥1 fulfillment method exist.
 
+### Phase 4 preorders + business rules (auth + membership)
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| GET/POST | `/stores/{storeId}/preorders` | List / create batches |
+| GET/PATCH | `/stores/{storeId}/preorders/{batchId}` | Detail + status/window updates |
+| POST | `/stores/{storeId}/preorders/{batchId}/products` | Assign / upsert product |
+| DELETE | `/stores/{storeId}/preorders/{batchId}/products/{productId}` | Remove assignment |
+| GET/PUT | `/stores/{storeId}/preorders/{batchId}/purchasing` | Consolidated purchasing list |
+| POST | `/stores/{storeId}/preorders/{batchId}/allocations` | Allocate purchased qty to item |
+| GET | `/stores/{storeId}/preorders/{batchId}/orders` | Orders in batch |
+| GET/POST | `/stores/{storeId}/business-rules` | List / publish rule (new version) |
+| PATCH/DELETE | `/stores/{storeId}/business-rules/{ruleId}` | Update (bumps version) / delete |
+| POST | `/stores/{storeId}/business-rules/preview` | Same evaluation as checkout |
+
+Rule precedence per type: batch → selling model → store. Checkout cart lines may include `batch_id` (one group per submit).
+
 ## Catalog imports (AI PDF)
 
 Uses mock AI when `AI_API_KEY` is unset. See prior sections for import + flipbook routes.
@@ -57,11 +74,19 @@ Uses mock AI when `AI_API_KEY` is unset. See prior sections for import + flipboo
 - `GET /public/stores/{slug}/catalog` / `…/catalog/products/{productID}`
 - `GET /public/files/{storeId}/{fileId}` — published stores only
 
-### Phase 3 public checkout + tracking
+### Phase 4 public preorders
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| POST | `/public/stores/{slug}/checkout/preview` | Body `{items, fulfillment_method?}` — rate limited |
+| GET | `/public/stores/{slug}/preorders` | Published batches |
+| GET | `/public/stores/{slug}/preorders/{batchSlug}` | Batch + assigned products |
+| GET | `/public/stores/{slug}/products/{productSlug}/preorders` | Open batches containing product |
+
+### Phase 3–4 public checkout + tracking
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| POST | `/public/stores/{slug}/checkout/preview` | Body `{items[{product_id,quantity,batch_id?}], fulfillment_method?}` — rate limited |
 | POST | `/public/stores/{slug}/checkout/submit` | Guest checkout; `idempotency_key` required; returns `tracking_token` once |
 | GET | `/public/tracking/{token}` | Order tracking (noindex); hash lookup only |
 | POST | `/public/tracking/{token}/evidence` | Multipart `file` (image/PDF ≤8 MB) |

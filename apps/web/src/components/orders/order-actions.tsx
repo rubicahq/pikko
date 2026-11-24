@@ -44,26 +44,63 @@ export function OrderActions({
     }
   }
 
-  const nextFulfillment =
-    fulfillmentMethod === "pickup"
-      ? fulfillmentStatus === "unfulfilled"
-        ? "ready_for_pickup"
-        : fulfillmentStatus === "ready_for_pickup"
-          ? "collected"
-          : null
-      : fulfillmentStatus === "unfulfilled"
-        ? "ready_to_ship"
-        : fulfillmentStatus === "ready_to_ship"
-          ? "shipped"
-          : fulfillmentStatus === "shipped"
-            ? "delivered"
-            : null;
+  const nextFulfillment = (() => {
+    if (fulfillmentMethod === "pickup") {
+      if (fulfillmentStatus === "unfulfilled" || fulfillmentStatus === "awaiting_arrival") {
+        return "ready_for_pickup";
+      }
+      if (fulfillmentStatus === "ready_for_pickup") return "collected";
+      return null;
+    }
+    const chain: Record<string, string> = {
+      unfulfilled: "ready_to_ship",
+      purchasing: "awaiting_arrival",
+      awaiting_arrival: "ready_to_ship",
+      ready_to_ship: "shipped",
+      shipped: "delivered",
+    };
+    return chain[fulfillmentStatus] || null;
+  })();
 
   return (
     <section className="mt-6 space-y-4 rounded-[10px] border border-border p-5">
       <h2 className="text-base font-medium">Actions</h2>
       {error ? <p className="text-sm text-error">{error}</p> : null}
       <div className="flex flex-wrap gap-2">
+        {orderStatus === "pending_confirmation" ? (
+          <>
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}`, {
+                    method: "PATCH",
+                    body: { order_status: "confirmed" },
+                  });
+                })
+              }
+            >
+              Confirm order
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await apiFetch(`/api/v1/stores/${storeId}/orders/${orderId}`, {
+                    method: "PATCH",
+                    body: { order_status: "cancelled", cancel_reason: "Rejected by merchant" },
+                  });
+                })
+              }
+            >
+              Reject order
+            </Button>
+          </>
+        ) : null}
+
         {paymentId && hasEvidence && paymentStatus === "awaiting_verification" ? (
           <>
             <Button

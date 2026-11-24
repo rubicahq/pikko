@@ -12,15 +12,22 @@ type EmailDrainer interface {
 	DrainPending(ctx context.Context, limit int) (int, error)
 }
 
+type BatchSyncer interface {
+	SyncAll(ctx context.Context) error
+}
+
 type Worker struct {
-	Queue    *Queue
-	Outbox   *Outbox
-	Email    EmailDrainer
-	Logger   *slog.Logger
-	WorkerID string
-	Types    []string
-	Handlers map[string]Handler
-	Interval time.Duration
+	Queue      *Queue
+	Outbox     *Outbox
+	Email      EmailDrainer
+	BatchSync  BatchSyncer
+	Logger     *slog.Logger
+	WorkerID   string
+	Types      []string
+	Handlers   map[string]Handler
+	Interval   time.Duration
+	syncEvery  int
+	tickCount  int
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -48,6 +55,14 @@ func (w *Worker) tick(ctx context.Context) {
 	}
 	if w.Email != nil {
 		_, _ = w.Email.DrainPending(ctx, 20)
+	}
+	w.tickCount++
+	every := w.syncEvery
+	if every <= 0 {
+		every = 30 // ~12s at 400ms interval
+	}
+	if w.BatchSync != nil && w.tickCount%every == 0 {
+		_ = w.BatchSync.SyncAll(ctx)
 	}
 	job, err := w.Queue.ClaimNext(ctx, w.WorkerID, w.Types)
 	if err != nil {

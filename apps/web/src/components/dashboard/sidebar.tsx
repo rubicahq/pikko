@@ -24,9 +24,9 @@ const nav = [
   { href: "storefront", label: "Storefront", icon: Store },
   { href: "catalog", label: "Catalog", icon: Package },
   { href: "orders", label: "Orders", icon: ShoppingBag },
-  { href: "preorders", label: "Preorders", icon: CalendarClock, soon: true },
+  { href: "preorders", label: "Preorders", icon: CalendarClock },
   { href: "customers", label: "Customers", icon: Users, soon: true },
-  { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal, soon: true },
+  { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal },
   { href: "settings", label: "Settings", icon: Settings },
 ];
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ApiError, apiFetch, formatIDR } from "@/lib/api";
-import { clearCart, onCartChanged, readCart, type CartLine } from "@/lib/cart";
+import { cartGroups, clearCart, onCartChanged, readCart, type CartLine } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,17 +28,25 @@ type Fulfillment = {
 type Preview = {
   subtotal_idr: number;
   shipping_fee_idr: number;
+  handling_fee_idr?: number;
   total_idr: number;
+  selling_model?: string;
+  batch_name?: string;
+  requires_approval?: boolean;
+  minimum_ok?: boolean;
+  minimum_message?: string;
   checkout_enabled: boolean;
   payment_methods: PaymentMethod[];
   fulfillment?: Fulfillment | null;
   lines: { product_name: string; quantity: number; line_total_idr: number }[];
 };
 
-export default function CheckoutPage() {
+function CheckoutInner() {
   const params = useParams();
+  const search = useSearchParams();
   const router = useRouter();
   const storeSlug = String(params.storeSlug || "");
+  const groupKey = search.get("group") || "";
   const [lines, setLines] = useState<CartLine[]>([]);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,14 +64,28 @@ export default function CheckoutPage() {
   const [province, setProvince] = useState("");
   const [postal, setPostal] = useState("");
 
+  const activeLines = useMemo(() => {
+    if (!groupKey) {
+      const groups = cartGroups(storeSlug);
+      return groups[0]?.lines || lines;
+    }
+    return lines.filter((l) => {
+      const key = l.batchId ? `preorder:${l.batchId}` : "ready_stock";
+      return key === groupKey;
+    });
+  }, [lines, groupKey, storeSlug]);
+
+  const activeGroupKey = groupKey || (activeLines[0]?.batchId ? `preorder:${activeLines[0].batchId}` : "ready_stock");
+
   const itemsPayload = useMemo(
     () =>
-      lines.map((l) => ({
+      activeLines.map((l) => ({
         product_id: l.productId,
         variant_id: l.variantId || undefined,
         quantity: l.quantity,
+        batch_id: l.batchId || undefined,
       })),
-    [lines],
+    [activeLines],
   );
 
   useEffect(() => {
@@ -72,7 +94,7 @@ export default function CheckoutPage() {
   }, [storeSlug]);
 
   useEffect(() => {
-    if (!lines.length) {
+    if (!activeLines.length) {
       setPreview(null);
       return;
     }
@@ -107,7 +129,7 @@ export default function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [storeSlug, itemsPayload, method, paymentMethodId, lines.length]);
+  }, [storeSlug, itemsPayload, method, paymentMethodId, activeLines.length]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -146,7 +168,7 @@ export default function CheckoutPage() {
           client_expected_total_idr: preview.total_idr,
         },
       });
-      clearCart(storeSlug);
+      clearCart(storeSlug, activeGroupKey);
       router.push(`/track/${res.tracking_token}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === "price_changed") {
@@ -159,7 +181,7 @@ export default function CheckoutPage() {
     }
   }
 
-  if (!lines.length) {
+  if (!activeLines.length) {
     return (
       <div className="mx-auto max-w-reading px-4 py-16">
         <h1 className="text-[30px] font-medium">Checkout</h1>
@@ -180,7 +202,13 @@ export default function CheckoutPage() {
         ← Back to cart
       </Link>
       <h1 className="mt-2 text-[30px] font-medium text-foreground">Checkout</h1>
-      <p className="mt-2 text-sm text-foreground-secondary">Guest checkout — no account needed.</p>
+      <p className="mt-2 text-sm text-foreground-secondary">
+        Guest checkout — no account needed.
+        {preview?.selling_model === "preorder" && preview.batch_name
+          ? ` Preorder batch: ${preview.batch_name}.`
+          : ""}
+        {preview?.requires_approval ? " This order needs merchant confirmation before payment." : ""}
+      </p>
 
       {error ? (
         <p className="mt-4 rounded-md border border-error/30 bg-error/5 px-3 py-2 text-sm text-error" role="alert">
@@ -327,6 +355,10 @@ export default function CheckoutPage() {
                 <span className="tabular-nums">{formatIDR(preview?.subtotal_idr || 0)}</span>
               </div>
               <div className="flex justify-between">
+                <span>Handling fee</span>
+                <span className="tabular-nums">{formatIDR(preview?.handling_fee_idr || 0)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Shipping</span>
                 <span className="tabular-nums">{formatIDR(preview?.shipping_fee_idr || 0)}</span>
               </div>
@@ -334,13 +366,30 @@ export default function CheckoutPage() {
                 <span>Total</span>
                 <span className="tabular-nums">{formatIDR(preview?.total_idr || 0)}</span>
               </div>
+              {preview?.minimum_ok === false ? (
+                <p className="pt-2 text-error">{preview.minimum_message || "Minimum not met."}</p>
+              ) : null}
             </div>
-            <Button type="submit" className="mt-6 w-full" disabled={submitting || !method || !paymentMethodId}>
+            <Button
+              type="submit"
+              className="mt-6 w-full"
+              disabled={
+                submitting || !method || !paymentMethodId || preview?.minimum_ok === false
+              }
+            >
               {submitting ? "Placing order…" : "Place order"}
             </Button>
           </aside>
         </form>
       )}
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="px-4 py-16 text-sm text-foreground-secondary">Loading checkout…</div>}>
+      <CheckoutInner />
+    </Suspense>
   );
 }

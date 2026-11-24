@@ -1,4 +1,4 @@
-# Database Schema (Phase 0–3)
+# Database Schema (Phase 0–4)
 
 Migrations:
 
@@ -6,6 +6,7 @@ Migrations:
 - `000002_phase2_storefront_catalog.up.sql` — products / storefront
 - `000003_ai_pdf_import.up.sql` — import jobs, job queue, catalog pages/hotspots
 - `000004_phase3_orders_payments.up.sql` — checkout, orders, payments, tracking
+- `000005_phase4_preorder_rules.up.sql` — preorder batches / business rules
 
 ## Phase 1 tables
 
@@ -54,6 +55,21 @@ Migrations:
 `stored_files.purpose` also allows `payment_evidence`.
 
 Timestamps are `TIMESTAMPTZ` (UTC). Display timezone default Asia/Jakarta.
+
+## Phase 4 preorder + rules (`000005`)
+
+| Table | Purpose |
+| --- | --- |
+| `preorder_batches` | Batch window, ETA, publication + operational status |
+| `preorder_batch_products` | Product assignment, batch price override, quota |
+| `preorder_batch_variants` | Optional variant-level overrides |
+| `preorder_purchasing_records` | Purchased / unavailable quantities per SKU |
+| `preorder_item_allocations` | Allocate purchased qty to order items |
+| `business_rules` | Enabled rules by type + scope (store / selling_model / batch) |
+| `business_rule_versions` | Immutable published configs (versioned) |
+| `order_rule_applications` | Per-order snapshots of applied rule versions |
+
+Also: `orders.preorder_batch_id` + batch name/slug/ETA snapshots + `requires_approval`; `order_items.batch_id`; `inventory_reservations.batch_id` for quotas; `stored_files.purpose` includes `preorder_cover`.
 
 ## Defaults on store create
 

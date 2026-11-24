@@ -1,4 +1,4 @@
-# Requirements Matrix (Phase 0–3)
+# Requirements Matrix (Phase 0–4)
 
 Status: `done` | `partial` | `deferred`
 
@@ -34,5 +34,11 @@ Status: `done` | `partial` | `deferred`
 | P3-8 | Transactional emails + idempotent jobs | done | Brevo adapter + `email_jobs` drain |
 | P3-9 | Stock reservations (finite) | done | `inventory_reservations` on submit |
 | P3-10 | Public rate limits + store-scoped authz | done | `public_rate_limits` + cross-store tests |
-| — | Preorder / handling fees / approval | deferred | Phase 4 |
+| P4-1 | Preorder batches + product assignment + quotas | done | `000005` + merchant/public preorder APIs/UI |
+| P4-2 | Preorder-aware checkout + cart groups | done | `batch_id` on lines; group checkout |
+| P4-3 | Business rules precedence + versioning | done | `business_rules` / versions / order snapshots |
+| P4-4 | Handling fee / minimum / approval | done | evaluate at preview/submit + UI |
+| P4-5 | Purchasing list + allocations | done | purchasing API + batch detail tab |
+| P4-6 | Extended fulfillment for preorder | done | purchasing → awaiting_arrival → ship/pickup |
+| P4-7 | Emails for approval + existing drain | done | needs-confirmation template + outbox |
 | — | VPS deploy / Emplicon | deferred | separate after merge |

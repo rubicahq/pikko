@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -190,6 +191,25 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/evidence/{evidenceID}/file", storeAuthed(commerceH.MerchantEvidenceFile))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers", storeAuthed(commerceH.ListCustomers))
 
+	// Phase 4: preorder batches
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storeAuthed(commerceH.ListBatches))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders", storeAuthed(commerceH.CreateBatch))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}", storeAuthed(commerceH.GetBatch))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storeAuthed(commerceH.PatchBatch))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storeAuthed(commerceH.AssignBatchProduct))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storeAuthed(commerceH.RemoveBatchProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.BatchPurchasing))
+	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.UpdateBatchPurchasing))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storeAuthed(commerceH.AllocateBatchItem))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/orders", storeAuthed(commerceH.ListBatchOrders))
+
+	// Phase 4: business rules
+	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storeAuthed(commerceH.ListRules))
+	mux.Handle("POST /api/v1/stores/{storeID}/business-rules", storeAuthed(commerceH.CreateRule))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/business-rules/{ruleID}", storeAuthed(commerceH.UpdateRule))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/business-rules/{ruleID}", storeAuthed(commerceH.DeleteRule))
+	mux.Handle("POST /api/v1/stores/{storeID}/business-rules/preview", storeAuthed(commerceH.PreviewRules))
+
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products", p2.PublicProducts)
@@ -198,6 +218,9 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog", flipH.PublicCatalog)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog/products/{productID}", flipH.PublicHotspotProduct)
 	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders", commerceH.PublicBatches)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders/{batchSlug}", commerceH.PublicBatch)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products/{productSlug}/preorders", commerceH.PublicProductBatches)
 
 	// Phase 3: public checkout + tracking
 	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/preview", commerceH.CheckoutPreview)
@@ -207,10 +230,15 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}/evidence/{evidenceID}/file", commerceH.TrackingEvidenceFile)
 
 	worker := &jobs.Worker{
-		Queue: queue, Outbox: outbox, Email: mailSvc, Logger: d.Logger, WorkerID: "api-" + uuidLike(),
-		Types: []string{jobs.TypeCatalogPDFImport},
+		Queue: queue, Outbox: outbox, Email: mailSvc, BatchSync: commerceSvc,
+		Logger: d.Logger, WorkerID: "api-" + uuidLike(),
+		Types: []string{jobs.TypeCatalogPDFImport, jobs.TypePreorderBatchSync},
 		Handlers: map[string]jobs.Handler{
 			jobs.TypeCatalogPDFImport: importSvc.ProcessJob,
+			jobs.TypePreorderBatchSync: func(ctx context.Context, job *jobs.Job) error {
+				_, err := commerceSvc.SyncBatchStatuses(ctx, job.StoreID)
+				return err
+			},
 		},
 		Interval: 400 * time.Millisecond,
 	}
