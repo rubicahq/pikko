@@ -3,6 +3,18 @@ import { redirect } from "next/navigation";
 import { getSession, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type CustomerRow = {
   id: string;
@@ -33,71 +45,73 @@ export default async function CustomersPage({
   const customers = data?.customers || [];
 
   return (
-    <div className="mx-auto max-w-dashboard">
-      <h1 className="text-[30px] font-medium text-foreground">Customers</h1>
-      <p className="mt-2 text-sm text-foreground-secondary">
-        Store-scoped customer records created from orders.
-      </p>
+    <div className="mx-auto max-w-dashboard space-y-8">
+      <PageHeader
+        title="Customers"
+        description="Store-scoped customer records created from orders."
+      />
 
-      <form className="mt-6 max-w-md" method="get">
-        <input
-          name="q"
-          defaultValue={q || ""}
-          placeholder="Search name, email, or phone"
-          className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
-        />
-      </form>
+      <FilterBar>
+        <form method="get" className="w-full max-w-md">
+          <Input
+            name="q"
+            defaultValue={q || ""}
+            placeholder="Search name, email, or phone"
+            aria-label="Search customers"
+          />
+        </form>
+      </FilterBar>
 
       {customers.length === 0 ? (
-        <div className="mt-8 rounded-[10px] border border-border p-8">
-          <p className="text-sm text-foreground-secondary">No customers yet.</p>
-          <p className="mt-2 text-sm text-foreground-secondary">
-            Customers appear automatically when orders are placed.
-          </p>
-        </div>
+        <EmptyState
+          title="No customers yet"
+          description="Customers appear automatically when orders are placed."
+        />
       ) : (
-        <div className="mt-8 overflow-hidden rounded-[10px] border border-border">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-surface text-xs font-medium uppercase tracking-wide text-foreground-secondary">
-              <tr>
-                <th className="px-4 py-3">Customer</th>
-                <th className="px-4 py-3">Contact</th>
-                <th className="px-4 py-3 text-right">Orders</th>
-                <th className="px-4 py-3 text-right">Completed value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {customers.map((c) => (
-                <tr key={c.id} className="border-t border-border hover:bg-background-subtle">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={urls.storeCustomer(storeId, c.id)}
-                      className="font-medium text-foreground hover:underline"
-                    >
-                      {c.name}
-                    </Link>
-                    {c.last_order_at ? (
-                      <p className="text-xs text-foreground-muted">
-                        Last order{" "}
-                        {new Date(c.last_order_at).toLocaleString("id-ID", {
-                          timeZone: "Asia/Jakarta",
-                        })}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p>{c.email}</p>
-                    {c.phone ? <p className="text-foreground-secondary">{c.phone}</p> : null}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">{c.total_orders}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {formatIDR(c.completed_order_value_idr)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table stickyHeader>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead sticky>Customer</TableHead>
+              <TableHead sticky>Contact</TableHead>
+              <TableHead sticky className="text-right">
+                Orders
+              </TableHead>
+              <TableHead sticky className="text-right">
+                Completed value
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {customers.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell>
+                  <Link
+                    href={urls.storeCustomer(storeId, c.id)}
+                    className="font-medium text-foreground hover:underline"
+                  >
+                    {c.name}
+                  </Link>
+                  {c.last_order_at ? (
+                    <p className="text-caption text-foreground-muted">
+                      Last order{" "}
+                      {new Date(c.last_order_at).toLocaleString("id-ID", {
+                        timeZone: "Asia/Jakarta",
+                      })}
+                    </p>
+                  ) : null}
+                </TableCell>
+                <TableCell>
+                  <p>{c.email}</p>
+                  {c.phone ? <p className="text-foreground-secondary">{c.phone}</p> : null}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatIDR(c.completed_order_value_idr)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       )}
     </div>
   );

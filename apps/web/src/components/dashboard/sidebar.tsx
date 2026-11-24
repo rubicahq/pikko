@@ -2,79 +2,43 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Store,
-  Package,
-  ShoppingBag,
-  CalendarClock,
-  Users,
-  SlidersHorizontal,
-  Settings,
-  UserRound,
-  BarChart3,
-  Bell,
-} from "lucide-react";
+import { UserRound } from "lucide-react";
 import type { Store as StoreType, User } from "@/lib/api";
 import { Wordmark } from "@/components/brand/wordmark";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
+import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { cn } from "@/lib/utils";
 import { urls } from "@/lib/urls";
-
-const nav = [
-  { href: "overview", label: "Overview", icon: LayoutDashboard },
-  { href: "analytics", label: "Analytics", icon: BarChart3 },
-  { href: "storefront", label: "Storefront", icon: Store },
-  { href: "catalog", label: "Catalog", icon: Package },
-  { href: "orders", label: "Orders", icon: ShoppingBag },
-  { href: "preorders", label: "Preorders", icon: CalendarClock },
-  { href: "customers", label: "Customers", icon: Users },
-  { href: "notifications", label: "Notifications", icon: Bell },
-  { href: "business-rules", label: "Business Rules", icon: SlidersHorizontal },
-  { href: "settings", label: "Settings", icon: Settings },
-];
 
 export function DashboardSidebar({
   user,
   stores,
   currentStore,
+  className,
 }: {
   user: User;
   stores: StoreType[];
   currentStore?: StoreType | null;
+  className?: string;
 }) {
   const pathname = usePathname();
   const storeId = currentStore?.id;
 
   return (
-    <aside className="flex h-full w-sidebar flex-col border-r border-border bg-background">
+    <aside
+      className={cn(
+        "flex h-full w-sidebar flex-col border-r border-border bg-background",
+        className,
+      )}
+    >
       <div className="px-4 py-5">
         <Wordmark href={storeId ? urls.storeOverview(storeId) : urls.stores()} />
       </div>
       <div className="px-3 pb-4">
         <StoreSwitcher stores={stores} current={currentStore} />
       </div>
-      <nav className="flex-1 space-y-0.5 px-3">
-        {nav.map((item) => {
-          const href = storeId ? `/stores/${storeId}/${item.href}` : urls.stores();
-          const active = pathname.startsWith(href);
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={href}
-              className={cn(
-                "flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground-secondary hover:bg-surface hover:text-foreground",
-                active && "bg-surface font-medium text-foreground",
-              )}
-            >
-              <Icon className="h-5 w-5" strokeWidth={1.75} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="border-t border-border p-3">
+      <SidebarNav storeId={storeId} />
+      <div className="mt-auto border-t border-border p-3">
         <Link
           href={urls.accountSettings()}
           className={cn(
@@ -82,7 +46,7 @@ export function DashboardSidebar({
             pathname.startsWith("/account") && "bg-surface font-medium text-foreground",
           )}
         >
-          <UserRound className="h-5 w-5" strokeWidth={1.75} />
+          <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.75} />
           <span className="min-w-0 truncate">{user.display_name || user.email}</span>
         </Link>
       </div>

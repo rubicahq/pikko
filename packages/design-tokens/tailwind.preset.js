@@ -82,14 +82,47 @@ module.exports = {
           "sans-serif",
         ],
       },
+      fontSize: {
+        page: ["var(--text-page)", { lineHeight: "var(--text-page-leading)", fontWeight: "500" }],
+        section: [
+          "var(--text-section)",
+          { lineHeight: "var(--text-section-leading)", fontWeight: "500" },
+        ],
+        card: ["var(--text-card)", { lineHeight: "var(--text-card-leading)", fontWeight: "500" }],
+        body: ["var(--text-body)", { lineHeight: "var(--text-body-leading)", fontWeight: "400" }],
+        table: ["var(--text-table)", { lineHeight: "var(--text-table-leading)", fontWeight: "400" }],
+        label: ["var(--text-label)", { lineHeight: "var(--text-label-leading)", fontWeight: "500" }],
+        caption: [
+          "var(--text-caption)",
+          { lineHeight: "var(--text-caption-leading)", fontWeight: "400" },
+        ],
+        "display-xl": [
+          "var(--text-display-xl)",
+          { lineHeight: "var(--text-display-xl-leading)", fontWeight: "500", letterSpacing: "-0.03em" },
+        ],
+        "display-lg": [
+          "var(--text-display-lg)",
+          { lineHeight: "var(--text-display-lg-leading)", fontWeight: "500", letterSpacing: "-0.02em" },
+        ],
+        "display-md": [
+          "var(--text-display-md)",
+          { lineHeight: "var(--text-display-md-leading)", fontWeight: "500", letterSpacing: "-0.02em" },
+        ],
+        "display-sm": [
+          "var(--text-display-sm)",
+          { lineHeight: "var(--text-display-sm-leading)", fontWeight: "500", letterSpacing: "-0.02em" },
+        ],
+      },
       spacing: {
-        // 4px base scale (PRD §13) — Tailwind already uses 4px units
+        // 4px base scale (PRD §4) — Tailwind default 4px units; prefer 1/2/3/4/5/6/8/10/12/16/20/24/32
+        gutter: "var(--content-gutter)",
       },
       maxWidth: {
         marketing: "1280px",
         reading: "760px",
         auth: "420px",
         dashboard: "1440px",
+        checkout: "1120px",
       },
       width: {
         sidebar: "var(--sidebar-width)",
@@ -102,6 +135,15 @@ module.exports = {
         hover: "150ms",
         standard: "200ms",
         dialog: "220ms",
+      },
+      keyframes: {
+        "skeleton-pulse": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.45" },
+        },
+      },
+      animation: {
+        skeleton: "skeleton-pulse 1.4s ease-in-out infinite",
       },
     },
   },
