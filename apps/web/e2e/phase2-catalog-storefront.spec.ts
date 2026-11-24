@@ -11,7 +11,10 @@ async function signInAndCreateStore(page: import("@playwright/test").Page, name:
   await page.getByRole("button", { name: "Sign in securely." }).click();
   await expect(page.getByRole("heading", { name: /Create your/ })).toBeVisible({ timeout: 15000 });
   await page.getByLabel("Store name").fill(name);
+  // Mark URL touched before/while setting it so async suggest-slug cannot race-append.
+  await page.getByLabel("Store URL").click();
   await page.getByLabel("Store URL").fill(slug);
+  await expect(page.getByLabel("Store URL")).toHaveValue(slug);
   await page.locator("#category").selectOption("other");
   await page.getByRole("button", { name: "Continue." }).click();
   await page.getByRole("button", { name: /Ready Stock/ }).click();
@@ -34,13 +37,13 @@ test.describe("Phase 2 catalog and storefront", () => {
     const slug = `phase2-${Date.now().toString(36)}`;
     await signInAndCreateStore(page, "Phase Two Shop", slug);
 
-    // Storefront host may be localhost or 127.0.0.1 depending on env; slug is authoritative.
+    // Prefer the overview storefront link (host may be localhost or 127.0.0.1).
     const storefrontHref = await page
-      .locator(`a[href*="/${slug}"]`)
+      .locator('main a[href*="://"]')
       .first()
-      .getAttribute("href")
-      .catch(() => null);
+      .getAttribute("href", { timeout: 5000 });
     const liveSlug = storefrontHref?.split("/").filter(Boolean).pop() || slug;
+    expect(liveSlug).toBe(slug);
 
     await page.getByRole("link", { name: "Catalog" }).click();
     await expect(page.getByRole("heading", { name: "Catalog" })).toBeVisible();

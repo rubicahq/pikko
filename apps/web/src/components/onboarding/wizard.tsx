@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Package, CalendarClock, Layers } from "lucide-react";
 import type { OnboardingDraft } from "@/lib/api";
@@ -64,6 +64,7 @@ export function OnboardingWizard({
   const [category, setCategory] = useState(draft.category || "");
   const [model, setModel] = useState(draft.selling_model || "");
   const [slugTouched, setSlugTouched] = useState(!!draft.store_slug);
+  const slugTouchedRef = useRef(slugTouched);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -78,16 +79,13 @@ export function OnboardingWizard({
 
   async function suggestFromName(nextName: string) {
     setName(nextName);
-    if (slugTouched) return;
+    if (slugTouchedRef.current) return;
     try {
       const res = await apiFetch<{ slug: string }>(
         `/api/v1/stores/suggest-slug?name=${encodeURIComponent(nextName)}`,
       );
-      // Re-check: user may have edited the slug while the suggestion request was in flight.
-      setSlugTouched((touched) => {
-        if (!touched) setSlug(res.slug);
-        return touched;
-      });
+      // Ref is sync; state updater alone can lose to Playwright fill mid-flight.
+      if (!slugTouchedRef.current) setSlug(res.slug);
     } catch {
       // ignore
     }
@@ -165,6 +163,7 @@ export function OnboardingWizard({
                     id="slug"
                     value={slug}
                     onChange={(e) => {
+                      slugTouchedRef.current = true;
                       setSlugTouched(true);
                       setSlug(e.target.value.toLowerCase());
                     }}
