@@ -4,8 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-07-payments-finance-4959`  
 **Prior:** Agent 06 main tip `c05b170` (PR #18/#19)  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_  
+**Feature merge SHA:** `1f11908457c8d5226c8c2b76f04bdef0318591a4` (PR #20)  
+**Merged main SHA:** `1f11908457c8d5226c8c2b76f04bdef0318591a4`  
 
 ---
 
