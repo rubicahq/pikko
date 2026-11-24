@@ -178,7 +178,21 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | PATCH | `/stores/{storeID}/orders/{orderID}/items/{itemID}` (qty adjust → revision) |
 | POST | `/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify` |
 | POST | `/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject` |
+| GET | `/stores/{storeID}/orders/{orderID}/payments` |
+| POST | `/stores/{storeID}/orders/{orderID}/payments` (deposit/final/partial/consolidated; `finance.write`) |
+| POST | `/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify-settlement` |
 | GET | `/stores/{storeID}/orders/evidence/{evidenceID}/file` |
+| GET | `/stores/{storeID}/finance` |
+| GET | `/stores/{storeID}/finance/orders/{orderID}` |
+| POST | `/stores/{storeID}/finance/adjustments` |
+| POST | `/stores/{storeID}/finance/refunds` |
+| POST | `/stores/{storeID}/orders/{orderID}/refunds` |
+| POST | `/stores/{storeID}/finance/refunds/{refundID}/process` |
+| GET/POST | `/stores/{storeID}/finance/deposit-policies` |
+| PATCH | `/stores/{storeID}/finance/deposit-policies/{policyID}` |
+| GET/POST | `/stores/{storeID}/finance/customers/{customerID}/credit` |
+| POST | `/stores/{storeID}/finance/credit/apply` |
+| PATCH | `/stores/{storeID}/finance/store-credit-settings` |
 | POST | `/stores/{storeID}/order-entry/validate` |
 | GET | `/stores/{storeID}/order-entry/catalog-suggest` |
 | GET/POST | `/stores/{storeID}/order-entry/drafts` |
@@ -253,7 +267,7 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | --- | --- |
 | Admin create/edit order | **Shipped Agent 05** — `POST /orders` + `/order-entry/*` |
 | Order item patch / revision list | **Shipped Agent 05** — revisions + item-events + qty PATCH |
-| Refunds + store credit | Agent 07 `/finance/*` |
+| Refunds + store credit | **Shipped Agent 07** — `/finance/*` + deposit/refund/credit |
 | Customer portal auth + orders | Agent 08 `/portal/*` |
 | Packing + shipments | Agent 09 |
 | Team invite/RBAC | **Shipped Agent 03** — see §2.4 Team |

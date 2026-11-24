@@ -92,7 +92,7 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 | Fees | Deterministic half-up percentage helpers (`money.Round`) |
 | Display | `money.FormatIDR` / UI thousand separators; timezone Asia/Jakarta for dates |
 
-Financial features (Agent 07) must add an **append-only ledger** (or event table) for refunds/credits; never rewrite historical `order_items.unit_price_idr` snapshots.
+Financial features use **append-only** `financial_events` / `store_credit_ledger` / `financial_adjustments`; never rewrite historical `payments.amount_idr` or `order_items.unit_price_idr` snapshots.
 
 ---
 
@@ -190,6 +190,6 @@ This architecture documents support for:
 - Purchasing allocations — **store-wide workspace + multi-vendor + concurrency (Agent 06)**
 - Historical revisions — **status history + `order_revisions` / `order_item_events` (Agent 05/06)**
 - Receiving foundation — **`receiving_records` / lines (Agent 06)**
-- Financial reconciliation — **payments live; ledger/refund/credit planned for Agent 07**
+- Financial reconciliation — **ledger/refund/credit/deposit shipped (Agent 07); bank verify preserved**
 
 No application feature code in Agent 01 scope.

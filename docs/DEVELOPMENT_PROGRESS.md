@@ -160,12 +160,31 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 07)
+## 3g. Agent 07 status (Payments & Financial Reconciliation)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000011_payments_finance` | Done |
+| `money.Reconcile` + deposit math (integer IDR) | Done |
+| Deposit policies + multi/consolidated payments + allocations | Done |
+| Financial adjustments + events ledger | Done |
+| Refunds workflow + version concurrency | Done |
+| Store credit ledger (`FEATURE_STORE_CREDIT` + per-store flag) | Done |
+| Finance RBAC + `/finance` workspace UI | Done |
+| E2E-F / concurrency / consolidated API tests | Done |
+| Bank transfer evidence verify preserved | Yes |
+| `docs/agents/07-payments-finance-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 08+)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
 3. Commercial pricing / counsel legal — owner (unchanged).
 4. pikko.id cutover date — owner only.
+5. Checkout-time store credit apply UX — optional follow-up; admin apply shipped.
 
 ---
 

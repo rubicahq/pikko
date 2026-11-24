@@ -223,7 +223,16 @@ func (s *Service) MarkOrderItemUnavailable(
 	var newSubtotal, newTotal int64
 	newSubtotal = o.SubtotalIDR
 	newTotal = o.TotalIDR
+	var financeDeltaIDR int64
 	if in.ApplyAdjustment {
+		// Preserve immutable original before shrinking totals (Agent 07 ledger).
+		_, err = tx.Exec(ctx, `
+			UPDATE orders SET original_total_idr = COALESCE(original_total_idr, total_idr)
+			WHERE id=$1 AND store_id=$2
+		`, orderID, storeID)
+		if err != nil {
+			return nil, err
+		}
 		err = tx.QueryRow(ctx, `
 			SELECT COALESCE(SUM(COALESCE(adjusted_line_total_idr, line_total_idr)),0)
 			FROM order_items WHERE order_id=$1 AND store_id=$2
@@ -232,6 +241,10 @@ func (s *Service) MarkOrderItemUnavailable(
 			return nil, err
 		}
 		newTotal = newSubtotal + o.ShippingFeeIDR + o.HandlingFeeIDR
+		financeDeltaIDR = o.TotalIDR - newTotal
+		if financeDeltaIDR < 0 {
+			financeDeltaIDR = 0
+		}
 		_, err = tx.Exec(ctx, `
 			UPDATE orders SET subtotal_idr=$3, total_idr=$4, updated_at=now()
 			WHERE id=$1 AND store_id=$2
@@ -287,6 +300,10 @@ func (s *Service) MarkOrderItemUnavailable(
 
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	if in.ApplyAdjustment && financeDeltaIDR > 0 {
+		idem := fmt.Sprintf("unavail:%s:%s:%d", orderID.String(), itemID.String(), in.UnavailableQty)
+		_, _ = s.ApplyUnavailableFinanceAdjustment(ctx, storeID, orderID, itemID, actorID, financeDeltaIDR, &revID, in.Reason, idem)
 	}
 	if in.UnavailableQty > 0 {
 		s.notifyUnavailableAllocation(ctx, storeID, orderID, item.ProductName, in.UnavailableQty)

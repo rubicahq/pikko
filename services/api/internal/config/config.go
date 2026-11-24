@@ -60,6 +60,10 @@ type Config struct {
 	ImportMaxPDFBytes int64
 	ImportMaxPages    int
 	ImportMaxItems    int
+
+	// FeatureStoreCredit is the global kill switch for REF-02/03 store credit ledger.
+	// Per-store enablement is stores.store_credit_enabled (both required).
+	FeatureStoreCredit bool
 }
 
 func Load() (*Config, error) {
@@ -172,6 +176,8 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	c.FeatureStoreCredit = getenvBool("FEATURE_STORE_CREDIT", false)
 
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")

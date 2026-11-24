@@ -90,7 +90,7 @@
 | ORD-06–07 | Admin / spreadsheet entry | done | `admin_orders.go`, order-entry UI | commerce admin tests | Draft autosave + keyboard grid |
 | ORD-08 | Order CSV | done | `order_csv.go`, import UI | commerce admin tests | Template + preview match + import |
 | ORD-09 | Full revisions | done | `order_revisions` + status history | commerce admin tests | Non-destructive append-only |
-| ORD-10 | Deposit/final payments | missing | — | — | Agent 07 |
+| ORD-10 | Deposit/final payments | done | deposit policies + payment_kind | finance tests | UI schedules lite |
 | PUR-01–03 | Purchasing + allocate | done | `purchasing.go` + workspace | allocation concurrency test | Concurrent FOR UPDATE |
 | PUR-04–06 | Multi-vendor / receiving | done | `000010`, workspace UI, `receiving.go` | allocation + receiving tests | Packing eligibility nudge only |
 | UNAV-01 | Unavailable adjust | done (hooks) | impact API + mark unavailable + revisions | allocation test | Ledger/refunds → Agent 07 |
@@ -103,9 +103,9 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | FIN-01–03 | Integer money + bank verify | done | `money/`, payments | unit + e2e | — |
-| FIN-04–08 | Reconciliation / ledger | missing/partial | — | — | Agent 07; E2E-F |
-| REF-01 | Refund status enums | partial | payment_status values | — | No workflow |
-| REF-02–04 | Store credit + audit | missing | — | — | Agent 07 |
+| FIN-04–08 | Reconciliation / ledger | done | `000011`, finance APIs, `money.Reconcile` | E2E-F + concurrency | Workspace UI lite |
+| REF-01 | Refund status enums | done | refunds workflow + payment_status | finance tests | — |
+| REF-02–04 | Store credit + audit | done | ledger behind `FEATURE_STORE_CREDIT` | flag + grant/apply | Portal apply later |
 | CRM-01–02 | Customers list/detail | done | customers handlers | phase5 | — |
 | CRM-03–05 | Addresses UX / merge | partial/missing | `customer_addresses` | — | Agent 08 |
 | PORT-01 | Tracking token page | done | `/track/[token]` | phase3 | — |
@@ -134,7 +134,7 @@
 | ID | Requirement | Status | Files | Tests | Limitations |
 | --- | --- | --- | --- | --- | --- |
 | STAT-01,04 | Multi-dimension order statuses | done | orders schema | commerce tests | — |
-| STAT-02–03 | Item + settlement dimensions | partial/missing | — | — | 05/07 |
+| STAT-02–03 | Item + settlement dimensions | done (settlement_status) | orders.settlement_status + finance | finance tests | Portal item UX → 08 |
 | DASH-01,03 | Overview + checklist | done | overview UI | — | — |
 | DASH-02,04 | Rich ops tasks / widgets | partial/missing | — | — | Later agents |
 | RULE-01–05 | Business rules | done | `rules.go` | rules_test + e2e | — |
@@ -153,9 +153,9 @@
 | E2E-C Admin entry | partial (API+UI; Playwright deferred) | Stage 1 |
 | E2E-D Purchasing | done (API + workspace) | Stage 2 |
 | E2E-E Partial availability | partial | Stage 2 |
-| E2E-F Reconciliation math | missing | Stage 2 |
-| E2E-G Store credit | missing | Stage 2 |
-| E2E-H Consolidated payment | missing | Stage 2 |
+| E2E-F Reconciliation math | done (API) | Stage 2 |
+| E2E-G Store credit | done (API, feature-flagged) | Stage 2 |
+| E2E-H Consolidated payment | done (API) | Stage 2 |
 | E2E-I Packing | missing | Stage 2 |
 | E2E-J Address change | missing | Stage 2 |
 | E2E-K Live shopping | missing | Stage 3 |
