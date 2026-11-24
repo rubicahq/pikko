@@ -39,10 +39,10 @@ export function middleware(request: NextRequest) {
   }
 
   // Never expose the component preview in production (PRD §14).
-  if (
-    request.nextUrl.pathname.startsWith("/dev/") &&
-    (process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_APP_ENV === "production")
-  ) {
+  // Prefer APP_ENV / NEXT_PUBLIC_APP_ENV so local `next start` for e2e can keep /dev open.
+  const appEnv =
+    process.env.NEXT_PUBLIC_APP_ENV || process.env.APP_ENV || process.env.NODE_ENV;
+  if (request.nextUrl.pathname.startsWith("/dev/") && appEnv === "production") {
     return applySecurityHeaders(NextResponse.rewrite(new URL("/404", request.url)));
   }
   return applySecurityHeaders(NextResponse.next());

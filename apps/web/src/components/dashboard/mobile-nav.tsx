@@ -15,10 +15,12 @@ export function MobileNav({
   user,
   stores,
   currentStore,
+  permissions,
 }: {
   user: User;
   stores: StoreType[];
   currentStore?: StoreType | null;
+  permissions?: string[] | null;
 }) {
   const [open, setOpen] = useState(false);
   const storeId = currentStore?.id;
@@ -38,7 +40,11 @@ export function MobileNav({
         <div className="px-3 pb-4 pt-2">
           <StoreSwitcher stores={stores} current={currentStore} />
         </div>
-        <SidebarNav storeId={storeId} onNavigate={() => setOpen(false)} />
+        <SidebarNav
+          storeId={storeId}
+          permissions={permissions}
+          onNavigate={() => setOpen(false)}
+        />
         <div className="mt-auto border-t border-border p-3">
           <Link
             href={urls.accountSettings()}

@@ -14,18 +14,32 @@ export function AppShell({
   currentStore: StoreType;
   children: React.ReactNode;
 }) {
+  const permissions = currentStore.permissions;
   return (
     <div className="flex min-h-screen bg-background">
       <div className="sticky top-0 hidden h-screen md:block">
-        <DashboardSidebar user={user} stores={stores} currentStore={currentStore} />
+        <DashboardSidebar
+          user={user}
+          stores={stores}
+          currentStore={currentStore}
+          permissions={permissions}
+        />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-topbar items-center justify-between gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <MobileNav user={user} stores={stores} currentStore={currentStore} />
+            <MobileNav
+              user={user}
+              stores={stores}
+              currentStore={currentStore}
+              permissions={permissions}
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">{currentStore.name}</p>
-              <p className="truncate text-caption text-foreground-muted">{currentStore.slug}</p>
+              <p className="truncate text-caption text-foreground-muted">
+                {currentStore.slug}
+                {currentStore.role ? ` · ${currentStore.role}` : ""}
+              </p>
             </div>
           </div>
           <NotificationBell storeId={currentStore.id} />

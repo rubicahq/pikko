@@ -13,8 +13,8 @@ const CHECKLIST_LABELS: { key: string; label: string; href?: (id: string) => str
     label: "Customize storefront",
     href: urls.storeStorefront,
   },
-  { key: "payment_methods", label: "Configure payment methods" },
-  { key: "fulfillment", label: "Configure fulfillment" },
+  { key: "payment_methods", label: "Configure payment methods", href: urls.storeSettings },
+  { key: "fulfillment", label: "Configure fulfillment", href: urls.storeSettings },
   { key: "publish_and_share", label: "Publish and share", href: urls.storeStorefront },
 ];
 

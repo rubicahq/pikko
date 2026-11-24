@@ -103,6 +103,7 @@ export type Store = {
   updated_at: string;
   role?: string;
   storefront_url?: string;
+  permissions?: string[];
 };
 
 export type OnboardingDraft = {

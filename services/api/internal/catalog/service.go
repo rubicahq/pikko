@@ -903,6 +903,7 @@ func (s *Service) ListCollections(ctx context.Context, storeID uuid.UUID, public
 
 func (s *Service) SetupChecklist(ctx context.Context, storeID uuid.UUID) (map[string]bool, error) {
 	var hasProduct, hasPublishedProduct, hasCustomTheme, published bool
+	var hasPaymentMethods, hasFulfillment bool
 	_ = s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE store_id=$1 AND status<>'archived')`, storeID).Scan(&hasProduct)
 	_ = s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM products WHERE store_id=$1 AND status='published')`, storeID).Scan(&hasPublishedProduct)
 	_ = s.DB.QueryRow(ctx, `
@@ -913,12 +914,21 @@ func (s *Service) SetupChecklist(ctx context.Context, storeID uuid.UUID) (map[st
 			)
 		)`, storeID).Scan(&hasCustomTheme)
 	_ = s.DB.QueryRow(ctx, `SELECT publication_status='published' FROM stores WHERE id=$1`, storeID).Scan(&published)
+	_ = s.DB.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM store_payment_methods WHERE store_id=$1 AND is_enabled=true)
+	`, storeID).Scan(&hasPaymentMethods)
+	_ = s.DB.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM store_fulfillment_settings
+			WHERE store_id=$1 AND (shipping_enabled OR pickup_enabled)
+		)
+	`, storeID).Scan(&hasFulfillment)
 	return map[string]bool{
 		"create_store":         true,
 		"first_product":        hasProduct,
 		"customize_storefront": hasCustomTheme,
-		"payment_methods":      false, // Phase 3
-		"fulfillment":          false, // Phase 3
+		"payment_methods":      hasPaymentMethods,
+		"fulfillment":          hasFulfillment,
 		"publish_and_share":    published && hasPublishedProduct,
 	}, nil
 }

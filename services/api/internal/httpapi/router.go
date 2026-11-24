@@ -22,9 +22,11 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
 	"github.com/rubicahq/pikko/services/api/internal/notifications"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
+	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
+	"github.com/rubicahq/pikko/services/api/internal/team"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
 
@@ -75,6 +77,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	authH := &AuthHandlers{Auth: authSvc, Cfg: d.Cfg}
 	accountH := &AccountHandlers{Account: accountSvc}
 	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg}
+	teamSvc := &team.Service{DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger}
+	teamH := &TeamHandlers{Team: teamSvc, Cfg: d.Cfg}
 	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen}
 	impH := &ImportHandlers{Imports: importSvc}
 	flipSvc := &flipbook.Service{DB: d.DB}
@@ -122,107 +126,123 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/onboarding/selling-model", authMW.Require(http.HandlerFunc(storeH.SaveSellingModel)))
 	mux.Handle("POST /api/v1/onboarding/complete", authMW.Require(http.HandlerFunc(storeH.CompleteOnboarding)))
 
-	// Explicit store-scoped routes with authorization middleware
+	// Explicit store-scoped routes with membership + optional permission checks
 	storeAuthed := func(h http.HandlerFunc) http.Handler {
 		return authMW.Require(storeMW.Require(h))
 	}
-	mux.Handle("GET /api/v1/stores/{storeID}", storeAuthed(storeH.Get))
-	mux.Handle("PATCH /api/v1/stores/{storeID}", storeAuthed(storeH.Patch))
-	mux.Handle("POST /api/v1/stores/{storeID}/archive", storeAuthed(storeH.Archive))
+	storePerm := func(perm rbac.Permission, h http.HandlerFunc) http.Handler {
+		return authMW.Require(storeMW.RequirePermission(perm)(h))
+	}
+
+	mux.Handle("GET /api/v1/stores/{storeID}", storePerm(rbac.PermStoresRead, storeH.Get))
+	mux.Handle("PATCH /api/v1/stores/{storeID}", storePerm(rbac.PermStoresSettings, storeH.Patch))
+	mux.Handle("POST /api/v1/stores/{storeID}/archive", storePerm(rbac.PermStoresArchive, storeH.Archive))
+
+	// Team RBAC (Agent 03)
+	mux.HandleFunc("GET /api/v1/team/invites/peek", teamH.PeekInvite)
+	mux.HandleFunc("POST /api/v1/team/invites/accept", teamH.AcceptInvite)
+	mux.Handle("GET /api/v1/stores/{storeID}/team/me", storePerm(rbac.PermStoresRead, teamH.Me))
+	mux.Handle("GET /api/v1/stores/{storeID}/team/members", storePerm(rbac.PermTeamRead, teamH.ListMembers))
+	mux.Handle("GET /api/v1/stores/{storeID}/team/invites", storePerm(rbac.PermTeamRead, teamH.ListInvites))
+	mux.Handle("POST /api/v1/stores/{storeID}/team/invites", storePerm(rbac.PermTeamInvite, teamH.CreateInvite))
+	mux.Handle("POST /api/v1/stores/{storeID}/team/invites/{inviteID}/resend", storePerm(rbac.PermTeamInvite, teamH.ResendInvite))
+	mux.Handle("POST /api/v1/stores/{storeID}/team/invites/{inviteID}/cancel", storePerm(rbac.PermTeamManage, teamH.CancelInvite))
+	mux.Handle("POST /api/v1/stores/{storeID}/team/members/{membershipID}/revoke", storePerm(rbac.PermTeamManage, teamH.RevokeMember))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/team/members/{membershipID}", storePerm(rbac.PermTeamManage, teamH.PatchMember))
 
 	// Phase 2: storefront, branding files, catalog
 	mux.Handle("GET /api/v1/meta/themes", authMW.Require(http.HandlerFunc(p2.ListThemes)))
-	mux.Handle("GET /api/v1/stores/{storeID}/storefront", storeAuthed(p2.GetStorefront))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/storefront", storeAuthed(p2.PatchStorefront))
-	mux.Handle("POST /api/v1/stores/{storeID}/storefront/publish", storeAuthed(p2.PublishStorefront))
-	mux.Handle("POST /api/v1/stores/{storeID}/storefront/discard", storeAuthed(p2.DiscardStorefront))
-	mux.Handle("PUT /api/v1/stores/{storeID}/storefront/featured", storeAuthed(p2.SetFeatured))
-	mux.Handle("GET /api/v1/stores/{storeID}/setup-checklist", storeAuthed(p2.SetupChecklist))
+	mux.Handle("GET /api/v1/stores/{storeID}/storefront", storePerm(rbac.PermStorefrontRead, p2.GetStorefront))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/storefront", storePerm(rbac.PermStorefrontWrite, p2.PatchStorefront))
+	mux.Handle("POST /api/v1/stores/{storeID}/storefront/publish", storePerm(rbac.PermStorefrontWrite, p2.PublishStorefront))
+	mux.Handle("POST /api/v1/stores/{storeID}/storefront/discard", storePerm(rbac.PermStorefrontWrite, p2.DiscardStorefront))
+	mux.Handle("PUT /api/v1/stores/{storeID}/storefront/featured", storePerm(rbac.PermStorefrontWrite, p2.SetFeatured))
+	mux.Handle("GET /api/v1/stores/{storeID}/setup-checklist", storePerm(rbac.PermStoresRead, p2.SetupChecklist))
 
-	mux.Handle("POST /api/v1/stores/{storeID}/files", storeAuthed(p2.UploadFile))
+	mux.Handle("POST /api/v1/stores/{storeID}/files", storePerm(rbac.PermCatalogWrite, p2.UploadFile))
 	mux.Handle("GET /api/v1/stores/{storeID}/files/{fileID}", storeAuthed(p2.GetFile))
 
-	mux.Handle("GET /api/v1/stores/{storeID}/categories", storeAuthed(p2.ListCategories))
-	mux.Handle("POST /api/v1/stores/{storeID}/categories", storeAuthed(p2.CreateCategory))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/categories/{categoryID}", storeAuthed(p2.UpdateCategory))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/categories/{categoryID}", storeAuthed(p2.DeleteCategory))
+	mux.Handle("GET /api/v1/stores/{storeID}/categories", storePerm(rbac.PermCatalogRead, p2.ListCategories))
+	mux.Handle("POST /api/v1/stores/{storeID}/categories", storePerm(rbac.PermCatalogWrite, p2.CreateCategory))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/categories/{categoryID}", storePerm(rbac.PermCatalogWrite, p2.UpdateCategory))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/categories/{categoryID}", storePerm(rbac.PermCatalogWrite, p2.DeleteCategory))
 
-	mux.Handle("GET /api/v1/stores/{storeID}/products", storeAuthed(p2.ListProducts))
-	mux.Handle("POST /api/v1/stores/{storeID}/products", storeAuthed(p2.CreateProduct))
-	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}", storeAuthed(p2.GetProduct))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/products/{productID}", storeAuthed(p2.UpdateProduct))
-	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/status", storeAuthed(p2.PatchProductStatus))
-	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/archive", storeAuthed(p2.ArchiveProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/products", storePerm(rbac.PermCatalogRead, p2.ListProducts))
+	mux.Handle("POST /api/v1/stores/{storeID}/products", storePerm(rbac.PermCatalogWrite, p2.CreateProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}", storePerm(rbac.PermCatalogRead, p2.GetProduct))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/products/{productID}", storePerm(rbac.PermCatalogWrite, p2.UpdateProduct))
+	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/status", storePerm(rbac.PermCatalogWrite, p2.PatchProductStatus))
+	mux.Handle("POST /api/v1/stores/{storeID}/products/{productID}/archive", storePerm(rbac.PermCatalogWrite, p2.ArchiveProduct))
 
-	mux.Handle("GET /api/v1/stores/{storeID}/collections", storeAuthed(p2.ListCollections))
-	mux.Handle("POST /api/v1/stores/{storeID}/collections", storeAuthed(p2.CreateCollection))
+	mux.Handle("GET /api/v1/stores/{storeID}/collections", storePerm(rbac.PermCatalogRead, p2.ListCollections))
+	mux.Handle("POST /api/v1/stores/{storeID}/collections", storePerm(rbac.PermCatalogWrite, p2.CreateCollection))
 
 	// Catalog import PDF + CSV (PRD §18)
-	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.Start))
-	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storeAuthed(impH.List))
-	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/csv-template", storeAuthed(impH.CSVTemplate))
-	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}", storeAuthed(impH.Get))
-	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}/items", storeAuthed(impH.ListItems))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storeAuthed(impH.PatchItem))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storeAuthed(impH.DeleteItem))
-	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/confirm", storeAuthed(impH.Confirm))
-	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/retry", storeAuthed(impH.Retry))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogWrite, impH.Start))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports", storePerm(rbac.PermCatalogRead, impH.List))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/csv-template", storePerm(rbac.PermCatalogRead, impH.CSVTemplate))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}", storePerm(rbac.PermCatalogRead, impH.Get))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}/items", storePerm(rbac.PermCatalogRead, impH.ListItems))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storePerm(rbac.PermCatalogWrite, impH.PatchItem))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storePerm(rbac.PermCatalogWrite, impH.DeleteItem))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/confirm", storePerm(rbac.PermCatalogWrite, impH.Confirm))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/retry", storePerm(rbac.PermCatalogWrite, impH.Retry))
 
 	// Flipbook catalog pages / hotspots
-	mux.Handle("GET /api/v1/stores/{storeID}/catalog-pages", storeAuthed(flipH.ListPages))
-	mux.Handle("PUT /api/v1/stores/{storeID}/catalog-pages/order", storeAuthed(flipH.Reorder))
-	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/status", storeAuthed(flipH.Publish))
-	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/{pageID}/hotspots", storeAuthed(flipH.CreateHotspot))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.UpdateHotspot))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.DeleteHotspot))
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-pages", storePerm(rbac.PermCatalogRead, flipH.ListPages))
+	mux.Handle("PUT /api/v1/stores/{storeID}/catalog-pages/order", storePerm(rbac.PermCatalogWrite, flipH.Reorder))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/status", storePerm(rbac.PermCatalogWrite, flipH.Publish))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/{pageID}/hotspots", storePerm(rbac.PermCatalogWrite, flipH.CreateHotspot))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storePerm(rbac.PermCatalogWrite, flipH.UpdateHotspot))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storePerm(rbac.PermCatalogWrite, flipH.DeleteHotspot))
 
 	// Phase 3: merchant commerce settings + orders
-	mux.Handle("GET /api/v1/stores/{storeID}/payment-methods", storeAuthed(commerceH.ListPaymentMethods))
-	mux.Handle("POST /api/v1/stores/{storeID}/payment-methods", storeAuthed(commerceH.CreatePaymentMethod))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/payment-methods/{methodID}", storeAuthed(commerceH.UpdatePaymentMethod))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/payment-methods/{methodID}", storeAuthed(commerceH.DeletePaymentMethod))
-	mux.Handle("GET /api/v1/stores/{storeID}/fulfillment", storeAuthed(commerceH.GetFulfillment))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/fulfillment", storeAuthed(commerceH.PatchFulfillment))
-	mux.Handle("GET /api/v1/stores/{storeID}/orders", storeAuthed(commerceH.ListOrders))
-	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}", storeAuthed(commerceH.GetOrder))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/orders/{orderID}", storeAuthed(commerceH.PatchOrder))
-	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify", storeAuthed(commerceH.VerifyPayment))
-	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject", storeAuthed(commerceH.RejectPayment))
-	mux.Handle("GET /api/v1/stores/{storeID}/orders/evidence/{evidenceID}/file", storeAuthed(commerceH.MerchantEvidenceFile))
-	mux.Handle("GET /api/v1/stores/{storeID}/customers", storeAuthed(commerceH.ListCustomers))
-	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storeAuthed(p5.GetCustomer))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storeAuthed(p5.PatchCustomer))
+	mux.Handle("GET /api/v1/stores/{storeID}/payment-methods", storePerm(rbac.PermStoresSettings, commerceH.ListPaymentMethods))
+	mux.Handle("POST /api/v1/stores/{storeID}/payment-methods", storePerm(rbac.PermStoresSettings, commerceH.CreatePaymentMethod))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/payment-methods/{methodID}", storePerm(rbac.PermStoresSettings, commerceH.UpdatePaymentMethod))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/payment-methods/{methodID}", storePerm(rbac.PermStoresSettings, commerceH.DeletePaymentMethod))
+	mux.Handle("GET /api/v1/stores/{storeID}/fulfillment", storePerm(rbac.PermStoresSettings, commerceH.GetFulfillment))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/fulfillment", storePerm(rbac.PermStoresSettings, commerceH.PatchFulfillment))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders", storePerm(rbac.PermOrdersRead, commerceH.ListOrders))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}", storePerm(rbac.PermOrdersRead, commerceH.GetOrder))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/orders/{orderID}", storePerm(rbac.PermOrdersWrite, commerceH.PatchOrder))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify", storePerm(rbac.PermOrdersPayments, commerceH.VerifyPayment))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject", storePerm(rbac.PermOrdersPayments, commerceH.RejectPayment))
+	mux.Handle("GET /api/v1/stores/{storeID}/orders/evidence/{evidenceID}/file", storePerm(rbac.PermOrdersRead, commerceH.MerchantEvidenceFile))
+	mux.Handle("GET /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersRead, commerceH.ListCustomers))
+	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersRead, p5.GetCustomer))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersWrite, p5.PatchCustomer))
 
 	// Phase 5: notifications + analytics
-	mux.Handle("GET /api/v1/stores/{storeID}/notifications", storeAuthed(p5.ListNotifications))
-	mux.Handle("GET /api/v1/stores/{storeID}/notifications/unread-count", storeAuthed(p5.UnreadCount))
-	mux.Handle("POST /api/v1/stores/{storeID}/notifications/read-all", storeAuthed(p5.MarkAllNotificationsRead))
-	mux.Handle("POST /api/v1/stores/{storeID}/notifications/{notificationID}/read", storeAuthed(p5.MarkNotificationRead))
-	mux.Handle("GET /api/v1/stores/{storeID}/notification-preferences", storeAuthed(p5.GetNotificationPreferences))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/notification-preferences", storeAuthed(p5.PatchNotificationPreferences))
-	mux.Handle("GET /api/v1/stores/{storeID}/analytics", storeAuthed(p5.AnalyticsOverview))
+	mux.Handle("GET /api/v1/stores/{storeID}/notifications", storePerm(rbac.PermNotificationsRead, p5.ListNotifications))
+	mux.Handle("GET /api/v1/stores/{storeID}/notifications/unread-count", storePerm(rbac.PermNotificationsRead, p5.UnreadCount))
+	mux.Handle("POST /api/v1/stores/{storeID}/notifications/read-all", storePerm(rbac.PermNotificationsWrite, p5.MarkAllNotificationsRead))
+	mux.Handle("POST /api/v1/stores/{storeID}/notifications/{notificationID}/read", storePerm(rbac.PermNotificationsWrite, p5.MarkNotificationRead))
+	mux.Handle("GET /api/v1/stores/{storeID}/notification-preferences", storePerm(rbac.PermNotificationsRead, p5.GetNotificationPreferences))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/notification-preferences", storePerm(rbac.PermNotificationsWrite, p5.PatchNotificationPreferences))
+	mux.Handle("GET /api/v1/stores/{storeID}/analytics", storePerm(rbac.PermAnalyticsRead, p5.AnalyticsOverview))
 
 	// Phase 4: preorder batches
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storeAuthed(commerceH.ListBatches))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders", storeAuthed(commerceH.CreateBatch))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}", storeAuthed(commerceH.GetBatch))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storeAuthed(commerceH.PatchBatch))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storeAuthed(commerceH.AssignBatchProduct))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storeAuthed(commerceH.RemoveBatchProduct))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storeAuthed(p5.ListBatchVariants))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storeAuthed(p5.AssignBatchVariant))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants/{variantID}", storeAuthed(p5.RemoveBatchVariant))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.BatchPurchasing))
-	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storeAuthed(commerceH.UpdateBatchPurchasing))
-	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storeAuthed(commerceH.AllocateBatchItem))
-	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/orders", storeAuthed(commerceH.ListBatchOrders))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCatalogRead, commerceH.ListBatches))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders", storePerm(rbac.PermCatalogWrite, commerceH.CreateBatch))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCatalogRead, commerceH.GetBatch))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/preorders/{batchID}", storePerm(rbac.PermCatalogWrite, commerceH.PatchBatch))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products", storePerm(rbac.PermCatalogWrite, commerceH.AssignBatchProduct))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}", storePerm(rbac.PermCatalogWrite, commerceH.RemoveBatchProduct))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCatalogRead, p5.ListBatchVariants))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants", storePerm(rbac.PermCatalogWrite, p5.AssignBatchVariant))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/preorders/{batchID}/products/{productID}/variants/{variantID}", storePerm(rbac.PermCatalogWrite, p5.RemoveBatchVariant))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storePerm(rbac.PermPurchasingRead, commerceH.BatchPurchasing))
+	mux.Handle("PUT /api/v1/stores/{storeID}/preorders/{batchID}/purchasing", storePerm(rbac.PermPurchasingWrite, commerceH.UpdateBatchPurchasing))
+	mux.Handle("POST /api/v1/stores/{storeID}/preorders/{batchID}/allocations", storePerm(rbac.PermPurchasingWrite, commerceH.AllocateBatchItem))
+	mux.Handle("GET /api/v1/stores/{storeID}/preorders/{batchID}/orders", storePerm(rbac.PermOrdersRead, commerceH.ListBatchOrders))
 
 	// Phase 4: business rules
-	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storeAuthed(commerceH.ListRules))
-	mux.Handle("POST /api/v1/stores/{storeID}/business-rules", storeAuthed(commerceH.CreateRule))
-	mux.Handle("PATCH /api/v1/stores/{storeID}/business-rules/{ruleID}", storeAuthed(commerceH.UpdateRule))
-	mux.Handle("DELETE /api/v1/stores/{storeID}/business-rules/{ruleID}", storeAuthed(commerceH.DeleteRule))
-	mux.Handle("POST /api/v1/stores/{storeID}/business-rules/preview", storeAuthed(commerceH.PreviewRules))
+	mux.Handle("GET /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesRead, commerceH.ListRules))
+	mux.Handle("POST /api/v1/stores/{storeID}/business-rules", storePerm(rbac.PermBusinessRulesWrite, commerceH.CreateRule))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/business-rules/{ruleID}", storePerm(rbac.PermBusinessRulesWrite, commerceH.UpdateRule))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/business-rules/{ruleID}", storePerm(rbac.PermBusinessRulesWrite, commerceH.DeleteRule))
+	mux.Handle("POST /api/v1/stores/{storeID}/business-rules/preview", storePerm(rbac.PermBusinessRulesRead, commerceH.PreviewRules))
 
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)

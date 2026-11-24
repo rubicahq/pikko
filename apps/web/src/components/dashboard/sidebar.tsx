@@ -14,11 +14,13 @@ export function DashboardSidebar({
   user,
   stores,
   currentStore,
+  permissions,
   className,
 }: {
   user: User;
   stores: StoreType[];
   currentStore?: StoreType | null;
+  permissions?: string[] | null;
   className?: string;
 }) {
   const pathname = usePathname();
@@ -37,7 +39,7 @@ export function DashboardSidebar({
       <div className="px-3 pb-4">
         <StoreSwitcher stores={stores} current={currentStore} />
       </div>
-      <SidebarNav storeId={storeId} />
+      <SidebarNav storeId={storeId} permissions={permissions} />
       <div className="mt-auto border-t border-border p-3">
         <Link
           href={urls.accountSettings()}

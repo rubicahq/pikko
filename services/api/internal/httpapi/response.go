@@ -42,8 +42,9 @@ func RequestID(r *http.Request) string {
 type ctxKey string
 
 const (
-	ctxKeyRequestID ctxKey = "request_id"
-	ctxKeyUserID    ctxKey = "user_id"
-	ctxKeySession   ctxKey = "session_raw"
-	ctxKeyStoreID   ctxKey = "store_id"
+	ctxKeyRequestID        ctxKey = "request_id"
+	ctxKeyUserID           ctxKey = "user_id"
+	ctxKeySession          ctxKey = "session_raw"
+	ctxKeyStoreID          ctxKey = "store_id"
+	ctxKeyMembershipRole   ctxKey = "membership_role"
 )

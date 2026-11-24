@@ -71,16 +71,45 @@ export const MERCHANT_NAV: NavGroup[] = [
       { href: "settings", label: "Settings", icon: Settings, implemented: true },
       // Deferred — Agents 06 / 03+10
       { href: "vendors", label: "Vendors", icon: Building2, implemented: false },
-      { href: "team", label: "Team", icon: UserCog, implemented: false },
+      { href: "team", label: "Team", icon: UserCog, implemented: true },
     ],
   },
 ];
 
-export function liveNavGroups(groups: NavGroup[] = MERCHANT_NAV): NavGroup[] {
+export function liveNavGroups(
+  groups: NavGroup[] = MERCHANT_NAV,
+  permissions?: string[] | null,
+): NavGroup[] {
   return groups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => item.implemented),
+      items: group.items.filter((item) => {
+        if (!item.implemented) return false;
+        if (!permissions) return true;
+        // Lazy import avoided: inline map matches apps/web/src/lib/rbac.ts NAV_PERMISSION
+        const required = NAV_PERM[item.href];
+        if (!required) return true;
+        return permissions.includes(required);
+      }),
     }))
     .filter((group) => group.items.length > 0);
 }
+
+const NAV_PERM: Record<string, string> = {
+  overview: "stores.read",
+  notifications: "notifications.read",
+  analytics: "analytics.read",
+  orders: "orders.read",
+  customers: "customers.read",
+  purchasing: "purchasing.read",
+  packing: "packing.read",
+  shipments: "packing.read",
+  finance: "finance.read",
+  catalog: "catalog.read",
+  preorders: "catalog.read",
+  storefront: "storefront.read",
+  "business-rules": "business_rules.read",
+  settings: "stores.settings",
+  vendors: "purchasing.read",
+  team: "team.read",
+};

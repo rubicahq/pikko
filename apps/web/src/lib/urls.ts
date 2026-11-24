@@ -39,6 +39,8 @@ export const urls = {
     `/stores/${storeId}/catalog/import/${jobId}`,
   catalogFlipbook: (storeId: string) => `/stores/${storeId}/catalog/flipbook`,
   storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
+  storeTeam: (storeId: string) => `/stores/${storeId}/team`,
+  inviteAccept: (token: string) => `/invites/accept?token=${encodeURIComponent(token)}`,
   storeOrders: (storeId: string) => `/stores/${storeId}/orders`,
   storeOrder: (storeId: string, orderId: string) => `/stores/${storeId}/orders/${orderId}`,
   storeCustomers: (storeId: string) => `/stores/${storeId}/customers`,

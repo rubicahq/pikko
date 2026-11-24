@@ -34,7 +34,7 @@ test.describe("Phase 5 merchant efficiency", () => {
     expect(storeId).toBeTruthy();
 
     await page.getByRole("link", { name: "Customers", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Customers", exact: true })).toBeVisible();
     await expect(page.getByText(/No customers yet/)).toBeVisible();
 
     await page.getByRole("link", { name: "Analytics", exact: true }).click();

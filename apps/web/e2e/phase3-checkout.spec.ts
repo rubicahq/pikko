@@ -63,7 +63,7 @@ test.describe("Phase 3 checkout and payment verification", () => {
 
     // Create + publish product
     await page.getByRole("link", { name: "Catalog" }).click();
-    await page.getByRole("link", { name: "Add product" }).click();
+    await page.getByRole("link", { name: "Add product" }).first().click();
     await page.getByLabel("Name").fill("Phase Tee");
     await page.getByLabel("Price (IDR)").fill("50000");
     await page.getByLabel("Status").selectOption("published");

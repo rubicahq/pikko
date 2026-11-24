@@ -267,3 +267,27 @@ func MagicLinkContent(fromName, confirmURL string, ttlMinutes int) (subject, htm
 </body></html>`, fromName, confirmURL, ttlMinutes)
 	return subject, html, text
 }
+
+func TeamInviteContent(fromName, storeName, role, acceptURL string, ttlHours int) (subject, html, text string) {
+	subject = fmt.Sprintf("You're invited to %s on Pikko", storeName)
+	text = fmt.Sprintf(
+		"You've been invited to join %s on Pikko as %s.\n\nAccept your invitation:\n%s\n\nThis link expires in about %d hours.\nIf you were not expecting this invite, you can ignore this email.\n",
+		storeName, role, acceptURL, ttlHours,
+	)
+	html = fmt.Sprintf(`<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#FFFFFF;font-family:Inter,Arial,sans-serif;color:#15191E;">
+<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="600" style="max-width:600px;width:100%%;border:1px solid #E1E3E8;border-radius:12px;">
+<tr><td style="padding:32px;">
+<p style="margin:0 0 8px;font-size:14px;color:#60646C;">%s</p>
+<h1 style="margin:0 0 16px;font-size:24px;font-weight:500;letter-spacing:-0.02em;">You're invited to %s.</h1>
+<p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#60646C;">Join as <strong>%s</strong>. Use the button below to accept — you'll sign in with this email via a secure link.</p>
+<p style="margin:0 0 24px;"><a href="%s" style="display:inline-block;background:#C83200;color:#FCFCFD;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:500;font-size:14px;">Accept invitation.</a></p>
+<div style="background:#F3F3F7;border:1px solid #E1E3E8;border-radius:8px;padding:16px;">
+<p style="margin:0;font-size:14px;line-height:1.5;color:#60646C;">This invite expires in about %d hours.<br/>If you were not expecting this, you can ignore this email.</p>
+</div>
+</td></tr></table>
+</td></tr></table>
+</body></html>`, fromName, storeName, role, acceptURL, ttlHours)
+	return subject, html, text
+}

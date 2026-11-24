@@ -40,6 +40,7 @@ type Store struct {
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
 	Role               string     `json:"role,omitempty"`
+	Permissions        []string   `json:"permissions,omitempty"`
 	StorefrontURL      string     `json:"storefront_url,omitempty"`
 }
 
@@ -369,9 +370,11 @@ type PatchInput struct {
 }
 
 func (s *Service) Patch(ctx context.Context, userID, storeID uuid.UUID, in PatchInput) (*Store, error) {
-	if _, err := s.GetAuthorized(ctx, userID, storeID); err != nil {
+	stAuth, err := s.GetAuthorized(ctx, userID, storeID)
+	if err != nil {
 		return nil, err
 	}
+	_ = stAuth
 	sets := []string{"updated_at=now()"}
 	args := []any{storeID}
 	n := 2
@@ -410,6 +413,9 @@ func (s *Service) Archive(ctx context.Context, userID, storeID uuid.UUID) (*Stor
 	st, err := s.GetAuthorized(ctx, userID, storeID)
 	if err != nil {
 		return nil, err
+	}
+	if st.Role != "owner" {
+		return nil, ErrForbidden
 	}
 	if st.ArchivedAt != nil {
 		return st, nil

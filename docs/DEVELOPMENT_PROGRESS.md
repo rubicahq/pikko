@@ -93,7 +93,23 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 03)
+## 3c. Agent 03 status (Auth & Multi-Store / RBAC)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000007_team_rbac` (widen roles + `team_invites`) | Done |
+| `internal/rbac` permission matrix + server enforcement | Done |
+| Team invite/accept/resend/cancel/revoke APIs + Brevo email | Done |
+| Team UI + role-aware nav (NAV-03) + store switcher roles | Done |
+| Setup checklist payment/fulfillment gap fix | Done |
+| Tenant isolation + invite integration tests + Playwright | Done |
+| `docs/agents/03-auth-multistore-handoff.md` | Done |
+| Magic-link auth / owner multi-store preserved | Yes |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 04)
 
 1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
 2. Campaign table vs facade over `preorder_batches` + `live_sessions` (Agent 04).

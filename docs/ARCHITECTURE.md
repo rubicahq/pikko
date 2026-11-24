@@ -53,7 +53,7 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 
 | Module | Introduced by | Notes |
 | --- | --- | --- |
-| `team` | Agent 03/10 | RBAC roles, invites |
+| `team` | Agent 03 (done) / 10 polish | RBAC roles, invites |
 | `campaigns` | Agent 04 | Unify preorder + live under campaign facade (or keep preorders + add live) |
 | `vendors` | Agent 06 | Vendor master data |
 | `receiving` | Agent 06 | Goods receipt |
@@ -76,15 +76,9 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 - **Never** trust client-supplied store id without membership check.
 - Multi-tab: store id is in the URL path, not a single global cookie.
 
-### 3.1 Membership evolution
+### 3.1 Membership evolution (Agent 03)
 
-Today: `store_memberships.role CHECK (role IN ('owner'))`.
-
-Target: widen CHECK **additively** to include admin/CS/catalog/purchasing/packing/finance. Migration must:
-
-1. Drop/replace CHECK without deleting rows
-2. Default existing rows remain `owner`
-3. Introduce permission helpers; keep owner as superset
+`000007` widens `store_memberships.role` to owner/admin/cs/catalog/purchasing/packing/finance. Existing rows remain `owner`. Permission matrix lives in `internal/rbac`; `StoreAuthMiddleware.RequirePermission` enforces server-side. Invites: `team_invites` + Brevo magic-link accept.
 
 ---
 

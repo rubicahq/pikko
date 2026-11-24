@@ -61,7 +61,12 @@ export function StoreSwitcher({
               <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-surface text-xs font-medium">
                 {initial(store.name)}
               </span>
-              <span className="min-w-0 flex-1 truncate">{store.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{store.name}</span>
+                {store.role ? (
+                  <span className="block truncate text-xs text-foreground-muted">{store.role}</span>
+                ) : null}
+              </span>
               {active?.id === store.id ? (
                 <Check className="h-4 w-4 text-brand-dark" strokeWidth={1.75} />
               ) : null}

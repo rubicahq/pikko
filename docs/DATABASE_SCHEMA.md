@@ -1,6 +1,6 @@
 # Database Schema — Current + Target (PRD v3.0)
 
-**Baseline migrations:** `000001`–`000006`  
+**Baseline migrations:** `000001`–`000007`  
 **Policy:** **Additive migrations only.** No `DROP TABLE`, no destructive column drops on production data without explicit owner approval. Down migrations exist for local/dev rollback only.
 
 ---
@@ -15,8 +15,9 @@
 | 000004 | `phase3_orders_payments` | Customers, orders, items, payments, evidence, inventory, counters |
 | 000005 | `phase4_preorder_rules` | Preorder batches, purchasing, allocations, business rules |
 | 000006 | `phase5_merchant_efficiency` | Notifications, analytics_events, CSV import columns |
+| 000007 | `team_rbac` | Widen membership roles; `team_invites` |
 
-Next free version: **`000007_…`** (Agents 03+).
+Next free version: **`000008_…`** (Agents 04+).
 
 ---
 
@@ -31,7 +32,8 @@ Next free version: **`000007_…`** (Agents 03+).
 | `sessions` | session_hash, user_id, expires_at, revoked_at | |
 | `user_preferences` | locale, timezone | |
 | `stores` | slug unique, selling_model, theme, publication_status, checkout_enabled, archived_at | |
-| `store_memberships` | role **CHECK (`owner` only)**, status active/revoked | **Target:** widen roles |
+| `store_memberships` | role CHECK (`owner`,`admin`,`cs`,`catalog`,`purchasing`,`packing`,`finance`), status active/revoked | Widened in `000007` |
+| `team_invites` | store_id, email, role, token_hash, status, expires_at | Invite / accept / cancel / resend |
 | `store_slug_aliases` | historical slugs | |
 | `onboarding_drafts` | step JSON progress | |
 | `auth_rate_limits` | email/IP windows | |
@@ -84,13 +86,13 @@ Money on products/variants: integer IDR. Status: draft/published/archived.
 
 Mark each as **planned additive migration**. Exact DDL owned by implementing agents; this section locks intent.
 
-### 3.1 Team RBAC (`000007` candidate — Agent 03)
+### 3.1 Team RBAC (`000007` — Agent 03) ✅
 
 ```text
 ALTER store_memberships: widen role CHECK to
   ('owner','admin','cs','catalog','purchasing','packing','finance')
-+ team_invites (store_id, email, role, token_hash, expires_at, accepted_at)
-+ optional permission_overrides (defer if role matrix sufficient)
++ team_invites (store_id, email, role, token_hash, expires_at, accepted_at, status)
+Permission overrides deferred (role matrix in Go `internal/rbac` is sufficient)
 ```
 
 ### 3.2 Order item operations & revisions (Agent 05)
