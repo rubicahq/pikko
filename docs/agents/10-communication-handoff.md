@@ -4,6 +4,8 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-10-communication-wa-0165`  
 **Prior:** Agent 09 main tip includes packing PR #25 merge `a033880` (+ handoff `#26` / `a613eae`)  
+**Feature merge SHA:** `983c67a594622fb356eb0bfb744161ea2cfe888c` (PR #27)  
+**Merged main SHA:** `983c67a594622fb356eb0bfb744161ea2cfe888c`
 
 ---
 
