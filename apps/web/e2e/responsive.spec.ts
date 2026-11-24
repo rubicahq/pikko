@@ -6,7 +6,7 @@ for (const width of widths) {
   test(`home has no horizontal overflow at ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: /Your business/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Sell your way/ })).toBeVisible();
     const overflow = await page.evaluate(() => {
       return document.documentElement.scrollWidth > document.documentElement.clientWidth + 1;
     });

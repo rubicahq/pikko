@@ -1,0 +1,11 @@
+# Install on the VPS as ubuntu (crontab -e). Adjust paths if the checkout differs.
+# Daily 02:15 Asia/Jakarta ≈ 19:15 UTC previous day — use server local TZ or UTC explicitly.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Pikko DB + storage backup (Phase 6)
+15 19 * * * BACKUP_DIR=/home/ubuntu/backups/pikko /home/ubuntu/pikko/infrastructure/backup/backup.sh >> /home/ubuntu/backups/pikko/backup.log 2>&1
+
+# Optional weekly restore smoke (Sunday 20:30 UTC) — pick newest dump
+# 30 20 * * 0 LATEST=$(ls -1d /home/ubuntu/backups/pikko/*/postgres.dump 2>/dev/null | tail -1); [ -n "$LATEST" ] && /home/ubuntu/pikko/infrastructure/backup/restore-test.sh "$LATEST" >> /home/ubuntu/backups/pikko/restore-test.log 2>&1

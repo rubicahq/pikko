@@ -1,4 +1,4 @@
-# API Reference (Phase 0–4)
+# API Reference (Phase 0–6)
 
 Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
@@ -138,6 +138,14 @@ Submit body (essentials):
 
 All money fields are integer IDR. `price_changed` (409) when client total ≠ server total.
 
-## Health
+## Health / readiness (Phase 6)
 
-`GET /healthz` — DB ping.
+| Path | Purpose |
+| --- | --- |
+| `GET /livez` | Process up (no dependency checks) |
+| `GET /healthz` | DB ping |
+| `GET /readyz` | DB query + storage path / config readiness |
+
+Responses are JSON `{ ok, time, ... }`. `readyz` returns 503 when a check fails.
+
+Coarse per-IP API rate limiting uses `API_RATE_LIMIT_IP_PER_HOUR` (default 1200) via `public_rate_limits`. Auth magic-link keeps tighter email/IP limits.

@@ -8,9 +8,10 @@ Premium, modern, minimal, approachable. Strong typography over decoration. White
 
 ## Typography
 
-- **Font:** Inter via `next/font` (`--font-inter`), fallback Arial.
-- Single typeface everywhere. Body 400, headings 500.
-- Marketing headlines use tracking `-0.02em`.
+- **Product UI font:** Inter via `next/font` (`--font-inter`), fallback Arial.
+- **Marketing display font:** Plus Jakarta Sans (`--font-jakarta` / `font-display`) for headlines and brand wordmark on marketing surfaces — not Inter-only.
+- Body 400, headings 500. Marketing headlines use tracking about `-0.02em` to `-0.03em`.
+- Avoid AI-default patterns on marketing: no big-number heroes, no 3-column icon-in-circle grids, no purple–blue gradients, no cream+terracotta serif look.
 
 ## Color tokens
 

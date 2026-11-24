@@ -45,6 +45,7 @@ type Config struct {
 	RedirectAllowlist  []string
 	RateLimitEmailHour int
 	RateLimitIPHour    int
+	APIRateLimitIPHour int
 
 	APIAddr     string
 	CORSOrigins []string
@@ -118,6 +119,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	c.RateLimitIPHour, err = getenvInt("AUTH_RATE_LIMIT_IP_PER_HOUR", 20)
+	if err != nil {
+		return nil, err
+	}
+	c.APIRateLimitIPHour, err = getenvInt("API_RATE_LIMIT_IP_PER_HOUR", 1200)
 	if err != nil {
 		return nil, err
 	}

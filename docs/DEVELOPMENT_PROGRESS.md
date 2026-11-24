@@ -2,37 +2,38 @@
 
 ## Scope
 
-Phase 5 Merchant Efficiency: in-app notifications, transactional email polish (including unavailable allocation), merchant analytics (Asia/Jakarta), CSV product import, customers dashboard, plus Phase 4 leftovers (batch cover editor + variant pairing UI). AI PDF import was already complete and not re-implemented. Built on Phase 0–4 (`main` @ `01ff5d8+`).
+Phase 6 Marketing and Production Readiness: final marketing site for pikko.site (landing, solutions, pricing, FAQ, legal), SEO (sitemap, robots, OG), accessibility polish, and production ops (health, logging, rate limits, security headers, scheduled backups, runbook, light load smoke, dependency audit). Built on Phase 0–5 (`main` @ `b963682+`).
 
 ## Completed
 
-### Phase 0–4 (prior)
+### Phase 0–5 (prior)
 
-- Auth, multi-store, storefront, catalog, AI PDF import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, emails
+- Auth, multi-store, storefront, catalog, AI PDF/CSV import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, notifications, analytics
 
-### Phase 5
+### Phase 6
 
-- Migration `000006`: `notifications`, `notification_preferences`, `analytics_events`; CSV support on `catalog_import_jobs` (`source_type`, `csv_file_id`); `catalog_csv` file purpose
-- In-app notifications API + UI (list, unread badge, mark read / mark all) wired from new order, payment evidence, batch close, purchasing issues
-- Customer email on unavailable allocation via existing `email_jobs` / Brevo drain; batch-closed merchant email
-- Analytics overview API + UI (sales, orders, top products, conversion) with Asia/Jakarta day boundaries, store-scoped queries
-- CSV catalog import (template download, validation, duplicate SKU warnings, review → draft products)
-- Customers list/detail + internal notes editor
-- Preorder batch cover upload/clear UI; variant pairing UI on batch products
-- Tests: Go `./...`; Playwright Phase 5 smoke; docs updated
+- Marketing routes: `/`, `/pricing`, `/faq`, `/privacy`, `/terms`, `/solutions`, `/solutions/jastip`, `/solutions/social-sellers`
+- Marketing layout (header/footer), Plus Jakarta Sans display + Inter body, design tokens only
+- SEO: `sitemap.xml`, `robots.txt`, Open Graph image, per-page canonicals; auth/dashboard remain noindex
+- API: `/livez`, `/healthz`, `/readyz`; structured access logs; coarse IP rate limit; hardened security headers
+- Ops: `infrastructure/backup/*`, `infrastructure/ops/load-smoke.sh`, `dependency-audit.sh`, `docs/RUNBOOK.md`
+- Nginx example edge headers; Playwright Phase 6 smoke; docs matrix updated
+- **No DB migration** in Phase 6
 
 ## Not in this release (by design)
 
+- Phase 7 pikko.id migration / commercial GTM (needs explicit approval)
+- Invented subscription prices (open business decision — pilot framing only)
 - Payment gateway / refunds money movement
-- Marketing site / Phase 6 production readiness
-- VPS deploy / Emplicon (out of scope for this agent)
-- Visual charts library (tables only for analytics MVP)
+- VPS deploy execution (documented for operator; agent does not SSH)
 
 ## Production requirements
 
-- Run migration `000006` (idempotent migrate up from empty or existing)
-- No new required secrets; Brevo + existing env remain (`EMAIL_MODE`, `BREVO_API_KEY`, `EMAIL_NOTIFICATION_FROM`)
-- Worker process should keep draining `email_jobs` and batch sync
+- No new migration
+- Optional new env: `API_RATE_LIMIT_IP_PER_HOUR` (default 1200)
+- Install backup cron from `infrastructure/backup/crontab.example`
+- Reload nginx if adopting updated `pikko.site.conf` header snippets
+- Set `NEXT_PUBLIC_APP_ENV=production` so marketing is indexable
 
 ## Test results
 
@@ -46,12 +47,12 @@ Phase 5 Merchant Efficiency: in-app notifications, transactional email polish (i
 
 ## Decisions / open questions for product
 
-1. Brevo sender domain readiness (carry-over)
-2. Paid-order cancel/refund UX (carry-over)
-3. Confirm merge → then separate deploy / migrate `000006` on production
+1. Final commercial pricing (carry-over; legal pages are working notices)
+2. Confirm VPS: pull main, install backup cron, optional nginx header reload
+3. Brevo sender domain readiness (carry-over)
 
 ## Known limitations
 
-- Unavailable-item email mints a fresh tracking token when the original raw token is unavailable (hash-only storage)
-- Analytics conversion = paid orders / total non-cancelled orders in range (not storefront visit conversion)
-- CSV import does not create variants from columns yet (flat products)
+- Pricing page describes pilot access — not a paid plan catalog
+- Legal pages are operational notices for pilots, not counsel-approved launch contracts
+- Light load smoke is a probe script, not a full capacity benchmark

@@ -34,6 +34,16 @@ Suites:
 - Flipbook editor smoke
 - Phase 3: bank/fulfillment setup → cart → checkout → evidence → merchant verify
 - Phase 4: preorder batch → cart group → checkout → merchant confirm
+- Phase 5: notifications / analytics / CSV / customers smoke
+- Phase 6: marketing pages, FAQ keyboard, robots/sitemap, security headers
+
+## Ops scripts
+
+```bash
+./infrastructure/ops/dependency-audit.sh
+./infrastructure/ops/load-smoke.sh https://pikko.site https://api.pikko.site
+./infrastructure/backup/restore-test.sh ~/backups/pikko/<stamp>/postgres.dump
+```
 
 ## Manual checks
 

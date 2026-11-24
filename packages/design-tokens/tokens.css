@@ -61,8 +61,9 @@
   --shadow-md: 0 8px 24px rgba(0, 7, 16, 0.08), 0 2px 6px rgba(0, 7, 16, 0.04);
   --shadow-overlay: 0 16px 48px rgba(0, 7, 16, 0.12);
 
-  /* Typography */
+  /* Typography — Inter for product UI; display face for marketing headlines */
   --font-sans: "Inter", Arial, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
 
   /* Layout */
   --sidebar-width: 248px;
