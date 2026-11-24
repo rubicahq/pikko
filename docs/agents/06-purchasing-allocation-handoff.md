@@ -4,7 +4,9 @@
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-06-purchasing-allocation-77d0`  
 **Prior:** Agent 05 main tip `ee7e549` + soft-gradient `6778db1`  
-**Merged main SHA:** _(filled after merge)_  
+**Feature merge SHA:** `257f3ab5a27c2bd03a69a2c2df345cefcbb1a789` (PR #18)  
+**Merged main SHA:** `257f3ab5a27c2bd03a69a2c2df345cefcbb1a789`  
+**PR:** https://github.com/rubicahq/pikko/pull/18  
 
 ---
 
