@@ -107,11 +107,11 @@
 | REF-01 | Refund status enums | done | refunds workflow + payment_status | finance tests | — |
 | REF-02–04 | Store credit + audit | done | ledger behind `FEATURE_STORE_CREDIT` | flag + grant/apply | Portal apply later |
 | CRM-01–02 | Customers list/detail | done | customers handlers | phase5 | — |
-| CRM-03–05 | Addresses UX / merge | partial/missing | `customer_addresses` | — | Agent 08 |
+| CRM-03–05 | Addresses UX / merge | done | portal addresses + merchant address-change queue | portal IDOR | Merge UX lite |
 | PORT-01 | Tracking token page | done | `/track/[token]` | phase3 | — |
-| PORT-02–04 | Auth portal | missing | — | — | Agent 08 |
+| PORT-02–04 | Auth portal | done | `000012`, `/portal/*`, web portal UI | portal security/IDOR | Shipments depth → 09 |
 | ADDR-01 | Checkout address | done | checkout | phase3 | — |
-| ADDR-02–03 | Saved + change request | partial/missing | — | — | Agent 08 |
+| ADDR-02–03 | Saved + change request | done | portal addresses + `portal_address_change_requests` | portal IDOR | Merchant approve UI lite (API done) |
 
 ---
 
@@ -157,10 +157,10 @@
 | E2E-G Store credit | done (API, feature-flagged) | Stage 2 |
 | E2E-H Consolidated payment | done (API) | Stage 2 |
 | E2E-I Packing | missing | Stage 2 |
-| E2E-J Address change | missing | Stage 2 |
+| E2E-J Address change | done (API) | Portal request + merchant review |
 | E2E-K Live shopping | missing | Stage 3 |
 | E2E-L Concurrency | partial | Stage 1–3 |
-| E2E-M Portal security | partial | Tracking only |
+| E2E-M Portal security | done (API) | Cross-customer + cross-store IDOR |
 | E2E-N Domain migration readiness | done (code) | Cutover owner |
 
 ---
@@ -174,5 +174,5 @@ Auth, multi-store, storefront, catalog, AI PDF/flipbook/CSV, checkout, bank tran
 | Stage | Top missing |
 | --- | --- |
 | 1 | Campaign unification, admin order entry, item revisions (RBAC done by Agent 03) |
-| 2 | Vendors/receiving, finance ledger/refunds/credit, portal, packing/shipments, WhatsApp |
+| 2 | Packing/shipments, WhatsApp (portal + finance done) |
 | 3 | Live shopping, analytics north-star depth, full E2E A–N, security/QA pass, deploy hardening (still no auto pikko.id) |

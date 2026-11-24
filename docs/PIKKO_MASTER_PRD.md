@@ -380,9 +380,9 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | ID | Requirement | Status |
 | --- | --- | --- |
 | PORT-01 | Tracking page by token (noindex) | Done |
-| PORT-02 | Authenticated customer portal (magic link) | Missing |
-| PORT-03 | Order history, payments, refunds, credit, shipments | Missing |
-| PORT-04 | Address change requests | Missing |
+| PORT-02 | Authenticated customer portal (magic link) | Done |
+| PORT-03 | Order history, payments, refunds, credit, shipments | Done (orders/payments/refunds/credit; shipments → Agent 09) |
+| PORT-04 | Address change requests | Done |
 
 ---
 
@@ -391,8 +391,8 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | ID | Requirement | Status |
 | --- | --- | --- |
 | ADDR-01 | Capture shipping address at checkout | Done |
-| ADDR-02 | Multiple saved addresses; default | Partial |
-| ADDR-03 | Post-order address change with merchant approval | Missing |
+| ADDR-02 | Multiple saved addresses; default | Done |
+| ADDR-03 | Post-order address change with merchant approval | Done |
 
 ---
 
@@ -622,10 +622,10 @@ Do not skip acceptance gates.
 | E2E-G | Store credit apply | 2 | Done (API, flag) |
 | E2E-H | Consolidated payment | 2 | Done (API) |
 | E2E-I | Packing flow | 2 | Missing |
-| E2E-J | Address change | 2 | Missing |
+| E2E-J | Address change | 2 | Done (API) |
 | E2E-K | Live shopping session | 3 | Missing |
 | E2E-L | Concurrency (stock/quota) | 1–3 | Partial tests |
-| E2E-M | Portal security (no cross-customer) | 2 | Tracking-only today |
+| E2E-M | Portal security (no cross-customer) | 2 | Done (API IDOR) |
 | E2E-N | Domain migration readiness (env-only) | 3 | Code ready; cutover owner |
 
 ---

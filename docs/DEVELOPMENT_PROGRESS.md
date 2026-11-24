@@ -45,7 +45,7 @@
 | --- | --- | --- | --- |
 | **06 Purchasing** | Vendors, multi-vendor, receiving handoff | PUR-01–03 | VEN/RCV + extended purchasing |
 | **07 Payments/Finance** | Reconciliation, refunds, store credit, E2E-F | FIN-01–03 | Ledger + REF-* + exact money tests |
-| **08 Customer Portal** | Auth portal beyond tracking | PORT-01, CRM | PORT-02–04; E2E-M |
+| **08 Customer Portal** | Auth portal beyond tracking | PORT-01, CRM | **Done** PORT-02–04; E2E-M/J API |
 | **09 Packing/Shipment** | Pack queues, shipments | Fulfillment statuses | PACK/SHIP; E2E-I |
 | **10 Communication** | WhatsApp templates + email completeness; RBAC invites polish | notifications/email | WA registry; team invites usable |
 
