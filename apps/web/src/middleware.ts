@@ -10,7 +10,24 @@ function applySecurityHeaders(res: NextResponse) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
   );
+  res.headers.set("Cross-Origin-Resource-Policy", "same-site");
   res.headers.set("X-DNS-Prefetch-Control", "on");
+  // Conservative CSP for Next App Router (SEC-08). Inline styles/scripts needed for Next runtime.
+  res.headers.set(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "connect-src 'self' https: wss:",
+      "form-action 'self'",
+    ].join("; "),
+  );
   const appEnv = process.env.NEXT_PUBLIC_APP_ENV || process.env.NODE_ENV;
   if (appEnv === "production") {
     res.headers.set(

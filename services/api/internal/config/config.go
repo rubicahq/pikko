@@ -181,6 +181,11 @@ func Load() (*Config, error) {
 
 	c.FeatureStoreCredit = getenvBool("FEATURE_STORE_CREDIT", false)
 
+	// Force Secure cookies in production/staging regardless of AUTH_COOKIE_SECURE misconfig (SEC-08).
+	if c.AppEnv == "production" || c.AppEnv == "staging" {
+		c.CookieSecure = true
+	}
+
 	if c.DatabaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}

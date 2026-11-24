@@ -12,6 +12,8 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/files"
+	"github.com/rubicahq/pikko/services/api/internal/rbac"
+	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
 	"github.com/rubicahq/pikko/services/api/internal/themes"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
@@ -106,6 +108,11 @@ func (h *Phase2Handlers) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	purpose := r.FormValue("purpose")
+	// Payment/refund evidence must not be planted via catalog.write upload (SEC-02/04).
+	if storage.IsPrivateUploadPurpose(purpose) {
+		writeError(w, r, http.StatusForbidden, "forbidden", "Use the dedicated evidence upload path for this file type.")
+		return
+	}
 	file, hdr, err := r.FormFile("file")
 	if err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "File is required.")
@@ -138,9 +145,29 @@ func (h *Phase2Handlers) GetFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rc.Close()
+	role := MembershipRole(r)
+	if !merchantMayReadFilePurpose(role, f.Purpose) {
+		writeError(w, r, http.StatusForbidden, "forbidden", "You do not have permission for this file.")
+		return
+	}
 	w.Header().Set("Content-Type", f.ContentType)
 	w.Header().Set("Cache-Control", "private, max-age=3600")
 	_, _ = io.Copy(w, rc)
+}
+
+// merchantMayReadFilePurpose gates private purposes behind orders/finance/catalog perms (SEC-02/04).
+func merchantMayReadFilePurpose(role, purpose string) bool {
+	switch purpose {
+	case "payment_evidence", "refund_evidence":
+		return rbac.HasPermission(role, rbac.PermOrdersPayments) ||
+			rbac.HasPermission(role, rbac.PermOrdersRead) ||
+			rbac.HasPermission(role, rbac.PermFinanceRead)
+	case "catalog_pdf", "catalog_csv":
+		return rbac.HasPermission(role, rbac.PermCatalogRead)
+	default:
+		// Branding / product assets: any store member already passed membership check.
+		return true
+	}
 }
 
 func (h *Phase2Handlers) ListCategories(w http.ResponseWriter, r *http.Request) {
@@ -432,7 +459,7 @@ func (h *Phase2Handlers) PublicCategories(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Phase2Handlers) PublicFile(w http.ResponseWriter, r *http.Request) {
-	// GET /api/v1/public/files/{storeID}/{fileID} — only for published store assets / product images
+	// GET /api/v1/public/files/{storeID}/{fileID} — published store assets / product images only (SEC-04).
 	storeID, err := uuid.Parse(r.PathValue("storeID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "File not found.")
@@ -457,6 +484,11 @@ func (h *Phase2Handlers) PublicFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer rc.Close()
+	if !storage.IsPublicPurpose(f.Purpose) {
+		// Indistinguishable 404 — do not confirm private evidence/PDF exists.
+		writeError(w, r, http.StatusNotFound, "not_found", "File not found.")
+		return
+	}
 	w.Header().Set("Content-Type", f.ContentType)
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = io.Copy(w, rc)

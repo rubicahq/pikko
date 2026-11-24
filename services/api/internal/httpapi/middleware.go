@@ -158,9 +158,16 @@ func MembershipRole(r *http.Request) string {
 }
 
 func ClientIP(r *http.Request) string {
+	// Prefer X-Real-IP set by our nginx from $remote_addr (not client-spoofable).
+	// Never trust the leftmost X-Forwarded-For hop — clients can prepend forged IPs
+	// when the proxy uses $proxy_add_x_forwarded_for (SEC-07).
+	if xri := strings.TrimSpace(r.Header.Get("X-Real-IP")); xri != "" {
+		return xri
+	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
+		// Rightmost hop is closest to us when a single trusted proxy appends.
+		return strings.TrimSpace(parts[len(parts)-1])
 	}
 	host := r.RemoteAddr
 	if i := strings.LastIndex(host, ":"); i >= 0 {

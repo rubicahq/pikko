@@ -34,6 +34,23 @@ func TestSecurityHeadersIncludeHardening(t *testing.T) {
 	}
 }
 
+func TestClientIPPrefersRealIPOverSpoofedXFF(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("X-Forwarded-For", "1.2.3.4, 10.0.0.1")
+	req.Header.Set("X-Real-IP", "203.0.113.50")
+	req.RemoteAddr = "127.0.0.1:1234"
+	if got := ClientIP(req); got != "203.0.113.50" {
+		t.Fatalf("want X-Real-IP, got %q", got)
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.Header.Set("X-Forwarded-For", "1.2.3.4, 10.0.0.9")
+	req2.RemoteAddr = "127.0.0.1:1234"
+	if got := ClientIP(req2); got != "10.0.0.9" {
+		t.Fatalf("want rightmost XFF hop, got %q", got)
+	}
+}
+
 func TestAccessLogDoesNotPanic(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h := AccessLogMiddleware(logger)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

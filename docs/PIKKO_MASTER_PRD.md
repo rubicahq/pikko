@@ -550,15 +550,15 @@ Store is the tenant boundary. All business rows carry `store_id`. Storage keys: 
 | ID | Requirement | Status |
 | --- | --- | --- |
 | SEC-01 | Tenant isolation on every query | Done (pattern); continuous tests |
-| SEC-02 | Server-side authz; never trust client store id | Done |
+| SEC-02 | Server-side authz; never trust client store id | Done (Agent 14: GetFile purpose RBAC; private upload reject) |
 | SEC-03 | Hashed tokens (auth + tracking) | Done |
-| SEC-04 | Private payment evidence | Done |
+| SEC-04 | Private payment evidence | Done (Agent 14: PublicFile purpose allowlist) |
 | SEC-05 | No secrets in frontend / git | Done (env-only) |
 | SEC-06 | PDPA-aware retention policy docs | Partial |
-| SEC-07 | Rate limits auth + public checkout/tracking + coarse API | Done |
-| SEC-08 | Security headers (CSP, HSTS, etc.) | Done |
+| SEC-07 | Rate limits auth + public checkout/tracking + coarse API | Done (Agent 14: X-Real-IP; prod fail-closed coarse limiter) |
+| SEC-08 | Security headers (CSP, HSTS, etc.) | Done (API + web CSP; CookieSecure forced in prod) |
 
-**Known risks to track:** membership role expansion must not widen owner-only checks incorrectly; public file endpoints must stay published-only; evidence URLs stay authz-gated; AI keys never logged.
+**Known risks to track:** membership role expansion must not widen owner-only checks incorrectly; public file endpoints must stay purpose-allowlisted; evidence URLs stay authz-gated; AI keys never logged; SEC-06 PDPA owner/counsel.
 
 ---
 
@@ -613,18 +613,18 @@ Do not skip acceptance gates.
 
 | ID | Scenario | Target stage | Current |
 | --- | --- | --- | --- |
-| E2E-A | Multi-store isolation | 1 | Covered (Playwright multi-store) |
-| E2E-B | PDF catalog → products → flipbook hotspot checkout | 3 | Done (API chain; Playwright deferred to stage smoke) |
-| E2E-C | Admin order entry | 1 | Missing |
+| E2E-A | Multi-store isolation | 1 | Done (Playwright + Stage 3 smoke) |
+| E2E-B | PDF catalog → products → flipbook hotspot checkout | 3 | Done (API chain; UI deferred) |
+| E2E-C | Admin order entry | 1 | Done (API admin order/CSV; UI Playwright deferred) |
 | E2E-D | Purchasing aggregation | 2 | Done (API + workspace; Playwright deferred) |
-| E2E-E | Partial availability allocation | 2 | Partial |
+| E2E-E | Partial availability allocation | 2 | Done (API unavailable + partial receiving) |
 | E2E-F | Financial reconciliation (300k/250k/110k → 190k payable, 60k refund) | 2 | Done (API) |
-| E2E-G | Store credit apply | 2 | Done (API, flag) |
+| E2E-G | Store credit apply | 2 | Done (API, flag; remaining-due cap) |
 | E2E-H | Consolidated payment | 2 | Done (API) |
 | E2E-I | Packing flow | 2 | Done (API) |
 | E2E-J | Address change | 2 | Done (API) |
 | E2E-K | Live shopping session | 3 | Done (API concurrency; Agent 12) |
-| E2E-L | Concurrency (stock/quota) | 1–3 | Partial tests |
+| E2E-L | Concurrency (stock/quota) | 1–3 | Done (API: live/purchasing/refund versions) |
 | E2E-M | Portal security (no cross-customer) | 2 | Done (API IDOR) |
 | E2E-N | Domain migration readiness (env-only) | 3 | Code ready; cutover owner |
 

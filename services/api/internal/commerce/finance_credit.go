@@ -199,6 +199,16 @@ func (s *Service) ApplyStoreCreditToOrder(ctx context.Context, storeID, actorID 
 	}
 	defer tx.Rollback(ctx)
 
+	// Cap credit against remaining due so payable cannot be driven artificially
+	// into refund entitlement (REF-03 / money integrity).
+	fin, err := s.recomputeSettlementTx(ctx, tx, storeID, in.OrderID)
+	if err != nil {
+		return nil, err
+	}
+	if in.AmountIDR > fin.RemainingDueIDR {
+		return nil, ErrInvalidInput
+	}
+
 	var bal int64
 	var ver int
 	err = tx.QueryRow(ctx, `
