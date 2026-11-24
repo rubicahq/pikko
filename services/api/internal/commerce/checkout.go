@@ -406,6 +406,7 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 	var batch *PreorderBatch
 	var batchName, batchSlug *string
 	var etaStart, etaEnd *time.Time
+	var campaignID *uuid.UUID
 	if batchID != nil {
 		batch, err = s.assertBatchOpenForCheckout(ctx, st.ID, *batchID)
 		if err != nil {
@@ -415,6 +416,14 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 		batchSlug = &batch.Slug
 		etaStart = batch.ETAStart
 		etaEnd = batch.ETAEnd
+		var cid uuid.UUID
+		cerr := s.DB.QueryRow(ctx, `
+			SELECT campaign_id FROM preorder_batches
+			WHERE id=$1 AND store_id=$2 AND campaign_id IS NOT NULL
+		`, *batchID, st.ID).Scan(&cid)
+		if cerr == nil {
+			campaignID = &cid
+		}
 	}
 
 	tx, err := s.DB.Begin(ctx)
@@ -474,7 +483,8 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 			customer_notes, payment_deadline_at, confirmed_at,
 			preorder_batch_id, batch_name_snapshot, batch_slug_snapshot,
 			batch_eta_start_snapshot, batch_eta_end_snapshot,
-			requires_approval, approval_deadline_at
+			requires_approval, approval_deadline_at,
+			source, campaign_id
 		) VALUES (
 			$1,$2,$3,$4,$5,
 			$6,'unpaid',$7,$8,
@@ -485,7 +495,8 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 			$25,$26,$27,
 			$28,$29,$30,
 			$31,$32,
-			$33,$34
+			$33,$34,
+			'customer',$35
 		)
 		RETURNING id
 	`, st.ID, customerID, orderNumber, in.IdempotencyKey, sellingModel,
@@ -498,6 +509,7 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 		batchID, batchName, batchSlug,
 		etaStart, etaEnd,
 		eval.RequiresApproval, approvalDeadline,
+		campaignID,
 	).Scan(&orderID)
 	if err != nil {
 		return nil, err

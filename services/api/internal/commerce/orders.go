@@ -73,7 +73,8 @@ func (s *Service) ListOrders(ctx context.Context, storeID uuid.UUID, f ListOrder
 		       customer_notes, internal_notes, cancel_reason,
 		       payment_deadline_at, confirmed_at, completed_at, cancelled_at,
 		       created_at, updated_at,
-		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval
+		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval,
+		       source, created_by_user_id, campaign_id
 		FROM orders WHERE `+w+`
 		ORDER BY created_at DESC
 		LIMIT $`+fmt.Sprint(n)+` OFFSET $`+fmt.Sprint(n+1), args...)
@@ -109,9 +110,13 @@ func scanOrder(row scannable) (*Order, error) {
 		&o.PaymentDeadlineAt, &o.ConfirmedAt, &o.CompletedAt, &o.CancelledAt,
 		&o.CreatedAt, &o.UpdatedAt,
 		&o.PreorderBatchID, &o.BatchNameSnapshot, &o.BatchSlugSnapshot, &o.RequiresApproval,
+		&o.Source, &o.CreatedByUserID, &o.CampaignID,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if o.Source == "" {
+		o.Source = OrderSourceCustomer
 	}
 	return &o, nil
 }
@@ -132,7 +137,8 @@ func (s *Service) GetOrder(ctx context.Context, storeID, orderID uuid.UUID) (*Or
 		       customer_notes, internal_notes, cancel_reason,
 		       payment_deadline_at, confirmed_at, completed_at, cancelled_at,
 		       created_at, updated_at,
-		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval
+		       preorder_batch_id, batch_name_snapshot, batch_slug_snapshot, requires_approval,
+		       source, created_by_user_id, campaign_id
 		FROM orders WHERE id=$1 AND store_id=$2
 	`, orderID, storeID)
 	o, err := scanOrder(row)
@@ -153,7 +159,9 @@ func (s *Service) GetOrder(ctx context.Context, storeID, orderID uuid.UUID) (*Or
 func (s *Service) listOrderItems(ctx context.Context, storeID, orderID uuid.UUID) ([]OrderItem, error) {
 	rows, err := s.DB.Query(ctx, `
 		SELECT id, product_id, variant_id, batch_id, product_name, product_slug, sku, variant_label,
-		       unit_price_idr, quantity, line_total_idr
+		       unit_price_idr, quantity, COALESCE(original_quantity, quantity), line_total_idr,
+		       COALESCE(availability_status, 'available'), COALESCE(allocated_qty, 0), COALESCE(packed_qty, 0),
+		       adjusted_line_total_idr
 		FROM order_items WHERE order_id=$1 AND store_id=$2 ORDER BY created_at
 	`, orderID, storeID)
 	if err != nil {
@@ -165,7 +173,8 @@ func (s *Service) listOrderItems(ctx context.Context, storeID, orderID uuid.UUID
 		var it OrderItem
 		if err := rows.Scan(
 			&it.ID, &it.ProductID, &it.VariantID, &it.BatchID, &it.ProductName, &it.ProductSlug, &it.SKU, &it.VariantLabel,
-			&it.UnitPriceIDR, &it.Quantity, &it.LineTotalIDR,
+			&it.UnitPriceIDR, &it.Quantity, &it.OriginalQuantity, &it.LineTotalIDR,
+			&it.AvailabilityStatus, &it.AllocatedQty, &it.PackedQty, &it.AdjustedLineTotalIDR,
 		); err != nil {
 			return nil, err
 		}

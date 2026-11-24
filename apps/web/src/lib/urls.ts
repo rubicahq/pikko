@@ -42,6 +42,8 @@ export const urls = {
   storeTeam: (storeId: string) => `/stores/${storeId}/team`,
   inviteAccept: (token: string) => `/invites/accept?token=${encodeURIComponent(token)}`,
   storeOrders: (storeId: string) => `/stores/${storeId}/orders`,
+  storeOrderNew: (storeId: string) => `/stores/${storeId}/orders/new`,
+  storeOrderImport: (storeId: string) => `/stores/${storeId}/orders/import`,
   storeOrder: (storeId: string, orderId: string) => `/stores/${storeId}/orders/${orderId}`,
   storeCustomers: (storeId: string) => `/stores/${storeId}/customers`,
   storeCustomer: (storeId: string, customerId: string) =>

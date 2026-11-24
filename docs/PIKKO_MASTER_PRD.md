@@ -304,11 +304,11 @@ See LIVE-01–03. Agent 12. Not video infrastructure. Focus: structured rapid or
 | ORD-02 | Manual bank transfer; evidence upload; verify/reject | Done |
 | ORD-03 | Tracking token ≥256-bit; hash only stored | Done |
 | ORD-04 | Multi-dimensional statuses: order / payment / fulfillment | Done (order-level) |
-| ORD-05 | Order-item level status + operations (split, adjust qty, unavailable) | Partial (allocations on preorder) |
-| ORD-06 | Admin-assisted order entry | Missing |
-| ORD-07 | Spreadsheet / bulk order entry | Missing |
-| ORD-08 | CSV order export/import | Partial (catalog CSV only) |
-| ORD-09 | Historical revisions / immutable change log beyond status history | Partial (`order_status_history` only) |
+| ORD-05 | Order-item level status + operations (split, adjust qty, unavailable) | Partial (qty adjust + item events; allocations on preorder) |
+| ORD-06 | Admin-assisted order entry | Done |
+| ORD-07 | Spreadsheet / bulk order entry | Done |
+| ORD-08 | CSV order export/import | Done (order CSV import; catalog CSV preserved) |
+| ORD-09 | Historical revisions / immutable change log beyond status history | Done (`order_revisions` + status history) |
 | ORD-10 | Deposit + final payment schedules | Missing |
 | ORD-11 | Cart groups ready-stock vs per-batch; one group per submit | Done |
 

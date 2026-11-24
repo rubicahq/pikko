@@ -186,9 +186,9 @@ Domains today: `*.pikko.site`. `pikko.id` cutover is **manual owner action**, no
 This architecture documents support for:
 
 - Multi-store tenancy — **implemented**
-- Order-item operations — **partial; target model defined**
+- Order-item operations — **partial; qty adjust + availability columns (Agent 05); split/unavailable finance later**
 - Purchasing allocations — **implemented for preorder batches**
-- Historical revisions — **status history live; full revision model planned additive**
+- Historical revisions — **status history + `order_revisions` / `order_item_events` (Agent 05)**
 - Financial reconciliation — **payments live; ledger/refund/credit planned for Agent 07**
 
 No application feature code in Agent 01 scope.

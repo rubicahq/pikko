@@ -44,13 +44,37 @@ export default async function OrdersPage({
     <div className="mx-auto max-w-dashboard space-y-8">
       <PageHeader
         title="Orders"
-        description="Review customer orders, verify bank transfers, and update fulfillment."
+        description="Review customer and admin orders, verify bank transfers, and update fulfillment."
+        actions={
+          <>
+            <Link
+              href={`/stores/${storeId}/orders/import`}
+              className="inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium text-foreground hover:bg-background-subtle"
+            >
+              Import CSV
+            </Link>
+            <Link
+              href={`/stores/${storeId}/orders/new`}
+              className="inline-flex h-10 items-center rounded-md bg-dark px-4 text-sm font-medium text-foreground-inverse hover:bg-foreground"
+            >
+              New order
+            </Link>
+          </>
+        }
       />
 
       {orders.length === 0 ? (
         <EmptyState
           title="No orders yet"
-          description="Share your storefront to start receiving orders."
+          description="Share your storefront or create an order manually."
+          action={
+            <Link
+              href={`/stores/${storeId}/orders/new`}
+              className="text-sm font-medium text-brand-accessible-dark underline"
+            >
+              Create admin order
+            </Link>
+          }
         />
       ) : (
         <Table stickyHeader>
