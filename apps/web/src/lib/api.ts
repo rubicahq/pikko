@@ -226,5 +226,24 @@ export type StoredFile = {
 };
 
 export function formatIDR(amount: number): string {
-  return `Rp${Math.trunc(amount).toLocaleString("id-ID")}`;
+  return `Rp${formatIDRDigits(amount)}`;
+}
+
+/** Thousand-separated digits only (id-ID), e.g. 175000 → "175.000". */
+export function formatIDRDigits(amount: number): string {
+  return Math.trunc(amount).toLocaleString("id-ID");
+}
+
+/** Parse a typed IDR field (strips dots/spaces/Rp); empty → null. */
+export function parseIDRInput(raw: string): number | null {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+  const n = Number.parseInt(digits, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+/** Mask raw keystrokes into thousand-separated digits while typing. */
+export function maskIDRInput(raw: string): string {
+  const n = parseIDRInput(raw);
+  return n == null ? "" : formatIDRDigits(n);
 }

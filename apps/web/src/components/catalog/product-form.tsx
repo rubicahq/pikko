@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, apiUpload, formatIDR, type Category, type Product } from "@/lib/api";
+import { apiFetch, apiUpload, formatIDRDigits, maskIDRInput, parseIDRInput, type Category, type Product } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,9 @@ export function ProductForm({
   const [name, setName] = useState(product?.name || "");
   const [sku, setSku] = useState(product?.sku || "");
   const [description, setDescription] = useState(product?.description || "");
-  const [price, setPrice] = useState(String(product?.base_price_idr ?? ""));
+  const [price, setPrice] = useState(
+    product?.base_price_idr != null ? formatIDRDigits(product.base_price_idr) : "",
+  );
   const [categoryId, setCategoryID] = useState(product?.category_id || "");
   const [status, setStatus] = useState(product?.status || "draft");
   const [readyStock, setReadyStock] = useState(product?.ready_stock_eligible ?? true);
@@ -51,8 +53,8 @@ export function ProductForm({
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const base = Number.parseInt(price.replace(/\D/g, ""), 10);
-    if (!name.trim() || Number.isNaN(base) || base < 0) {
+    const base = parseIDRInput(price);
+    if (!name.trim() || base == null || base < 0) {
       setError("Name and a valid IDR price are required.");
       setSaving(false);
       return;
@@ -119,15 +121,11 @@ export function ProductForm({
         <Input
           id="price"
           inputMode="numeric"
+          autoComplete="off"
           value={price}
-          onChange={(e) => setPrice(e.target.value)}
+          onChange={(e) => setPrice(maskIDRInput(e.target.value))}
           required
         />
-        {price && !Number.isNaN(Number.parseInt(price.replace(/\D/g, ""), 10)) && (
-          <p className="text-xs text-foreground-muted">
-            {formatIDR(Number.parseInt(price.replace(/\D/g, ""), 10))}
-          </p>
-        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="description">Description</Label>

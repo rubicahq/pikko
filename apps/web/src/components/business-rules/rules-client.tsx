@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiFetch, formatIDR } from "@/lib/api";
+import { ApiError, apiFetch, formatIDR, formatIDRDigits, maskIDRInput, parseIDRInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,14 +45,14 @@ export function RulesClient({
   const [scopeModel, setScopeModel] = useState("preorder");
   const [scopeBatch, setScopeBatch] = useState("");
   const [feeMode, setFeeMode] = useState("fixed");
-  const [feeFixed, setFeeFixed] = useState("10000");
+  const [feeFixed, setFeeFixed] = useState(formatIDRDigits(10000));
   const [feePercent, setFeePercent] = useState("5");
-  const [minSubtotal, setMinSubtotal] = useState("100000");
+  const [minSubtotal, setMinSubtotal] = useState(formatIDRDigits(100000));
   const [minQty, setMinQty] = useState("2");
 
   const [previewModel, setPreviewModel] = useState("preorder");
   const [previewBatch, setPreviewBatch] = useState("");
-  const [previewSubtotal, setPreviewSubtotal] = useState("200000");
+  const [previewSubtotal, setPreviewSubtotal] = useState(formatIDRDigits(200000));
   const [previewQty, setPreviewQty] = useState("3");
   const [previewResult, setPreviewResult] = useState<{
     handling_fee_idr?: number;
@@ -79,17 +79,34 @@ export function RulesClient({
   function buildConfig() {
     if (ruleType === "handling_fee") {
       if (feeMode === "fixed") {
-        return { fee_mode: "fixed", fee_fixed_idr: Number(feeFixed) };
+        return { fee_mode: "fixed", fee_fixed_idr: parseIDRInput(feeFixed) ?? 0 };
       }
       return { fee_mode: "percent", fee_percent: Number(feePercent) };
     }
     if (ruleType === "minimum_order") {
+      const minSub = parseIDRInput(minSubtotal);
       return {
-        min_subtotal_idr: minSubtotal ? Number(minSubtotal) : undefined,
+        min_subtotal_idr: minSub ?? undefined,
         min_quantity: minQty ? Number(minQty) : undefined,
       };
     }
     return { require_approval: true };
+  }
+
+  function ruleConfigSummary(r: Rule): string {
+    const c = r.config || {};
+    if (r.rule_type === "handling_fee") {
+      if (c.fee_mode === "percent" && c.fee_percent != null) return `${c.fee_percent}%`;
+      if (c.fee_fixed_idr != null) return formatIDR(c.fee_fixed_idr);
+      return "—";
+    }
+    if (r.rule_type === "minimum_order") {
+      const parts: string[] = [];
+      if (c.min_subtotal_idr != null) parts.push(formatIDR(c.min_subtotal_idr));
+      if (c.min_quantity != null) parts.push(`qty ≥ ${c.min_quantity}`);
+      return parts.length ? parts.join(" · ") : "—";
+    }
+    return "Approval";
   }
 
   return (
@@ -194,7 +211,12 @@ export function RulesClient({
               {feeMode === "fixed" ? (
                 <div className="space-y-2">
                   <Label>Fixed amount</Label>
-                  <Input value={feeFixed} onChange={(e) => setFeeFixed(e.target.value)} />
+                  <Input
+                    inputMode="numeric"
+                    autoComplete="off"
+                    value={feeFixed}
+                    onChange={(e) => setFeeFixed(maskIDRInput(e.target.value))}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -208,7 +230,12 @@ export function RulesClient({
             <>
               <div className="space-y-2">
                 <Label>Min subtotal (IDR)</Label>
-                <Input value={minSubtotal} onChange={(e) => setMinSubtotal(e.target.value)} />
+                <Input
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={minSubtotal}
+                  onChange={(e) => setMinSubtotal(maskIDRInput(e.target.value))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Min quantity</Label>
@@ -233,6 +260,7 @@ export function RulesClient({
                 <th className="px-4 py-3">Name</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Scope</th>
+                <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Version</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -246,6 +274,7 @@ export function RulesClient({
                     {r.scope_type}
                     {r.scope_selling_model ? ` · ${r.scope_selling_model}` : ""}
                   </td>
+                  <td className="px-4 py-3 tabular-nums">{ruleConfigSummary(r)}</td>
                   <td className="px-4 py-3 tabular-nums">v{r.current_version}</td>
                   <td className="px-4 py-3 text-right">
                     <Button
@@ -267,7 +296,7 @@ export function RulesClient({
               ))}
               {rules.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-foreground-secondary">
+                  <td colSpan={6} className="px-4 py-8 text-center text-foreground-secondary">
                     No rules yet. Defaults apply: no handling fee, no minimum, no approval.
                   </td>
                 </tr>
@@ -301,7 +330,7 @@ export function RulesClient({
                 body: {
                   selling_model: previewModel,
                   batch_id: previewBatch || undefined,
-                  subtotal_idr: Number(previewSubtotal),
+                  subtotal_idr: parseIDRInput(previewSubtotal) ?? 0,
                   item_quantity: Number(previewQty),
                   fulfillment_method: "pickup",
                 },
@@ -338,7 +367,12 @@ export function RulesClient({
           </div>
           <div className="space-y-2">
             <Label>Subtotal</Label>
-            <Input value={previewSubtotal} onChange={(e) => setPreviewSubtotal(e.target.value)} />
+            <Input
+              inputMode="numeric"
+              autoComplete="off"
+              value={previewSubtotal}
+              onChange={(e) => setPreviewSubtotal(maskIDRInput(e.target.value))}
+            />
           </div>
           <div className="space-y-2">
             <Label>Quantity</Label>

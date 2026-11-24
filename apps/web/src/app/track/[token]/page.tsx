@@ -21,6 +21,7 @@ type Tracking = {
     total_idr: number;
     subtotal_idr: number;
     shipping_fee_idr: number;
+    handling_fee_idr?: number;
     fulfillment_method: string;
     customer_name: string;
     payment_deadline_at?: string | null;
@@ -135,15 +136,32 @@ export default function TrackingPage() {
               <li key={i} className="flex justify-between gap-3">
                 <span>
                   {it.product_name} × {it.quantity}
+                  <span className="text-foreground-muted"> · {formatIDR(it.unit_price_idr)}</span>
                 </span>
                 <span className="tabular-nums">{formatIDR(it.line_total_idr)}</span>
               </li>
             ))}
           </ul>
-          <div className="mt-4 border-t border-border pt-3 text-sm">
+          <div className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
             <div className="flex justify-between">
+              <span>Subtotal</span>
+              <span className="tabular-nums">{formatIDR(o.subtotal_idr)}</span>
+            </div>
+            {(o.handling_fee_idr ?? 0) > 0 ? (
+              <div className="flex justify-between">
+                <span>Handling fee</span>
+                <span className="tabular-nums">{formatIDR(o.handling_fee_idr || 0)}</span>
+              </div>
+            ) : null}
+            {(o.shipping_fee_idr ?? 0) > 0 ? (
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="tabular-nums">{formatIDR(o.shipping_fee_idr)}</span>
+              </div>
+            ) : null}
+            <div className="flex justify-between pt-1 font-medium">
               <span>Total</span>
-              <span className="font-medium tabular-nums">{formatIDR(o.total_idr)}</span>
+              <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
             </div>
           </div>
         </section>

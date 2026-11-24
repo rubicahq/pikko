@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiFetch, formatIDR } from "@/lib/api";
+import { ApiError, apiFetch, formatIDR, maskIDRInput, parseIDRInput } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -200,7 +200,7 @@ export function BatchDetailClient({
                   method: "POST",
                   body: {
                     product_id: productId,
-                    price_override_idr: priceOverride ? Number(priceOverride) : undefined,
+                    price_override_idr: parseIDRInput(priceOverride) ?? undefined,
                     quantity_limit: qtyLimit ? Number(qtyLimit) : undefined,
                     availability: "available",
                   },
@@ -232,8 +232,9 @@ export function BatchDetailClient({
               <Input
                 id="batch-price"
                 value={priceOverride}
-                onChange={(e) => setPriceOverride(e.target.value)}
+                onChange={(e) => setPriceOverride(maskIDRInput(e.target.value))}
                 inputMode="numeric"
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
