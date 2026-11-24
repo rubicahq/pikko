@@ -3,9 +3,9 @@
 **Date:** 2026-11-25 (Asia/Jakarta)  
 **PRD:** v3.0 (`docs/PIKKO_MASTER_PRD.md`)  
 **Branch:** `cursor/agent-12-live-shopping-5fd1`  
-**Prior:** Agent 11 feature merge `6a51005` (PDF hardening); main tip may include later doc PRs  
-**Feature merge SHA:** _(filled after merge)_  
-**Merged main SHA:** _(filled after merge)_
+**Prior:** Agent 11 feature merge `6a51005` (PDF hardening); main tip includes handoff PR #30  
+**Feature merge SHA:** `b2a930782ca0a55ad47afe00b2282c70985fc380` (PR #31)  
+**Merged main SHA:** `b2a930782ca0a55ad47afe00b2282c70985fc380`
 
 ---
 
