@@ -1,61 +1,92 @@
-# Development Progress
+# Development Progress — PRD v3.0 Serial Agents
 
-## Scope
+**Program:** Agents 01–15 across Stages 1–3  
+**Foundation:** Prior v4 phases 0–7 live on `pikko.site` (`main` @ `353498a`)  
+**Policy:** Incremental delivery on existing modular monolith. No rewrite. No automatic `pikko.id` cutover.
 
-Phase 7 Official Go-to-Market **prep** (code + docs only): domain-agnostic configuration so pikko.site → pikko.id is env/nginx cutover, legacy redirect templates, launch runbook, and QA against PRD launch criteria. **No production DNS/VPS cutover executed.** Built on Phase 0–6 (`main` @ `2cfca6e+`). Also includes VPS backup script `sudo docker` fallback from `cursor/fix-backup-sudo-docker-86c4`.
+---
 
-## Completed
+## 1. What is reused (do not rebuild)
 
-### Phase 0–6 (prior)
+| Area | Reuse |
+| --- | --- |
+| Monorepo + Docker/VPS | As-is |
+| Auth magic link + sessions | Harden only |
+| Multi-store membership (owner) | Extend roles additively |
+| Design tokens + basic UI | Agent 02 expands |
+| Storefront + 24 themes | Preserve |
+| Catalog + variants + collections | Extend brands/attrs |
+| AI PDF/CSV + flipbook | Agent 11 hardens |
+| Checkout + bank transfer + tracking | Preserve |
+| Preorder batches + business rules | Campaign facade later |
+| Purchasing list + allocations | Agent 06 extends |
+| Notifications + analytics + customers | Extend |
+| Marketing site + SEO | Preserve |
+| job_queue + outbox + email_jobs | Extend event types |
+| Domain-agnostic config + LAUNCH prep | Keep; cutover owner-gated |
 
-- Auth, multi-store, storefront, catalog, AI PDF/CSV import, flipbook, ready-stock + preorder checkout, bank transfer, tracking, business rules, notifications, analytics, marketing site, production ops
+---
 
-### Phase 7 (this release)
+## 2. Stage plan mapped to Agents 02–15
 
-- Domain-agnostic: `APP_URL` alias, `LEGACY_BASE_DOMAIN`, `AUTH_COOKIE_DOMAIN`, email From defaults from `APP_BASE_DOMAIN`, redirect allowlist includes base+legacy, CORS defaults from surface URLs in prod/staging
-- Web: `lib/site.ts` for marketing/canonical/sitemap/support/storefront host; middleware 308 legacy host map (strips `token`); marketing copy uses env domain
-- Nginx: `emplicon-nginx.d-pikko.id.conf.example`, `emplicon-nginx.d-pikko.site-redirect.conf.example`
-- Compose/Docker build args for `NEXT_PUBLIC_APP_BASE_DOMAIN`, legacy, support email
-- `.env.production.pikko.id.example` + updated `.env.example`
-- `docs/LAUNCH.md` ordered cutover + owner checklist (rotate keys, SPF, Full strict, magic-link test)
-- Playwright Phase 7 domain smoke; Go URL/config tests for pikko.id
-- Backup scripts: prefer `docker`, fall back to `sudo docker` (merged from fix branch)
-- **No DB migration** for Phase 7
+### Stage 1 — Platform & Commerce Foundation
 
-## Not in this release (by design)
+| Agent | Scope | Depends on | Exit gate |
+| --- | --- | --- | --- |
+| **01 Lead Architect** | Audit + docs (this program) | — | Docs merged; architecture supports tenancy/item ops/purchasing/revisions/finance |
+| **02 Design System** | Expand tokens/components; Brex reference; nav/visual foundations | 01 handoff | DESIGN_SYSTEM complete; components cover PRD tables; no AI-generic look |
+| **03 Auth & Multi-Store** | Session hardening; additive RBAC schema; invite scaffolding if in scope | 02 | Auth regression green; role CHECK widened safely; STORE-06 path clear |
+| **04 Campaign & Catalog** | Campaign model (preorder+live prep); brands/attrs gaps | 03 | Catalog gaps addressed; preorder preserved |
+| **05 Order Management** | Item ops, admin entry foundation, revision log | 04 | ORD-05/06/09 partial→done per acceptance; no break checkout |
 
-- **Executing** DNS/TLS/env cutover to pikko.id (owner-only; needs explicit approval)
-- Brevo sender domain authentication on pikko.id (owner)
-- Invented subscription prices / counsel-final legal contracts
-- Payment gateway / refunds money movement
-- VPS SSH deploy by agent
+### Stage 2 — Jastiper Operations
 
-## Production requirements
+| Agent | Scope | Reuses | Exit gate |
+| --- | --- | --- | --- |
+| **06 Purchasing** | Vendors, multi-vendor, receiving handoff | PUR-01–03 | VEN/RCV + extended purchasing |
+| **07 Payments/Finance** | Reconciliation, refunds, store credit, E2E-F | FIN-01–03 | Ledger + REF-* + exact money tests |
+| **08 Customer Portal** | Auth portal beyond tracking | PORT-01, CRM | PORT-02–04; E2E-M |
+| **09 Packing/Shipment** | Pack queues, shipments | Fulfillment statuses | PACK/SHIP; E2E-I |
+| **10 Communication** | WhatsApp templates + email completeness; RBAC invites polish | notifications/email | WA registry; team invites usable |
 
-- No new migration
-- New optional env: `APP_URL`, `LEGACY_BASE_DOMAIN`, `AUTH_COOKIE_DOMAIN`, `NEXT_PUBLIC_APP_BASE_DOMAIN`, `NEXT_PUBLIC_LEGACY_BASE_DOMAIN`, `NEXT_PUBLIC_SUPPORT_EMAIL`
-- Cutover only via `docs/LAUNCH.md` after owner approval
-- Current production may remain on pikko.site until that approval
+### Stage 3 — Experience & Production Readiness
 
-## Test results
+| Agent | Scope | Reuses | Exit gate |
+| --- | --- | --- | --- |
+| **11 PDF/AI Catalog** | Reliability, limits, review UX | PDF-01–05 | Hardened import; no schema destruction |
+| **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | LIVE-*; E2E-K |
+| **13 Analytics** | North-star fulfilled items metric | analytics | AN-01 satisfied |
+| **14 Security/QA** | Threat pass, TEST_REPORT, E2E A–N | all e2e | Matrix accurate; critical gaps ticketed |
+| **15 Integration/Deploy** | Runbook validation; smoke; **no auto cutover** | deploy scripts | DEPLOYMENT_RUNBOOK current; owner checklist only for pikko.id |
 
-### Go
+---
 
-`cd services/api && go test ./... -count=1 -p 1`
+## 3. Agent 01 status
 
-### Frontend / Playwright
+| Deliverable | Status |
+| --- | --- |
+| `PIKKO_MASTER_PRD.md` | Done |
+| `ARCHITECTURE.md` | Done |
+| `DATABASE_SCHEMA.md` | Done |
+| `API_CONTRACTS.md` | Done |
+| `REQUIREMENTS_MATRIX.md` | Done |
+| `DEVELOPMENT_PROGRESS.md` | Done (this file) |
+| `DEPLOYMENT_RUNBOOK.md` | Done |
+| `docs/agents/01-lead-architect-handoff.md` | Done |
+| `DESIGN_SYSTEM.md` stub update | Done |
+| App feature code | **Not in scope** |
 
-`cd apps/web && npx tsc --noEmit && npm run lint && npm run build && npx playwright test`
+---
 
-## Decisions / open questions for product
+## 4. Open decisions (non-blocking for Agent 02)
 
-1. Explicit approval + date for pikko.id cutover
-2. Brevo pikko.id authentication + SPF
-3. Final commercial pricing and counsel legal pages
-4. Confirm VPS pull of main (includes backup sudo docker fix)
+1. Customer portal auth model: separate customer identities vs linked users (Agent 08 decides with 01 note preferring separate).
+2. Campaign table vs facade over `preorder_batches` + `live_sessions` (Agent 04).
+3. Commercial pricing / counsel legal — owner (unchanged).
+4. pikko.id cutover date — owner only.
 
-## Known limitations
+---
 
-- Pricing remains early-access framing until business decision
-- Legal pages are working notices until counsel replaces them
-- Legacy magic-link emails pointing at pikko.site require a new link after redirect (tokens not forwarded)
+## 5. Historical v4 progress (reference)
+
+Phases 0–7 completed on pikko.site: foundation, auth, storefront/catalog/import, checkout, preorder/rules, merchant efficiency, marketing/ops, domain cutover **prep**. See prior `PRODUCT_REQUIREMENTS.md` and phase handoffs in project store `internal/phase-*-handoff.md`.

@@ -1,5 +1,7 @@
 # API Reference (Phase 0–6)
 
+> **v3.0 note:** Prefer `docs/API_CONTRACTS.md` for conventions + complete inventory. This file is retained as historical phase commentary.
+
 Base path: `/api/v1`. Errors: `{ "error": { "code", "message", "request_id" } }`.
 
 ## Auth / account / stores
