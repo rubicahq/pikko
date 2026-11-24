@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS audit_logs;
+DROP TABLE IF EXISTS email_jobs;
+DROP TABLE IF EXISTS auth_rate_limits;
+DROP TABLE IF EXISTS onboarding_drafts;
+DROP TABLE IF EXISTS store_slug_aliases;
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_last_store_id_fkey;
+DROP TABLE IF EXISTS store_memberships;
+DROP TABLE IF EXISTS stores;
+DROP TABLE IF EXISTS user_preferences;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS authentication_tokens;
+DROP TABLE IF EXISTS users;

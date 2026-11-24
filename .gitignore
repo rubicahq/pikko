@@ -1,0 +1,46 @@
+# env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# deps / build
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+
+# go
+services/api/bin/
+*.exe
+*.test
+/tmp/
+
+# data
+.data/
+postgres_data/
+
+# test / playwright
+test-results/
+playwright-report/
+blob-report/
+coverage/
+apps/web/test-results/
+apps/web/playwright-report/
+
+# next generated agent rules
+apps/web/AGENTS.md
+
+# ide / os
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+
+# logs
+*.log
+npm-debug.log*
