@@ -1,9 +1,10 @@
-# Database Schema (Phase 0–2)
+# Database Schema (Phase 0–2 + AI import)
 
 Migrations:
 
-- `000001_phase1_auth_stores.up.sql`
-- `000002_phase2_storefront_catalog.up.sql`
+- `000001_phase1_auth_stores.up.sql` — auth / stores
+- `000002_phase2_storefront_catalog.up.sql` — products / storefront
+- `000003_ai_pdf_import.up.sql` — import jobs, job queue, catalog pages/hotspots
 
 ## Phase 1 tables
 
@@ -32,3 +33,16 @@ Hotspots should reference `products.id` (UUID) within the same `store_id`. Only 
 ## Defaults on store create
 
 Theme `pikko_signature`, draft `storefront_configs` row, currency IDR, timezone Asia/Jakarta, locale id-ID, publication draft, checkout false.
+
+## AI import & flipbook foundation (`000003`)
+
+| Table | Purpose |
+| --- | --- |
+| `job_queue` | PostgreSQL job queue with idempotency + SKIP LOCKED claims |
+| `outbox_events` | Transactional outbox for import domain events |
+| `catalog_import_jobs` | PDF import job status/progress (one PDF per job) |
+| `catalog_import_items` | Reviewable extracted items + optional bbox hotspot candidates |
+| `catalog_pages` | Flipbook page images (`draft`/`published`) |
+| `catalog_page_hotspots` | Hotspots linking pages → `products.id` (store-scoped) |
+
+`stored_files.purpose` also allows `catalog_pdf`, `catalog_page`, `import_crop`.

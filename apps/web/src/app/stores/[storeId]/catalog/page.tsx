@@ -37,9 +37,14 @@ export default async function CatalogPage({
             Products, categories, images, and publication status for {store.name}.
           </p>
         </div>
-        <Button asChild>
-          <Link href={urls.storeCatalogNew(storeId)}>Add product</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href={urls.catalogImport(storeId)}>Import PDF</Link>
+          </Button>
+          <Button asChild>
+            <Link href={urls.storeCatalogNew(storeId)}>Add product</Link>
+          </Button>
+        </div>
       </div>
 
       <CategoryManager storeId={storeId} categories={categories} />

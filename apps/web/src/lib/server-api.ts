@@ -14,7 +14,7 @@ import type {
 const API = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 const COOKIE = process.env.AUTH_COOKIE_NAME || "pikko_session";
 
-async function serverFetch<T>(path: string, auth = true): Promise<T | null> {
+export async function serverFetch<T>(path: string, auth = true): Promise<T | null> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (auth) {
     const jar = await cookies();

@@ -44,6 +44,8 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(), `
 		TRUNCATE audit_logs, email_jobs, auth_rate_limits, onboarding_drafts,
+		         outbox_events, job_queue,
+		         catalog_page_hotspots, catalog_pages, catalog_import_items, catalog_import_jobs,
 		         storefront_featured_collections, storefront_featured_products,
 		         storefront_banners, storefront_configs,
 		         collection_products, collections,
@@ -98,7 +100,7 @@ func TestProductCRUDAndCrossStoreIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := cfg()
-	router := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: store})
+	router, _ := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: store})
 	storeSvc := &stores.Service{DB: pool, Cfg: c}
 
 	userA, tokenA := signIn(t, pool, "catalog-a@example.com")

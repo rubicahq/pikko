@@ -30,14 +30,23 @@ Phase 2 products are the stable target for later flipbook catalog pages and chec
 - `GET /api/v1/public/stores/{slug}/products`
 - `GET /api/v1/public/stores/{slug}/products/{productSlug}` → includes `link_ref` and `product_url`
 
-## Suggested hotspot row (future worker)
+## Catalog pages & hotspots
+
+Migration `000003` introduces:
 
 ```
+catalog_pages (
+  id, store_id, image_file_id, display_order,
+  status draft|published, source_import_job_id, page_number
+)
+
 catalog_page_hotspots (
   id, store_id, catalog_page_id,
   product_id REFERENCES products(id),
-  x_pct, y_pct, width_pct, height_pct
+  import_item_id, x_pct, y_pct, width_pct, height_pct
 )
 ```
 
-Always scope by `store_id` and authorize membership; resolve checkout only for `status=published` products in the same store.
+AI PDF import renders each PDF page into a draft `catalog_pages` row and stores normalized bounding boxes on `catalog_import_items`. Confirming selected items creates draft products and optional hotspot candidates (`product_id` + bbox on the matching page).
+
+Always scope by `store_id` and authorize membership; resolve checkout only for `status=published` products in the same store. Public flipbook surfaces must never expose draft products or draft catalog pages.
