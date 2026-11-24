@@ -156,6 +156,7 @@ Preorder routes remain; gated by `campaign.*` and sync into `campaigns`.
 | GET | `/stores/{storeID}/catalog-imports/{jobID}` |
 | GET | `/stores/{storeID}/catalog-imports/{jobID}/items` |
 | PATCH/DELETE | `…/items/{itemID}` |
+| POST | `…/items/bulk` (`select_all` / `reject_all` / `reject_uncertain` / `accept_high_confidence` / `set`) |
 | POST | `…/confirm` / `…/retry` |
 | GET | `/stores/{storeID}/catalog-pages` |
 | PUT | `/stores/{storeID}/catalog-pages/order` |

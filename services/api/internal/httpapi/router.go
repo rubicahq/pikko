@@ -220,6 +220,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}", storePerm(rbac.PermCatalogRead, impH.Get))
 	mux.Handle("GET /api/v1/stores/{storeID}/catalog-imports/{jobID}/items", storePerm(rbac.PermCatalogRead, impH.ListItems))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storePerm(rbac.PermCatalogWrite, impH.PatchItem))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/bulk", storePerm(rbac.PermCatalogWrite, impH.BulkItems))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-imports/{jobID}/items/{itemID}", storePerm(rbac.PermCatalogWrite, impH.DeleteItem))
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/confirm", storePerm(rbac.PermCatalogWrite, impH.Confirm))
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/retry", storePerm(rbac.PermCatalogWrite, impH.Retry))

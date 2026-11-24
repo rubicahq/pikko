@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { urls } from "@/lib/urls";
@@ -27,14 +27,19 @@ type Page = {
 
 type ProductOpt = { id: string; name: string; status: string };
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
 export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeSlug: string }) {
   const [pages, setPages] = useState<Page[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [selectedPage, setSelectedPage] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [productId, setProductId] = useState<string>("");
+  const [dragging, setDragging] = useState<string | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     const [pRes, prodRes] = await Promise.all([
@@ -44,18 +49,17 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
     if (pRes.ok) {
       const data = await pRes.json();
       setPages(data.pages || []);
-      if (!selectedPage && data.pages?.[0]) setSelectedPage(data.pages[0].id);
+      setSelectedPage((prev) => prev || data.pages?.[0]?.id || null);
     }
     if (prodRes.ok) {
       const data = await prodRes.json();
       setProducts((data.products || []).map((p: ProductOpt) => ({ id: p.id, name: p.name, status: p.status })));
     }
-  }, [storeId, selectedPage]);
+  }, [storeId]);
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeId]);
+  }, [load]);
 
   const page = pages.find((p) => p.id === selectedPage) || null;
 
@@ -96,6 +100,10 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
       setError("Select a product before placing a hotspot.");
       return;
     }
+    const width = 10;
+    const height = 10;
+    const xPct = clamp(x, 0, 100 - width);
+    const yPct = clamp(y, 0, 100 - height);
     const res = await fetch(
       urls.api(`/api/v1/stores/${storeId}/catalog-pages/${page.id}/hotspots`),
       {
@@ -104,19 +112,50 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product_id: productId,
-          x_pct: Math.max(0, Math.min(90, x)),
-          y_pct: Math.max(0, Math.min(90, y)),
-          width_pct: 10,
-          height_pct: 10,
+          x_pct: xPct,
+          y_pct: yPct,
+          width_pct: width,
+          height_pct: height,
         }),
       },
     );
     if (!res.ok) {
-      setError("Unable to create hotspot.");
+      const data = await res.json().catch(() => null);
+      setError(data?.error?.message || "Unable to create hotspot.");
       return;
     }
     setMessage("Hotspot added.");
+    setError(null);
     await load();
+  }
+
+  async function updateHotspot(hs: Hotspot, x: number, y: number) {
+    const xPct = clamp(x, 0, 100 - hs.width_pct);
+    const yPct = clamp(y, 0, 100 - hs.height_pct);
+    setPages((prev) =>
+      prev.map((p) =>
+        p.id !== page?.id
+          ? p
+          : {
+              ...p,
+              hotspots: (p.hotspots || []).map((h) =>
+                h.id === hs.id ? { ...h, x_pct: xPct, y_pct: yPct } : h,
+              ),
+            },
+      ),
+    );
+    await fetch(urls.api(`/api/v1/stores/${storeId}/catalog-pages/hotspots/${hs.id}`), {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: hs.product_id,
+        x_pct: xPct,
+        y_pct: yPct,
+        width_pct: hs.width_pct,
+        height_pct: hs.height_pct,
+      }),
+    });
   }
 
   async function deleteHotspot(id: string) {
@@ -203,13 +242,14 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
                   </select>
                 </label>
                 <p className="text-xs text-foreground-secondary">
-                  Click the page to place a 10%×10% hotspot. Drag existing hotspots via delete + re-add
-                  for MVP positioning.
+                  Click the page to place a hotspot. Drag an existing hotspot to reposition it.
                 </p>
               </div>
               <div
+                ref={pageRef}
                 className="relative max-w-2xl border border-border bg-background"
                 onClick={(e) => {
+                  if (dragging) return;
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = ((e.clientX - rect.left) / rect.width) * 100 - 5;
                   const y = ((e.clientY - rect.top) / rect.height) * 100 - 5;
@@ -217,24 +257,69 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
                 }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={page.image_url} alt="" className="w-full" draggable={false} />
+                <img src={page.image_url} alt="" className="w-full select-none" draggable={false} />
                 {(page.hotspots || []).map((hs) => (
                   <div
                     key={hs.id}
-                    className="absolute border border-brand bg-brand/15"
+                    className="absolute cursor-grab border border-brand bg-brand/15 active:cursor-grabbing"
                     style={{
                       left: `${hs.x_pct}%`,
                       top: `${hs.y_pct}%`,
                       width: `${hs.width_pct}%`,
                       height: `${hs.height_pct}%`,
+                      minWidth: 24,
+                      minHeight: 24,
                     }}
                     onClick={(e) => e.stopPropagation()}
-                    onMouseDown={() => setDrag({ x: hs.x_pct, y: hs.y_pct })}
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      setDragging(hs.id);
+                      const target = pageRef.current;
+                      if (!target) return;
+                      const onMove = (ev: PointerEvent) => {
+                        const rect = target.getBoundingClientRect();
+                        const x = ((ev.clientX - rect.left) / rect.width) * 100 - hs.width_pct / 2;
+                        const y = ((ev.clientY - rect.top) / rect.height) * 100 - hs.height_pct / 2;
+                        setPages((prev) =>
+                          prev.map((p) =>
+                            p.id !== page.id
+                              ? p
+                              : {
+                                  ...p,
+                                  hotspots: (p.hotspots || []).map((h) =>
+                                    h.id === hs.id
+                                      ? {
+                                          ...h,
+                                          x_pct: clamp(x, 0, 100 - h.width_pct),
+                                          y_pct: clamp(y, 0, 100 - h.height_pct),
+                                        }
+                                      : h,
+                                  ),
+                                },
+                          ),
+                        );
+                      };
+                      const onUp = (ev: PointerEvent) => {
+                        window.removeEventListener("pointermove", onMove);
+                        window.removeEventListener("pointerup", onUp);
+                        setDragging(null);
+                        const rect = target.getBoundingClientRect();
+                        const x = ((ev.clientX - rect.left) / rect.width) * 100 - hs.width_pct / 2;
+                        const y = ((ev.clientY - rect.top) / rect.height) * 100 - hs.height_pct / 2;
+                        updateHotspot(hs, x, y);
+                      };
+                      window.addEventListener("pointermove", onMove);
+                      window.addEventListener("pointerup", onUp);
+                    }}
                   >
                     <button
                       type="button"
                       className="absolute right-0 top-0 bg-background px-1 text-xs text-error"
-                      onClick={() => deleteHotspot(hs.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteHotspot(hs.id);
+                      }}
                     >
                       ×
                     </button>
@@ -244,11 +329,10 @@ export function FlipbookEditor({ storeId, storeSlug }: { storeId: string; storeS
                   </div>
                 ))}
               </div>
-              {drag && (
-                <p className="text-xs text-foreground-secondary">
-                  Hotspot selected at {drag.x.toFixed(0)}%, {drag.y.toFixed(0)}%.
-                </p>
-              )}
+              <p className="text-xs text-foreground-secondary">
+                {(page.hotspots || []).length} hotspot(s) on this page. Publish products before they
+                appear on the public flipbook.
+              </p>
             </div>
           )}
         </div>

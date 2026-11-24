@@ -77,7 +77,7 @@
 | CAT-01–03,07 | Catalog core + snapshots | done | `catalog/` | phase2 e2e | Collections unchanged |
 | CAT-04 | Brands entity | done | `brands` + `products.brand_id` | campaigns integration | Text `brand` column kept |
 | CAT-05–06 | Vendors link / custom attrs | done (foundation) | `vendors`, `product_vendors`, `attribute_*` | campaigns integration | Purchasing UX → Agent 06 |
-| PDF-01–05 | AI PDF + CSV + flipbook | done | imports, flipbook, ai | catalog-import, flipbook e2e | AI quality depends on key/model |
+| PDF-01–05 | AI PDF + CSV + flipbook | done (hardened) | imports, flipbook, ai, `000015` | unit + E2E-B API | Mock AI without key; SumoPod/OpenAI-compat when configured |
 
 ---
 
@@ -151,7 +151,7 @@
 | ID | Status | Notes |
 | --- | --- | --- |
 | E2E-A Multi-store | done | Playwright |
-| E2E-B PDF→checkout | partial | Pieces exist |
+| E2E-B PDF→checkout | done (API) | PDF→confirm→publish→public hotspot product; Playwright deferred |
 | E2E-C Admin entry | partial (API+UI; Playwright deferred) | Stage 1 |
 | E2E-D Purchasing | done (API + workspace) | Stage 2 |
 | E2E-E Partial availability | partial | Stage 2 |

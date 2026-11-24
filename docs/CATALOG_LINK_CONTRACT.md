@@ -56,4 +56,5 @@ Always scope by `store_id` and authorize membership; resolve checkout only for `
 - Merchant editor: `/stores/{storeId}/catalog/flipbook`
 - Public viewer: `/{storeSlug}/catalog`
 - Product deep link: `/{storeSlug}/products/{productSlug}`
-- Hotspot click loads `GET /api/v1/public/stores/{slug}/catalog/products/{productId}` then offers **Add to cart** via `apps/web/src/lib/cart.ts` (store-scoped cart). Checkout is Phase 3: `/{storeSlug}/cart` → `/{storeSlug}/checkout` → `/track/{token}`. Prices/stock are always revalidated server-side on checkout preview/submit.
+- Hotspot click loads `GET /api/v1/public/stores/{slug}/catalog/products/{productId}` then offers **Add to cart** via `apps/web/src/lib/cart.ts` (store-scoped cart) plus cart/checkout links. Flow: `/{storeSlug}/cart` → `/{storeSlug}/checkout` → `/track/{token}`. Prices/stock are always revalidated server-side on checkout preview/submit.
+- Import review items expose `confidence_pct` and `review_status` (`pending`|`accepted`|`rejected`); confirm creates draft products and clamped hotspot candidates.

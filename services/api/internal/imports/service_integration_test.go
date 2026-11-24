@@ -21,6 +21,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/httpapi"
+	"github.com/rubicahq/pikko/services/api/internal/imports"
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
@@ -50,18 +51,23 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 		TRUNCATE audit_logs, email_jobs, auth_rate_limits, public_rate_limits, onboarding_drafts, team_invites,
 		         analytics_events, notifications, notification_preferences,
 		         outbox_events, job_queue,
+		         whatsapp_template_sends,
+		         order_rule_applications, business_rule_versions, business_rules,
+		         receiving_lines, receiving_records,
+		         shipment_items, shipments, packing_task_items, packing_tasks,
+		         preorder_item_allocations, preorder_purchasing_records,
 		         inventory_adjustments, inventory_reservations,
 		         store_credit_ledger, store_credits, refunds, financial_adjustments, financial_events,
 		         payment_allocations, payment_evidence, payments, store_deposit_policies,
 		         order_tracking_tokens, order_status_history, order_item_events, order_revisions, admin_order_drafts, order_items, orders,
 		         store_order_counters, customer_addresses, customers,
 		         store_payment_methods, store_fulfillment_settings,
+		         campaign_products, campaigns,
+		         preorder_batch_variants, preorder_batch_products, preorder_batches,
 		         catalog_page_hotspots, catalog_pages, catalog_import_items, catalog_import_jobs,
 		         storefront_featured_collections, storefront_featured_products,
 		         storefront_banners, storefront_configs,
-		         campaign_products, campaigns,
 		         product_attribute_values, attribute_definitions,
-		         receiving_lines, receiving_records,
 		         product_vendors, vendors,
 		         collection_products, collections,
 		         variant_option_values, product_variants, product_option_values, product_options,
@@ -285,4 +291,228 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	}
 
 	_ = jobs.TypeCatalogPDFImport
+}
+
+// TestE2EB_PDFImportToPublicFlipbook covers E2E-B: PDF → extract → review/bulk →
+// confirm drafts → publish products/pages/storefront → public hotspot product.
+func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
+	pool := testPool(t)
+	defer pool.Close()
+	reset(t, pool)
+
+	dir := t.TempDir()
+	store, err := storage.NewLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg()
+	router, worker := httpapi.NewRouter(httpapi.Deps{
+		Cfg: c, DB: pool, Logger: slog.Default(), Storage: store,
+		AI: ai.NewMockExtractor(), Renderer: &pdfutil.PlaceholderRenderer{Width: 80, Height: 100},
+	})
+
+	uid, tok := signIn(t, pool, "e2eb@example.com")
+	storeID := createStore(t, pool, uid, "E2E B Store", "e2eb-store")
+
+	pdf := pdfutil.MinimalPDF()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("extract_images", "true")
+	fw, _ := mw.CreateFormFile("file", "catalog.pdf")
+	_, _ = fw.Write(pdf)
+	_ = mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Idempotency-Key", "e2eb-import-1")
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != http.StatusAccepted {
+		t.Fatalf("start %d %s", rr.Code, rr.Body.String())
+	}
+	var start struct {
+		Job struct {
+			ID string `json:"id"`
+		} `json:"job"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &start)
+	jobID := start.Job.ID
+
+	for i := 0; i < 8; i++ {
+		ok, err := worker.ProcessOnce(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ok {
+			break
+		}
+		time.Sleep(40 * time.Millisecond)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/items", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	var itemsResp struct {
+		Items []struct {
+			ID            string   `json:"id"`
+			Name          string   `json:"name"`
+			ConfidencePct *float64 `json:"confidence_pct"`
+			ReviewStatus  string   `json:"review_status"`
+		} `json:"items"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &itemsResp)
+	if len(itemsResp.Items) < 1 {
+		t.Fatal("expected extracted items")
+	}
+	if itemsResp.Items[0].ConfidencePct == nil {
+		t.Fatal("expected confidence_pct on items")
+	}
+
+	bulkBody, _ := json.Marshal(map[string]any{"action": "accept_high_confidence"})
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/items/bulk", bytes.NewReader(bulkBody))
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("bulk %d %s", rr.Code, rr.Body.String())
+	}
+
+	ids := make([]string, 0, len(itemsResp.Items))
+	for _, it := range itemsResp.Items {
+		if it.Name != "" {
+			ids = append(ids, it.ID)
+		}
+	}
+	confBody, _ := json.Marshal(map[string]any{"item_ids": ids})
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/confirm", bytes.NewReader(confBody))
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("confirm %d %s", rr.Code, rr.Body.String())
+	}
+	var conf struct {
+		CreatedCount int `json:"created_count"`
+		HotspotCount int `json:"hotspot_count"`
+		ProductIDs   []string `json:"product_ids"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &conf)
+	if conf.CreatedCount < 1 || len(conf.ProductIDs) < 1 {
+		t.Fatalf("confirm %+v", conf)
+	}
+
+	for _, pid := range conf.ProductIDs {
+		stBody, _ := json.Marshal(map[string]string{"status": "published"})
+		req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/products/"+pid+"/status", bytes.NewReader(stBody))
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		rr = httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+		if rr.Code != 200 {
+			t.Fatalf("publish product %d %s", rr.Code, rr.Body.String())
+		}
+	}
+
+	pubPages, _ := json.Marshal(map[string]any{"status": "published"})
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-pages/status", bytes.NewReader(pubPages))
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("Content-Type", "application/json")
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("publish pages %d", rr.Code)
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/storefront/publish", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("publish storefront %d %s", rr.Code, rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/e2eb-store/catalog", nil)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("public catalog %d %s", rr.Code, rr.Body.String())
+	}
+	var pub struct {
+		Pages []struct {
+			Hotspots []struct {
+				ProductID string `json:"product_id"`
+			} `json:"hotspots"`
+		} `json:"pages"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &pub)
+	if len(pub.Pages) < 1 {
+		t.Fatal("expected published pages")
+	}
+	// Hotspots appear when confirm created bbox candidates; mock AI provides bboxes.
+	if conf.HotspotCount > 0 && (len(pub.Pages[0].Hotspots) < 1) {
+		t.Fatalf("expected public hotspots after confirm, got %+v", pub)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/e2eb-store/catalog/products/"+conf.ProductIDs[0], nil)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != 200 {
+		t.Fatalf("public product %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestCSVImportClearErrors(t *testing.T) {
+	pool := testPool(t)
+	defer pool.Close()
+	reset(t, pool)
+
+	dir := t.TempDir()
+	store, err := storage.NewLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	router, _ := httpapi.NewRouter(httpapi.Deps{
+		Cfg: cfg(), DB: pool, Logger: slog.Default(), Storage: store,
+		AI: ai.NewMockExtractor(),
+	})
+	uid, tok := signIn(t, pool, "csv-err@example.com")
+	storeID := createStore(t, pool, uid, "CSV Store", "csv-err-store")
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("source", "csv")
+	fw, _ := mw.CreateFormFile("file", "bad.csv")
+	_, _ = fw.Write([]byte("foo,bar\n1,2\n"))
+	_ = mw.Close()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rr := httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing columns, got %d %s", rr.Code, rr.Body.String())
+	}
+	if !bytes.Contains(rr.Body.Bytes(), []byte("missing required column")) {
+		t.Fatalf("body=%s", rr.Body.String())
+	}
+
+	var buf2 bytes.Buffer
+	mw2 := multipart.NewWriter(&buf2)
+	_ = mw2.WriteField("source", "csv")
+	fw2, _ := mw2.CreateFormFile("file", "ok.csv")
+	_, _ = fw2.Write([]byte(imports.CSVTemplate))
+	_ = mw2.Close()
+	req2 := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports", &buf2)
+	req2.Header.Set("Content-Type", mw2.FormDataContentType())
+	req2.Header.Set("Authorization", "Bearer "+tok)
+	req2.Header.Set("Idempotency-Key", "csv-ok-1")
+	rr2 := httptest.NewRecorder()
+	router.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("csv start %d %s", rr2.Code, rr2.Body.String())
+	}
 }

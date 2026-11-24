@@ -122,6 +122,10 @@ func (c *OpenAICompatClient) ExtractCatalog(ctx context.Context, req ExtractRequ
 		if req.MaxItems > 0 && len(items) > req.MaxItems {
 			items = items[:req.MaxItems]
 		}
+		for i := range items {
+			items[i].NormalizeConfidence()
+			clampBBox(&items[i])
+		}
 		return &ExtractResult{Items: items, Raw: raw}, nil
 	}
 	if lastErr == nil {
@@ -195,6 +199,48 @@ func truncate(s string, n int) string {
 	return s[:n] + "…"
 }
 
+func clampBBox(it *ExtractedItem) {
+	clamp := func(p **float64) {
+		if *p == nil {
+			return
+		}
+		v := **p
+		if v < 0 {
+			v = 0
+		}
+		if v > 100 {
+			v = 100
+		}
+		**p = v
+	}
+	clamp(&it.BBoxXPct)
+	clamp(&it.BBoxYPct)
+	clamp(&it.BBoxWidthPct)
+	clamp(&it.BBoxHeightPct)
+	if it.BBoxXPct != nil && it.BBoxWidthPct != nil && *it.BBoxXPct+*it.BBoxWidthPct > 100 {
+		w := 100 - *it.BBoxXPct
+		if w <= 0 {
+			it.BBoxWidthPct = nil
+			it.BBoxXPct = nil
+			it.BBoxYPct = nil
+			it.BBoxHeightPct = nil
+		} else {
+			it.BBoxWidthPct = &w
+		}
+	}
+	if it.BBoxYPct != nil && it.BBoxHeightPct != nil && *it.BBoxYPct+*it.BBoxHeightPct > 100 {
+		h := 100 - *it.BBoxYPct
+		if h <= 0 {
+			it.BBoxWidthPct = nil
+			it.BBoxXPct = nil
+			it.BBoxYPct = nil
+			it.BBoxHeightPct = nil
+		} else {
+			it.BBoxHeightPct = &h
+		}
+	}
+}
+
 var _ CatalogExtractor = (*OpenAICompatClient)(nil)
 
 // NewExtractor selects mock when no API key is configured (safe for CI).
@@ -202,5 +248,22 @@ func NewExtractor(apiKey, baseURL, model string) CatalogExtractor {
 	if strings.TrimSpace(apiKey) == "" {
 		return NewMockExtractor()
 	}
+	baseURL = strings.TrimSpace(baseURL)
+	model = strings.TrimSpace(model)
+	if baseURL == "" || model == "" {
+		return NewMockExtractor()
+	}
 	return NewOpenAICompat(baseURL, apiKey, model)
+}
+
+// ProviderName reports which extractor implementation is active (for job metadata).
+func ProviderName(ex CatalogExtractor) string {
+	switch ex.(type) {
+	case *MockExtractor:
+		return "mock"
+	case *OpenAICompatClient:
+		return "openai_compat"
+	default:
+		return "unknown"
+	}
 }

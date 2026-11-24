@@ -16,7 +16,7 @@
 | Design tokens + basic UI | Agent 02 expands |
 | Storefront + 24 themes | Preserve |
 | Catalog + variants + collections | Extend brands/attrs |
-| AI PDF/CSV + flipbook | Agent 11 hardens |
+| AI PDF/CSV + flipbook | Agent 11 hardened |
 | Checkout + bank transfer + tracking | Preserve |
 | Preorder batches + business rules | Campaign facade later |
 | Purchasing list + allocations | Agent 06 extends |
@@ -53,7 +53,7 @@
 
 | Agent | Scope | Reuses | Exit gate |
 | --- | --- | --- | --- |
-| **11 PDF/AI Catalog** | Reliability, limits, review UX | PDF-01–05 | Hardened import; no schema destruction |
+| **11 PDF/AI Catalog** | Reliability, limits, review UX | PDF-01–05 | **Done** — hardened import + E2E-B API; no schema destruction |
 | **12 Live Shopping & Storefront** | Live sessions + storefront polish | storefront | LIVE-*; E2E-K |
 | **13 Analytics** | North-star fulfilled items metric | analytics | AN-01 satisfied |
 | **14 Security/QA** | Threat pass, TEST_REPORT, E2E A–N | all e2e | Matrix accurate; critical gaps ticketed |
@@ -226,7 +226,23 @@
 
 ---
 
-## 4. Open decisions (non-blocking for Agent 11+)
+## 3k. Agent 11 status (PDF/AI Catalog Hardening)
+
+| Deliverable | Status |
+| --- | --- |
+| Migration `000015_pdf_import_hardening` | Done (additive) |
+| Confidence + review_status + bulk review APIs | Done |
+| Review UX (filter, reject, bulk confirm) | Done |
+| CSV clearer errors / edge cases | Done |
+| Flipbook hotspot clamp + drag + public polish | Done |
+| Mock AI without key; OpenAI-compat path | Done |
+| E2E-B API chain test | Done |
+| `docs/agents/11-pdf-ai-catalog-handoff.md` | Done |
+| pikko.id cutover | **Not in scope** |
+
+---
+
+## 4. Open decisions (non-blocking for Agent 12+)
 
 1. Customer portal auth model: separate customer identities (shipped Agent 08).
 2. Campaign table chosen (`campaigns` + linked `preorder_batches`); live sessions deepen in Agent 12.
