@@ -16,7 +16,7 @@ export function AppShell({
 }) {
   const permissions = currentStore.permissions;
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen bg-ambient">
       <div className="sticky top-0 hidden h-screen md:block">
         <DashboardSidebar
           user={user}
@@ -26,7 +26,7 @@ export function AppShell({
         />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-topbar items-center justify-between gap-3 border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:px-8">
+        <header className="sticky top-0 z-30 flex h-topbar items-center justify-between gap-3 border-b border-border/70 bg-white/80 px-4 backdrop-blur-sm supports-[backdrop-filter]:bg-white/70 md:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <MobileNav
               user={user}

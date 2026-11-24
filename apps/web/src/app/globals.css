@@ -11,14 +11,20 @@ body {
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-inter), Inter, Arial, sans-serif;
+  background: var(--gradient-ambient);
+  background-attachment: fixed;
+  font-family: var(--font-jakarta), "Plus Jakarta Sans", var(--font-inter), Inter, Arial, sans-serif;
   font-feature-settings: "ss01" on, "cv11" on;
   -webkit-font-smoothing: antialiased;
 }
 
 .font-display {
   font-family: var(--font-jakarta), "Plus Jakarta Sans", var(--font-inter), Inter, Arial, sans-serif;
+}
+
+/* Opt-in Inter for surfaces that still prefer the previous product face */
+.font-inter {
+  font-family: var(--font-inter), Inter, Arial, sans-serif;
 }
 
 *:focus-visible {

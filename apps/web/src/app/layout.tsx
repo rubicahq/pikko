@@ -3,12 +3,14 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import { MARKETING_DEFAULT_DESCRIPTION, marketingURL } from "@/lib/marketing-seo";
 import "./globals.css";
 
+/* Inter kept loaded (--font-inter / font-inter) so existing consumers do not break abruptly */
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
   display: "swap",
 });
 
+/* Plus Jakarta Sans is the product + marketing face (font-sans / font-display) */
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",

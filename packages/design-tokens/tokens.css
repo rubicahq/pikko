@@ -1,7 +1,7 @@
 /**
- * Pikko design tokens — PRD §13.
- * Source of truth for brand colors, radii, shadows, and type.
- * Map to Tailwind via apps/web/tailwind.config.ts.
+ * Pikko design tokens — soft-gradient SaaS (Brex usability + warmer identity).
+ * Source of truth for brand colors, gradients, radii, shadows, and type.
+ * Map to Tailwind via apps/web/tailwind.config.ts + tailwind.preset.js.
  */
 :root {
   /* Brand */
@@ -9,26 +9,40 @@
   --brand-hover: #eb3800;
   --brand-pressed: #d63200;
   --brand-accessible-dark: #c83200;
-  --brand-soft: #fff1eb;
-  --brand-border: #ffd2c2;
+  --brand-soft-orange: #ff8050;
+  --brand-warm-peach: #ffe1d5;
+  --brand-soft: #ffe1d5;
+  --brand-border: #ffd1bf;
+
+  /* Named palette aliases */
+  --cool-mist: #dce4f0;
+  --cloud-white: #f5f6fa;
+  --ink: #15191e;
+  --white: #ffffff;
 
   /* Surfaces */
   --background: #ffffff;
-  --background-subtle: #f9f9fb;
-  --surface: #f3f3f7;
-  --surface-strong: #e8e9ee;
+  --background-subtle: #f5f6fa;
+  --surface: #f0f3f8;
+  --surface-strong: #dce4f0;
 
   /* Foreground */
   --foreground: #15191e;
-  --foreground-secondary: #60646c;
+  --foreground-secondary: #606975;
   --foreground-muted: #8b8d98;
   --foreground-subtle: #b9bbc6;
   --foreground-inverse: #fcfcfd;
   --dark: #000710;
 
-  /* Borders */
-  --border: #e1e3e8;
+  /* Borders — lightweight */
+  --border: #e4e8ef;
   --border-strong: #c7cad2;
+
+  /* Gradients */
+  --gradient-ambient: linear-gradient(155deg, #dce4f0 0%, #f0f3f8 50%, #fafafc 100%);
+  --gradient-warm: linear-gradient(140deg, #ffffff 0%, #fff6f1 50%, #ffd1bf 100%);
+  --gradient-brand: linear-gradient(135deg, #ff3d00 0%, #ff8050 100%);
+  --gradient-chart: linear-gradient(180deg, #ff8050 0%, #ffd1bf 100%);
 
   /* Semantic */
   --success: #166534;
@@ -47,22 +61,22 @@
   --neutral-bg: #f3f4f6;
   --neutral-border: #e5e7eb;
 
-  /* Radii */
+  /* Radii — controls 10–12px; cards 16–20px */
   --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
 
-  /* Shadows (use sparingly; borders define boundaries) */
-  --shadow-xs: 0 1px 2px rgba(0, 7, 16, 0.04);
-  --shadow-sm: 0 2px 6px rgba(0, 7, 16, 0.05), 0 1px 2px rgba(0, 7, 16, 0.03);
-  --shadow-md: 0 8px 24px rgba(0, 7, 16, 0.08), 0 2px 6px rgba(0, 7, 16, 0.04);
-  --shadow-overlay: 0 16px 48px rgba(0, 7, 16, 0.12);
+  /* Shadows — subtle realistic card elevation; borders still primary */
+  --shadow-xs: 0 1px 2px rgba(21, 25, 30, 0.04);
+  --shadow-sm: 0 2px 8px rgba(21, 25, 30, 0.05), 0 1px 2px rgba(21, 25, 30, 0.03);
+  --shadow-md: 0 8px 24px rgba(21, 25, 30, 0.07), 0 2px 6px rgba(21, 25, 30, 0.04);
+  --shadow-overlay: 0 16px 48px rgba(21, 25, 30, 0.12);
 
-  /* Typography — Inter for product UI; display face for marketing headlines */
-  --font-sans: "Inter", Arial, sans-serif;
+  /* Typography — Plus Jakarta Sans primary; Inter kept as loaded fallback */
+  --font-sans: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
   --font-display: "Plus Jakarta Sans", "Inter", Arial, sans-serif;
 
   /* Type ramp — product (dashboard) */
@@ -96,4 +110,8 @@
   --sidebar-collapsed: 64px;
   --topbar-height: 56px;
   --content-gutter: 32px;
+
+  /* Sidebar / glass (restrained — no heavy blur on lists/tables) */
+  --sidebar-bg: rgba(255, 255, 255, 0.78);
+  --glass-bg: rgba(255, 255, 255, 0.72);
 }

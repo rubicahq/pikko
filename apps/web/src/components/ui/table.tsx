@@ -9,7 +9,7 @@ export function Table({
   return (
     <div
       className={cn(
-        "relative w-full overflow-auto rounded-lg border border-border",
+        "relative w-full overflow-auto rounded-lg border border-border bg-background",
         stickyHeader && "max-h-[min(70vh,720px)]",
       )}
     >
