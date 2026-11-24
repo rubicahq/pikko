@@ -34,8 +34,13 @@ Checkout path on the server: `~/pikko` (separate from `~/emplicon`).
 | ACME webroot | `~/emplicon/deploy/acme-webroot` (mounted at `/var/www/acme`) |
 | Renew hook | `/etc/letsencrypt/renewal-hooks/deploy/pikko.sh` |
 
-Repo example (kept in sync with production intent):  
-`infrastructure/nginx/emplicon-nginx.d-pikko.site.conf.example`
+Repo examples (kept in sync with production intent):
+
+- Current pilots: `infrastructure/nginx/emplicon-nginx.d-pikko.site.conf.example`
+- Official domain (cutover): `infrastructure/nginx/emplicon-nginx.d-pikko.id.conf.example`
+- Legacy redirect after cutover: `infrastructure/nginx/emplicon-nginx.d-pikko.site-redirect.conf.example`
+- Env template for pikko.id: `.env.production.pikko.id.example`
+- **Ordered cutover runbook:** `docs/LAUNCH.md` (do not execute without owner approval)
 
 ## First-time VPS deploy
 
@@ -176,7 +181,9 @@ Do **not** `docker compose down -v`, prune volumes, or drop the database without
 
 Scheduled script (Phase 6): `infrastructure/backup/backup.sh`  
 Crontab example: `infrastructure/backup/crontab.example`  
-Restore validation (ephemeral container): `infrastructure/backup/restore-test.sh`
+Restore validation (ephemeral container): `infrastructure/backup/restore-test.sh`  
+
+Scripts prefer unprivileged `docker`, then fall back to `sudo docker` when the invoking user is not in the docker group (typical on the VPS). Storage volume archival uses `sudo test` / `sudo tar` because mountpoints under `/var/lib/docker` are root-owned.
 
 ```bash
 # Manual one-shot (legacy)

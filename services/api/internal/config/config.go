@@ -11,6 +11,7 @@ import (
 type Config struct {
 	AppEnv        string
 	BaseDomain    string
+	LegacyDomain  string // prior apex for cutover allowlists (e.g. pikko.site → pikko.id)
 	MarketingURL  string
 	DashboardURL  string
 	StorefrontURL string
@@ -40,6 +41,7 @@ type Config struct {
 	ResendCooldown     time.Duration
 	SessionTTL         time.Duration
 	CookieName         string
+	CookieDomain       string // empty = host-only (preferred when Next proxies /api)
 	CookieSecure       bool
 	CookieSameSite     string
 	RedirectAllowlist  []string
@@ -61,10 +63,19 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
+	baseDomain := getenv("APP_BASE_DOMAIN", "pikko.site")
+	// APP_URL is an alias for MARKETING_URL (PRD §7 / launch cutover docs).
+	marketing := firstNonEmpty(os.Getenv("MARKETING_URL"), os.Getenv("APP_URL"), "http://localhost:3000")
+	emailDomain := baseDomain
+	if emailDomain == "localhost" || strings.HasPrefix(emailDomain, "127.") {
+		emailDomain = "pikko.site"
+	}
+
 	c := &Config{
 		AppEnv:        getenv("APP_ENV", "development"),
-		BaseDomain:    getenv("APP_BASE_DOMAIN", "pikko.site"),
-		MarketingURL:  getenv("MARKETING_URL", "http://localhost:3000"),
+		BaseDomain:    baseDomain,
+		LegacyDomain:  getenv("LEGACY_BASE_DOMAIN", ""),
+		MarketingURL:  marketing,
 		DashboardURL:  getenv("DASHBOARD_URL", "http://localhost:3000"),
 		StorefrontURL: getenv("STOREFRONT_URL", "http://localhost:3000"),
 		APIBaseURL:    getenv("API_BASE_URL", "http://localhost:8080"),
@@ -85,11 +96,12 @@ func Load() (*Config, error) {
 		EmailMode:             getenv("EMAIL_MODE", "log"),
 		BrevoAPIKey:           os.Getenv("BREVO_API_KEY"),
 		EmailFromName:         getenv("EMAIL_FROM_NAME", "Pikko"),
-		EmailAccountFrom:      getenv("EMAIL_ACCOUNT_FROM", "account@pikko.site"),
-		EmailNotificationFrom: getenv("EMAIL_NOTIFICATION_FROM", "notifications@pikko.site"),
-		EmailReplyTo:          getenv("EMAIL_REPLY_TO", "support@pikko.site"),
+		EmailAccountFrom:      getenv("EMAIL_ACCOUNT_FROM", "account@"+emailDomain),
+		EmailNotificationFrom: getenv("EMAIL_NOTIFICATION_FROM", "notifications@"+emailDomain),
+		EmailReplyTo:          getenv("EMAIL_REPLY_TO", "support@"+emailDomain),
 
 		CookieName:     getenv("AUTH_COOKIE_NAME", "pikko_session"),
+		CookieDomain:   getenv("AUTH_COOKIE_DOMAIN", ""),
 		CookieSecure:   getenvBool("AUTH_COOKIE_SECURE", false),
 		CookieSameSite: getenv("AUTH_COOKIE_SAMESITE", "lax"),
 
@@ -127,9 +139,22 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	allow := getenv("AUTH_REDIRECT_ALLOWLIST", "localhost,127.0.0.1,pikko.site")
+	allowDefault := "localhost,127.0.0.1," + c.BaseDomain
+	if c.LegacyDomain != "" && c.LegacyDomain != c.BaseDomain {
+		allowDefault += "," + c.LegacyDomain
+	}
+	allow := getenv("AUTH_REDIRECT_ALLOWLIST", allowDefault)
 	c.RedirectAllowlist = splitCSV(allow)
-	c.CORSOrigins = splitCSV(getenv("API_CORS_ORIGINS", "http://localhost:3000"))
+
+	corsDefault := "http://localhost:3000"
+	if c.AppEnv == "production" || c.AppEnv == "staging" {
+		corsDefault = strings.Join([]string{
+			c.DashboardURL,
+			c.MarketingURL,
+			c.StorefrontURL,
+		}, ",")
+	}
+	c.CORSOrigins = splitCSV(getenv("API_CORS_ORIGINS", corsDefault))
 
 	c.AIAPIKey = os.Getenv("AI_API_KEY")
 	c.AIBaseURL = getenv("AI_BASE_URL", "")
@@ -198,4 +223,13 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }

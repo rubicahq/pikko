@@ -143,8 +143,8 @@ export default function MarketingHomePage() {
               A better way to sell starts here.
             </h2>
             <p className="mt-5 max-w-lg text-base leading-relaxed text-foreground-subtle">
-              Passwordless sign-in. First store in two short steps. Controlled
-              pilots on pikko.site.
+              Passwordless sign-in. First store in two short steps. Built for
+              independent sellers who want a store that stays simple.
             </p>
             <div className="mt-9">
               <Button asChild size="large">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { mapLegacyHost } from "@/lib/site";
 
 function applySecurityHeaders(res: NextResponse) {
   res.headers.set("X-Content-Type-Options", "nosniff");
@@ -21,6 +22,22 @@ function applySecurityHeaders(res: NextResponse) {
 }
 
 export function middleware(request: NextRequest) {
+  // Permanent redirect from legacy apex/subdomains (e.g. pikko.site → pikko.id).
+  // Primary cutover redirect lives in nginx; this is defense-in-depth for the web app.
+  const host = request.headers.get("host") || "";
+  const mapped = mapLegacyHost(host);
+  if (mapped) {
+    const url = request.nextUrl.clone();
+    url.host = mapped;
+    url.protocol = "https:";
+    url.port = "";
+    // Never forward magic-link tokens through uncontrolled redirects (PRD §7).
+    if (url.searchParams.has("token")) {
+      url.searchParams.delete("token");
+    }
+    return applySecurityHeaders(NextResponse.redirect(url, 308));
+  }
+
   // Never expose the component preview in production (PRD §14).
   if (
     request.nextUrl.pathname.startsWith("/dev/") &&

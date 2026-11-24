@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { appBaseDomain } from "@/lib/site";
 
 export const runtime = "edge";
 export const alt = "Pikko — Sell your way.";
@@ -6,6 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default function OpenGraphImage() {
+  const domain = appBaseDomain() === "localhost" ? "pikko.id" : appBaseDomain();
   return new ImageResponse(
     (
       <div
@@ -48,7 +50,7 @@ export default function OpenGraphImage() {
             Beautiful storefronts. Flexible ordering. Effortless operations.
           </div>
         </div>
-        <div style={{ fontSize: 22, color: "#8B8D98" }}>pikko.site</div>
+        <div style={{ fontSize: 22, color: "#8B8D98" }}>{domain}</div>
       </div>
     ),
     { ...size },

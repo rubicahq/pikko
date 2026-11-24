@@ -11,7 +11,7 @@ Use `-p 1` so packages sharing `pikko_test` do not truncate concurrently.
 
 Coverage highlights:
 
-- Unit: themes (24 PRD hex), money/IDR + half-up rounding, slug validation, URLs, PDF page counting, mock AI extractor
+- Unit: themes (24 PRD hex), money/IDR + half-up rounding, slug validation, URLs (incl. pikko.id), config domain-agnostic defaults, PDF page counting, mock AI extractor
 - Integration: auth, store create, catalog CRUD, cross-store 404 on products, storefront publish → public product + `link_ref`
 - Integration: PDF import (mock AI); flipbook publish + public hotspots
 - Integration (Phase 3): checkout → evidence → verify; idempotent submit; tracking token hash-only; cross-store order isolation; email jobs enqueued
@@ -36,6 +36,7 @@ Suites:
 - Phase 4: preorder batch → cart group → checkout → merchant confirm
 - Phase 5: notifications / analytics / CSV / customers smoke
 - Phase 6: marketing pages, FAQ keyboard, robots/sitemap, security headers
+- Phase 7: domain-agnostic sitemap/canonicals + support mailto from env
 
 ## Ops scripts
 
