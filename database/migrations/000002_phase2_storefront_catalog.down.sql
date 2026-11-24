@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS storefront_featured_collections;
+DROP TABLE IF EXISTS storefront_featured_products;
+DROP TABLE IF EXISTS collection_products;
+DROP TABLE IF EXISTS collections;
+DROP TABLE IF EXISTS variant_option_values;
+DROP TABLE IF EXISTS product_variants;
+DROP TABLE IF EXISTS product_option_values;
+DROP TABLE IF EXISTS product_options;
+DROP TABLE IF EXISTS product_images;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS storefront_banners;
+DROP TABLE IF EXISTS storefront_configs;
+DROP TABLE IF EXISTS stored_files;

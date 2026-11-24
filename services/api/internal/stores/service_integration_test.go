@@ -41,6 +41,11 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(), `
 		TRUNCATE audit_logs, email_jobs, auth_rate_limits, onboarding_drafts,
+		         storefront_featured_collections, storefront_featured_products,
+		         storefront_banners, storefront_configs,
+		         collection_products, collections,
+		         variant_option_values, product_variants, product_option_values, product_options,
+		         product_images, products, categories, stored_files,
 		         store_slug_aliases, store_memberships, stores, user_preferences,
 		         sessions, authentication_tokens, users CASCADE
 	`)

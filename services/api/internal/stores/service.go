@@ -288,6 +288,15 @@ func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*
 	}
 
 	_, err = tx.Exec(ctx, `
+		INSERT INTO storefront_configs (store_id, channel, theme_id, background_color, text_color, primary_color)
+		VALUES ($1,'draft','pikko_signature','#FFFFFF','#15191E','#FF3D00')
+		ON CONFLICT (store_id, channel) DO NOTHING
+	`, st.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(ctx, `
 		UPDATE onboarding_drafts SET completed_at=now(), updated_at=now() WHERE id=$1
 	`, d.ID)
 	if err != nil {

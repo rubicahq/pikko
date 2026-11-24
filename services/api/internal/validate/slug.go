@@ -18,6 +18,8 @@ var ReservedSlugs = map[string]struct{}{
 	"dashboard": {}, "billing": {}, "pricing": {}, "legal": {}, "privacy": {},
 	"terms": {}, "track": {}, "tracking": {}, "webhook": {}, "webhooks": {},
 	"public": {}, "internal": {}, "system": {}, "root": {}, "me": {},
+	"catalog": {}, "flipbook": {}, "onboarding": {}, "dev": {}, "products": {},
+	"collections": {}, "preorders": {}, "cart": {}, "search": {},
 }
 
 func IsReservedSlug(slug string) bool {
