@@ -14,6 +14,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/files"
+	"github.com/rubicahq/pikko/services/api/internal/flipbook"
 	"github.com/rubicahq/pikko/services/api/internal/imports"
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
@@ -72,6 +73,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg}
 	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen}
 	impH := &ImportHandlers{Imports: importSvc}
+	flipSvc := &flipbook.Service{DB: d.DB}
+	flipH := &FlipbookHandlers{Flipbook: flipSvc, Catalog: catalogSvc, URLs: urlGen}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -158,11 +161,21 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/confirm", storeAuthed(impH.Confirm))
 	mux.Handle("POST /api/v1/stores/{storeID}/catalog-imports/{jobID}/retry", storeAuthed(impH.Retry))
 
+	// Flipbook catalog pages / hotspots
+	mux.Handle("GET /api/v1/stores/{storeID}/catalog-pages", storeAuthed(flipH.ListPages))
+	mux.Handle("PUT /api/v1/stores/{storeID}/catalog-pages/order", storeAuthed(flipH.Reorder))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/status", storeAuthed(flipH.Publish))
+	mux.Handle("POST /api/v1/stores/{storeID}/catalog-pages/{pageID}/hotspots", storeAuthed(flipH.CreateHotspot))
+	mux.Handle("PATCH /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.UpdateHotspot))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/catalog-pages/hotspots/{hotspotID}", storeAuthed(flipH.DeleteHotspot))
+
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products", p2.PublicProducts)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products/{productSlug}", p2.PublicProduct)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/categories", p2.PublicCategories)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog", flipH.PublicCatalog)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog/products/{productID}", flipH.PublicHotspotProduct)
 	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
 
 	worker := &jobs.Worker{

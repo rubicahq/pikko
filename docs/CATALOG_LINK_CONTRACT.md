@@ -50,3 +50,10 @@ catalog_page_hotspots (
 AI PDF import renders each PDF page into a draft `catalog_pages` row and stores normalized bounding boxes on `catalog_import_items`. Confirming selected items creates draft products and optional hotspot candidates (`product_id` + bbox on the matching page).
 
 Always scope by `store_id` and authorize membership; resolve checkout only for `status=published` products in the same store. Public flipbook surfaces must never expose draft products or draft catalog pages.
+
+## Public flipbook
+
+- Merchant editor: `/stores/{storeId}/catalog/flipbook`
+- Public viewer: `/{storeSlug}/catalog`
+- Product deep link: `/{storeSlug}/products/{productSlug}`
+- Hotspot click loads `GET /api/v1/public/stores/{slug}/catalog/products/{productId}` then offers **Add to cart** via `apps/web/src/lib/cart.ts` (localStorage hook). Full checkout (PRD §20) is not in this release — CTAs also link to the product page.

@@ -39,6 +39,9 @@ export default async function CatalogPage({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline">
+            <Link href={urls.catalogFlipbook(storeId)}>Flipbook</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href={urls.catalogImport(storeId)}>Import PDF</Link>
           </Button>
           <Button asChild>
