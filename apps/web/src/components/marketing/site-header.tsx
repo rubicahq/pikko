@@ -19,7 +19,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-marketing items-center justify-between px-4 py-4 md:px-8">
-        <Wordmark className="font-display text-xl tracking-[-0.03em]" />
+        <Wordmark size="lg" />
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
           {nav.map((item) => (

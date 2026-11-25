@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Reveal } from "@/components/marketing/reveal";
@@ -26,10 +27,15 @@ export default async function MarketingHomePage() {
         />
         <div className="relative mx-auto grid max-w-marketing gap-12 px-4 pb-20 pt-16 md:grid-cols-[1.15fr_0.85fr] md:items-end md:px-8 md:pb-28 md:pt-24">
           <div>
-            <p className="font-display text-sm font-medium tracking-[0.04em] text-brand-dark">
-              Pikko
-            </p>
-            <h1 className="mt-4 max-w-3xl font-display text-[42px] font-medium leading-[1.02] tracking-[-0.03em] text-foreground md:text-[64px]">
+            <Image
+              src="/brand/pikko-logo.png"
+              alt="Pikko"
+              width={220}
+              height={89}
+              className="h-10 w-auto md:h-12"
+              priority
+            />
+            <h1 className="mt-6 max-w-3xl font-display text-[42px] font-medium leading-[1.02] tracking-[-0.03em] text-foreground md:text-[64px]">
               Sell your way.
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-foreground-secondary">
@@ -61,7 +67,14 @@ export default async function MarketingHomePage() {
                 Ready stock and preorder batches on one shareable storefront —
                 without rebuilding every order from chat.
               </p>
-              <div className="absolute bottom-6 right-6 h-16 w-16 rounded-xl bg-brand md:bottom-8 md:right-8" />
+              <Image
+                src="/brand/pikko-icon.png"
+                alt=""
+                width={64}
+                height={64}
+                aria-hidden
+                className="absolute bottom-6 right-6 h-16 w-16 md:bottom-8 md:right-8"
+              />
             </div>
           </Reveal>
         </div>

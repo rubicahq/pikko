@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublicBatches, getPublicLives, getPublicProducts, getPublicStore } from "@/lib/server-api";
@@ -195,10 +196,21 @@ export default async function PublicStorePage({ params }: Props) {
         </section>
       </main>
 
-      <footer className="border-t px-4 py-6 text-center text-xs opacity-60 md:px-8"
+      <footer
+        className="flex flex-col items-center gap-2 border-t px-4 py-6 text-center text-xs opacity-60 md:px-8"
         style={{ borderColor: sf.border_color || "#E1E3E8" }}
       >
-        {store.name} · Powered by Pikko
+        <span>{store.name}</span>
+        <span className="inline-flex items-center gap-1.5">
+          Powered by
+          <Image
+            src="/brand/pikko-logo.png"
+            alt="Pikko"
+            width={72}
+            height={29}
+            className="h-3.5 w-auto opacity-90"
+          />
+        </span>
       </footer>
     </div>
   );

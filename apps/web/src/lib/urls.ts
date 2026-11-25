@@ -120,6 +120,7 @@ export const RESERVED_STOREFRONT_SLUGS = new Set([
   "cart",
   "search",
   "favicon.ico",
+  "brand",
   "pricing",
   "faq",
   "privacy",

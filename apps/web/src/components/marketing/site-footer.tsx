@@ -33,7 +33,7 @@ export function SiteFooter() {
     <footer className="border-t border-border bg-background-subtle">
       <div className="mx-auto grid max-w-marketing gap-10 px-4 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:px-8">
         <div>
-          <Wordmark className="font-display text-xl tracking-[-0.03em]" />
+          <Wordmark size="lg" />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-foreground-secondary">
             Sell your way. Commerce infrastructure for independent sellers —
             ready stock, preorder, and operations that stay simple.
