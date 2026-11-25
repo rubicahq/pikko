@@ -113,6 +113,8 @@ export type OnboardingDraft = {
   store_slug: string | null;
   category: string | null;
   selling_model: string | null;
+  plan_code?: string | null;
+  billing_cycle?: string | null;
   is_first_store: boolean;
   updated_at: string;
 };

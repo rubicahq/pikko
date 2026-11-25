@@ -88,7 +88,13 @@ Source: `services/api/internal/httpapi/router.go`.
 | GET | `/onboarding/draft` | required |
 | POST | `/onboarding/identity` | required |
 | POST | `/onboarding/selling-model` | required |
+| POST | `/onboarding/plan` | required |
 | POST | `/onboarding/complete` | required |
+| GET | `/billing/plans` | public |
+| GET | `/stores/{id}/subscription` | stores.settings |
+| POST | `/stores/{id}/subscription/activate` | stores.settings |
+| POST | `/stores/{id}/subscription/change` | stores.settings |
+| GET | `/stores/{id}/subscription/usage` | stores.read |
 | GET/PATCH | `/stores/{storeID}` | store member (+ permissions on mutate) |
 | POST | `/stores/{storeID}/archive` | owner (`stores.archive`) |
 

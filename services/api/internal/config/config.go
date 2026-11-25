@@ -65,6 +65,17 @@ type Config struct {
 	// FeatureStoreCredit is the global kill switch for REF-02/03 store credit ledger.
 	// Per-store enablement is stores.store_credit_enabled (both required).
 	FeatureStoreCredit bool
+
+	// Subscription / entitlement flags (env kill switches; DB can further disable).
+	FeatureSubscriptions            bool
+	FeatureSubscriptionPlanSelect   bool
+	FeatureSubscriptionTestBypass   bool
+	FeatureSubscriptionUsageEnforce bool
+	FeatureSubscriptionPlanChange   bool
+	FeatureCommercialTrial          bool
+	FeatureRealBilling              bool
+	FeatureSubscriptionAutoRenew    bool
+	SubscriptionAdminToken          string
 }
 
 func Load() (*Config, error) {
@@ -180,6 +191,17 @@ func Load() (*Config, error) {
 	}
 
 	c.FeatureStoreCredit = getenvBool("FEATURE_STORE_CREDIT", false)
+
+	// Subscriptions: testing bypass ON; commercial trial OFF; real billing OFF.
+	c.FeatureSubscriptions = getenvBool("FEATURE_SUBSCRIPTIONS", true)
+	c.FeatureSubscriptionPlanSelect = getenvBool("FEATURE_SUBSCRIPTION_PLAN_SELECT", true)
+	c.FeatureSubscriptionTestBypass = getenvBool("FEATURE_SUBSCRIPTION_TEST_BYPASS", true)
+	c.FeatureSubscriptionUsageEnforce = getenvBool("FEATURE_SUBSCRIPTION_USAGE_ENFORCE", true)
+	c.FeatureSubscriptionPlanChange = getenvBool("FEATURE_SUBSCRIPTION_PLAN_CHANGE", true)
+	c.FeatureCommercialTrial = getenvBool("FEATURE_COMMERCIAL_TRIAL", false)
+	c.FeatureRealBilling = getenvBool("FEATURE_REAL_BILLING", false)
+	c.FeatureSubscriptionAutoRenew = getenvBool("FEATURE_SUBSCRIPTION_AUTO_RENEW", false)
+	c.SubscriptionAdminToken = os.Getenv("SUBSCRIPTION_ADMIN_TOKEN")
 
 	// Force Secure cookies in production/staging regardless of AUTH_COOKIE_SECURE misconfig (SEC-08).
 	if c.AppEnv == "production" || c.AppEnv == "staging" {

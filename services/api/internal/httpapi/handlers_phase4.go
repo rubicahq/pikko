@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 // --- Preorder batches (merchant) ---
@@ -22,6 +23,16 @@ func (h *CommerceHandlers) ListBatches(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CommerceHandlers) CreateBatch(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeaturePreorders); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitCampaigns, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in commerce.CreateBatchInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
@@ -204,6 +215,12 @@ func (h *CommerceHandlers) ListRules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CommerceHandlers) CreateRule(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureBusinessRules); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in commerce.UpsertRuleInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")

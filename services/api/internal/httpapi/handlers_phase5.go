@@ -10,6 +10,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/notifications"
 	"github.com/rubicahq/pikko/services/api/internal/portal"
 )
@@ -19,6 +20,7 @@ type Phase5Handlers struct {
 	Analytics     *analytics.Service
 	Commerce      *commerce.Service
 	Portal        *portal.Service
+	Ent           *entitlements.Service
 }
 
 func (h *Phase5Handlers) ListNotifications(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +98,12 @@ func (h *Phase5Handlers) PatchNotificationPreferences(w http.ResponseWriter, r *
 }
 
 func (h *Phase5Handlers) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureAnalytics); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	q := r.URL.Query()
 	ov, err := h.Analytics.Overview(r.Context(), StoreID(r), q.Get("from"), q.Get("to"), q.Get("tz"))
 	if err != nil {

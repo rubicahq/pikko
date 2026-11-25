@@ -8,9 +8,20 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 func (h *CommerceHandlers) CreateAdminOrder(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureOrders); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitOrdersPerMonth, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in commerce.AdminCreateOrderInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
@@ -20,6 +31,9 @@ func (h *CommerceHandlers) CreateAdminOrder(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		h.mapErr(w, r, err)
 		return
+	}
+	if h.Ent != nil {
+		_ = h.Ent.IncrementUsage(r.Context(), StoreID(r), entitlements.LimitOrdersPerMonth, 1)
 	}
 	writeJSON(w, http.StatusCreated, res)
 }

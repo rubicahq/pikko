@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/files"
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
@@ -24,6 +25,7 @@ type Phase2Handlers struct {
 	Catalog    *catalog.Service
 	Files      *files.Service
 	URLs       *urls.Generator
+	Ent        *entitlements.Service
 }
 
 func (h *Phase2Handlers) ListThemes(w http.ResponseWriter, r *http.Request) {
@@ -102,6 +104,13 @@ func (h *Phase2Handlers) SetFeatured(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Phase2Handlers) UploadFile(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		// Block when already at/over storage capacity (gauge).
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitStorageGB, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	const maxMem = 8 << 20
 	if err := r.ParseMultipartForm(maxMem); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid multipart upload.")
@@ -119,6 +128,8 @@ func (h *Phase2Handlers) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+	// Storage GB is a gauge; RequireLimit(..., 0) ensures used <= limit before upload.
+	// After upload the next create/upload will re-check.
 	f, err := h.Files.Upload(r.Context(), StoreID(r), UserID(r), purpose, hdr.Filename, hdr.Header.Get("Content-Type"), file, hdr.Size)
 	if err != nil {
 		if errors.Is(err, files.ErrInvalidInput) || strings.Contains(err.Error(), "invalid input") {
@@ -251,6 +262,16 @@ func (h *Phase2Handlers) ListProducts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Phase2Handlers) CreateProduct(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureProducts); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitActiveProducts, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in catalog.ProductWriteInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")

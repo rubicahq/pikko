@@ -51,6 +51,8 @@ type OnboardingDraft struct {
 	StoreSlug    *string   `json:"store_slug"`
 	Category     *string   `json:"category"`
 	SellingModel *string   `json:"selling_model"`
+	PlanCode     *string   `json:"plan_code"`
+	BillingCycle *string   `json:"billing_cycle"`
 	IsFirstStore bool      `json:"is_first_store"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -149,26 +151,27 @@ func (s *Service) GetOrCreateDraft(ctx context.Context, userID uuid.UUID) (*Onbo
 
 	var d OnboardingDraft
 	err := s.DB.QueryRow(ctx, `
-		SELECT id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
+		SELECT id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
 		FROM onboarding_drafts
 		WHERE user_id=$1 AND completed_at IS NULL
-	`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+	`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = s.DB.QueryRow(ctx, `
 			INSERT INTO onboarding_drafts (user_id, step, is_first_store)
 			VALUES ($1, 1, $2)
 			ON CONFLICT (user_id) DO UPDATE
 			  SET step=1, store_name=NULL, store_slug=NULL, category=NULL, selling_model=NULL,
+			      plan_code=NULL, billing_cycle=NULL,
 			      is_first_store=EXCLUDED.is_first_store, completed_at=NULL, updated_at=now()
 			WHERE onboarding_drafts.completed_at IS NOT NULL
-			RETURNING id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
-		`, userID, isFirst).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+			RETURNING id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
+		`, userID, isFirst).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Active draft exists from race; re-read
 			err = s.DB.QueryRow(ctx, `
-				SELECT id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
+				SELECT id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
 				FROM onboarding_drafts WHERE user_id=$1 AND completed_at IS NULL
-			`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+			`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 		}
 	}
 	if err != nil {
@@ -208,8 +211,8 @@ func (s *Service) SaveIdentityStep(ctx context.Context, userID uuid.UUID, in Ide
 		UPDATE onboarding_drafts
 		SET step=2, store_name=$2, store_slug=$3, category=$4, updated_at=now()
 		WHERE user_id=$1 AND completed_at IS NULL
-		RETURNING id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
-	`, userID, name, slug, cat).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+		RETURNING id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
+	`, userID, name, slug, cat).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoActiveDraft
 	}
@@ -223,17 +226,53 @@ func (s *Service) SaveSellingModelStep(ctx context.Context, userID uuid.UUID, mo
 	var d OnboardingDraft
 	err := s.DB.QueryRow(ctx, `
 		UPDATE onboarding_drafts
-		SET selling_model=$2, updated_at=now()
+		SET selling_model=$2, step=3, updated_at=now()
 		WHERE user_id=$1 AND completed_at IS NULL AND step>=2 AND store_name IS NOT NULL AND store_slug IS NOT NULL
-		RETURNING id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
-	`, userID, model).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+		RETURNING id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
+	`, userID, model).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrInvalidInput
 	}
 	return &d, err
 }
 
-func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*Store, error) {
+func (s *Service) SavePlanStep(ctx context.Context, userID uuid.UUID, planCode, billingCycle string) (*OnboardingDraft, error) {
+	planCode = strings.ToLower(strings.TrimSpace(planCode))
+	billingCycle = strings.ToLower(strings.TrimSpace(billingCycle))
+	if planCode == "" || (billingCycle != "monthly" && billingCycle != "annual") {
+		return nil, ErrInvalidInput
+	}
+	var exists bool
+	if err := s.DB.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM subscription_plans WHERE code=$1 AND is_active=true)
+	`, planCode).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrInvalidInput
+	}
+	var d OnboardingDraft
+	err := s.DB.QueryRow(ctx, `
+		UPDATE onboarding_drafts
+		SET plan_code=$2, billing_cycle=$3, step=4, updated_at=now()
+		WHERE user_id=$1 AND completed_at IS NULL AND step>=3 AND selling_model IS NOT NULL
+		RETURNING id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
+	`, userID, planCode, billingCycle).Scan(
+		&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrInvalidInput
+	}
+	return &d, err
+}
+
+type CreateFromDraftResult struct {
+	Store        *Store
+	PlanCode     string
+	BillingCycle string
+}
+
+func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*CreateFromDraftResult, error) {
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -242,11 +281,11 @@ func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*
 
 	var d OnboardingDraft
 	err = tx.QueryRow(ctx, `
-		SELECT id, step, store_name, store_slug, category, selling_model, is_first_store, updated_at
+		SELECT id, step, store_name, store_slug, category, selling_model, plan_code, billing_cycle, is_first_store, updated_at
 		FROM onboarding_drafts
 		WHERE user_id=$1 AND completed_at IS NULL
 		FOR UPDATE
-	`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.IsFirstStore, &d.UpdatedAt)
+	`, userID).Scan(&d.ID, &d.Step, &d.StoreName, &d.StoreSlug, &d.Category, &d.SellingModel, &d.PlanCode, &d.BillingCycle, &d.IsFirstStore, &d.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoActiveDraft
 	}
@@ -254,6 +293,10 @@ func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*
 		return nil, err
 	}
 	if d.StoreName == nil || d.StoreSlug == nil || d.Category == nil || d.SellingModel == nil {
+		return nil, ErrInvalidInput
+	}
+	// Plan selection required when subscription tables exist (migration 000022+).
+	if d.PlanCode == nil || d.BillingCycle == nil {
 		return nil, ErrInvalidInput
 	}
 
@@ -321,7 +364,11 @@ func (s *Service) CreateStoreFromDraft(ctx context.Context, userID uuid.UUID) (*
 		return nil, err
 	}
 	st.Role = "owner"
-	return &st, nil
+	return &CreateFromDraftResult{
+		Store:        &st,
+		PlanCode:     *d.PlanCode,
+		BillingCycle: *d.BillingCycle,
+	}, nil
 }
 
 type CreateDirectInput struct {
@@ -329,9 +376,11 @@ type CreateDirectInput struct {
 	Slug         string `json:"slug"`
 	Category     string `json:"category"`
 	SellingModel string `json:"selling_model"`
+	PlanCode     string `json:"plan_code"`
+	BillingCycle string `json:"billing_cycle"`
 }
 
-// CreateStore creates via the two-step draft flow atomically when all fields provided (additional stores).
+// CreateStore creates via the draft flow atomically when all fields provided (additional stores).
 func (s *Service) CreateStore(ctx context.Context, userID uuid.UUID, in CreateDirectInput) (*Store, error) {
 	name := strings.TrimSpace(in.Name)
 	slug := strings.ToLower(strings.TrimSpace(in.Slug))
@@ -359,7 +408,27 @@ func (s *Service) CreateStore(ctx context.Context, userID uuid.UUID, in CreateDi
 	if _, err := s.SaveSellingModelStep(ctx, userID, in.SellingModel); err != nil {
 		return nil, err
 	}
-	return s.CreateStoreFromDraft(ctx, userID)
+	if _, err := s.SavePlanStep(ctx, userID, in.PlanCode, in.BillingCycle); err != nil {
+		return nil, err
+	}
+	res, err := s.CreateStoreFromDraft(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return res.Store, nil
+}
+
+// DraftPlan returns plan selection from the completed draft just before completion, or from active draft.
+func (s *Service) LastDraftPlan(ctx context.Context, userID uuid.UUID) (planCode, billingCycle string, err error) {
+	err = s.DB.QueryRow(ctx, `
+		SELECT COALESCE(plan_code,''), COALESCE(billing_cycle,'')
+		FROM onboarding_drafts WHERE user_id=$1
+		ORDER BY updated_at DESC LIMIT 1
+	`, userID).Scan(&planCode, &billingCycle)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", ErrNoActiveDraft
+	}
+	return planCode, billingCycle, err
 }
 
 type PatchInput struct {

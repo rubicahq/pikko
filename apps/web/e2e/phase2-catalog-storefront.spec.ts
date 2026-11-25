@@ -101,6 +101,10 @@ test.describe("Phase 2 catalog and storefront", () => {
         data: { selling_model: "ready_stock" },
       });
       expect(selling.ok()).toBeTruthy();
+      const plan = await ctx.post("/api/v1/onboarding/plan", {
+        data: { plan_code: "ultimate", billing_cycle: "monthly" },
+      });
+      expect(plan.ok()).toBeTruthy();
       const complete = await ctx.post("/api/v1/onboarding/complete");
       expect(complete.ok()).toBeTruthy();
       const body = await complete.json();

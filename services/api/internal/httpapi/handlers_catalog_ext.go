@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 // --- Brands ---
@@ -162,6 +163,12 @@ func (h *Phase2Handlers) ListAttributeDefinitions(w http.ResponseWriter, r *http
 }
 
 func (h *Phase2Handlers) CreateAttributeDefinition(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureProductAttributes); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in catalog.AttributeDefinitionInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
