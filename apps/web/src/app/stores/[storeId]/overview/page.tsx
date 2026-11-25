@@ -175,12 +175,21 @@ export default async function StoreOverviewPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary" size="sm">
-              <a href={storefrontHref} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
-                View store
-              </a>
-            </Button>
+            {store.publication_status === "published" ? (
+              <Button asChild variant="secondary" size="sm">
+                <a href={storefrontHref} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
+                  View store
+                </a>
+              </Button>
+            ) : (
+              <Button asChild variant="secondary" size="sm">
+                <Link href={urls.storeStorefront(storeId)}>
+                  <ExternalLink className="h-4 w-4" strokeWidth={1.75} />
+                  Publish to view
+                </Link>
+              </Button>
+            )}
             <Button asChild variant="primary" size="sm">
               <Link href={urls.storeStorefront(storeId)}>
                 <Share2 className="h-4 w-4" strokeWidth={1.75} />
