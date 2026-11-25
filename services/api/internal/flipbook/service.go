@@ -156,7 +156,7 @@ func (s *Service) listHotspots(ctx context.Context, storeID, pageID uuid.UUID, p
 		WHERE h.store_id=$1 AND h.catalog_page_id=$2
 	`
 	if publishedProductsOnly {
-		q += ` AND (h.product_id IS NULL OR p.status='published')`
+		q += ` AND (h.product_id IS NULL OR p.status IN ('published','unlisted'))`
 	}
 	q += ` ORDER BY h.created_at`
 	rows, err := s.DB.Query(ctx, q, storeID, pageID)

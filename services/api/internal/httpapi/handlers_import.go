@@ -74,6 +74,7 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 		job, err = h.Imports.Start(r.Context(), StoreID(r), UserID(r), imports.StartInput{
 			IdempotencyKey: r.Header.Get("Idempotency-Key"),
 			CatalogTitle:   catalogName,
+			ImageMode:      r.FormValue("image_mode"),
 			Filename:       hdr.Filename,
 			DeclaredType:   hdr.Header.Get("Content-Type"),
 			Reader:         file,

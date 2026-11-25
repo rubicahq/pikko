@@ -135,7 +135,7 @@ func (s *Service) priceLines(ctx context.Context, storeID uuid.UUID, items []Car
 		if err != nil {
 			return nil, 0, err
 		}
-		if status != "published" || availability != "available" {
+		if (status != "published" && status != "unlisted") || availability != "available" {
 			return nil, 0, ErrInsufficientStock
 		}
 		if sellingModel == "ready_stock" && !readyEligible {

@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
 	"io"
 	"log/slog"
 	"strings"
@@ -53,6 +56,7 @@ type Job struct {
 	PDFFileID      *uuid.UUID `json:"pdf_file_id,omitempty"`
 	CSVFileID      *uuid.UUID `json:"csv_file_id,omitempty"`
 	ExtractImages  bool       `json:"extract_images"`
+	ImageMode      string     `json:"image_mode"`
 	Status         string     `json:"status"`
 	PageCount      *int       `json:"page_count,omitempty"`
 	ItemCount      int        `json:"item_count"`
@@ -72,7 +76,7 @@ type Job struct {
 }
 
 const jobSelectCols = `
-	id, store_id, COALESCE(source_type,'pdf'), pdf_file_id, csv_file_id, extract_images, status, page_count,
+	id, store_id, COALESCE(source_type,'pdf'), pdf_file_id, csv_file_id, extract_images, COALESCE(image_mode,'none'), status, page_count,
 	item_count, COALESCE(warning_count,0), progress_pct,
 	COALESCE(progress_stage,'queued'), progress_page, progress_pages,
 	error_message, ai_provider, COALESCE(catalog_title,''), idempotency_key, created_at, updated_at, completed_at
@@ -83,7 +87,7 @@ func scanJob(row interface {
 }) (*Job, error) {
 	var j Job
 	err := row.Scan(
-		&j.ID, &j.StoreID, &j.SourceType, &j.PDFFileID, &j.CSVFileID, &j.ExtractImages, &j.Status, &j.PageCount,
+		&j.ID, &j.StoreID, &j.SourceType, &j.PDFFileID, &j.CSVFileID, &j.ExtractImages, &j.ImageMode, &j.Status, &j.PageCount,
 		&j.ItemCount, &j.WarningCount, &j.ProgressPct, &j.ProgressStage, &j.ProgressPage, &j.ProgressPages,
 		&j.ErrorMessage, &j.AIProvider, &j.CatalogTitle, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
 	)
@@ -146,6 +150,7 @@ type Service struct {
 type StartInput struct {
 	IdempotencyKey string `json:"idempotency_key"`
 	CatalogTitle   string // required for PDF catalog imports (name before upload)
+	ImageMode      string // none, first_page, or crop
 	Filename       string
 	DeclaredType   string
 	Reader         io.Reader
@@ -161,6 +166,10 @@ func (s *Service) limits() Limits {
 
 func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in StartInput) (*Job, error) {
 	lim := s.limits()
+	if in.ImageMode == "" { in.ImageMode = "none" }
+	if in.ImageMode != "none" && in.ImageMode != "first_page" && in.ImageMode != "crop" {
+		return nil, fmt.Errorf("%w: invalid product image option", ErrInvalidInput)
+	}
 	title := strings.TrimSpace(in.CatalogTitle)
 	if title == "" {
 		return nil, fmt.Errorf("%w: catalog name is required before uploading a PDF", ErrInvalidInput)
@@ -228,10 +237,10 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	var jobID uuid.UUID
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO catalog_import_jobs (
-			store_id, created_by, source_type, pdf_file_id, extract_images, status, page_count, catalog_title, idempotency_key
-		) VALUES ($1,$2,'pdf',$3,false,'pending',$4,$5,$6)
+			store_id, created_by, source_type, pdf_file_id, extract_images, image_mode, status, page_count, catalog_title, idempotency_key
+		) VALUES ($1,$2,'pdf',$3,false,$7,'pending',$4,$5,$6)
 		RETURNING id
-	`, storeID, userID, f.ID, pages, title, idem).Scan(&jobID)
+	`, storeID, userID, f.ID, pages, title, idem, in.ImageMode).Scan(&jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -921,6 +930,7 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 	_, _ = s.DB.Exec(ctx, `DELETE FROM catalog_import_items WHERE job_id=$1 AND store_id=$2`, jobID, storeID)
 
 	aiPages := make([]ai.PageImage, 0, len(pages))
+	var firstPageFileID uuid.UUID
 	for _, p := range pages {
 		sf, err := s.Files.Upload(ctx, storeID, uuid.Nil, "catalog_page",
 			fmt.Sprintf("page-%d.png", p.PageNumber), "image/png",
@@ -928,6 +938,7 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, err)
 		}
+		if p.PageNumber == 1 { firstPageFileID = sf.ID }
 		_, err = s.DB.Exec(ctx, `
 			INSERT INTO catalog_pages (store_id, image_file_id, display_order, status, source_import_job_id, page_number)
 			VALUES ($1,$2,$3,'draft',$4,$5)
@@ -972,6 +983,12 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 			return s.failJob(ctx, storeID, jobID, fmt.Errorf("AI extraction failed on page %d: %w", pageNum, err))
 		}
 
+		var productPageImage image.Image
+		if job.ImageMode == "crop" {
+			if pageBytes, decodeErr := base64.StdEncoding.DecodeString(pageImg.Base64Data); decodeErr == nil {
+				productPageImage, _ = png.Decode(bytes.NewReader(pageBytes))
+			}
+		}
 		for _, ex := range result.Items {
 			if count >= lim.MaxItems {
 				break
@@ -987,6 +1004,12 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 				variant = json.RawMessage(`{}`)
 			}
 			var imageID *uuid.UUID
+			if job.ImageMode == "first_page" && firstPageFileID != uuid.Nil {
+				imageID = &firstPageFileID
+			}
+			if job.ImageMode == "crop" {
+				imageID = s.cropImportItem(ctx, storeID, productPageImage, ex, displayOrder)
+			}
 			if ex.Uncertain || (ex.Warning != nil && strings.TrimSpace(*ex.Warning) != "") {
 				warnCount++
 			}
@@ -1039,6 +1062,24 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		"ai_provider":   provider,
 	}, "outbox-review-"+job.IdempotencyKey)
 	return nil
+}
+
+// cropImportItem derives a product photo from an already rendered PDF page.
+func (s *Service) cropImportItem(ctx context.Context, storeID uuid.UUID, source image.Image, item ai.ExtractedItem, order int) *uuid.UUID {
+	if item.BBoxXPct == nil || item.BBoxYPct == nil || item.BBoxWidthPct == nil || item.BBoxHeightPct == nil { return nil }
+	x, y, w, h, ok := clampHotspotBBox(*item.BBoxXPct, *item.BBoxYPct, *item.BBoxWidthPct, *item.BBoxHeightPct)
+	if !ok { return nil }
+	if source == nil { return nil }
+	bounds := source.Bounds()
+	area := image.Rect(bounds.Min.X+int(x*float64(bounds.Dx())/100), bounds.Min.Y+int(y*float64(bounds.Dy())/100), bounds.Min.X+int((x+w)*float64(bounds.Dx())/100), bounds.Min.Y+int((y+h)*float64(bounds.Dy())/100)).Intersect(bounds)
+	if area.Empty() { return nil }
+	cropped := image.NewRGBA(image.Rect(0,0,area.Dx(),area.Dy()))
+	draw.Draw(cropped, cropped.Bounds(), source, area.Min, draw.Src)
+	var output bytes.Buffer
+	if err := png.Encode(&output, cropped); err != nil || output.Len() > 5<<20 { return nil }
+	file, err := s.Files.Upload(ctx, storeID, uuid.Nil, "import_crop", fmt.Sprintf("item-%d.png", order+1), "image/png", bytes.NewReader(output.Bytes()), int64(output.Len()))
+	if err != nil { return nil }
+	return &file.ID
 }
 
 // ensureProductImage returns a stored_files id with purpose=product suitable for product_images.

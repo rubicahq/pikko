@@ -35,7 +35,7 @@ export function CatalogBannerCards({
 
   return (
     <div>
-      <ul className="mt-4 flex flex-col gap-4">
+      <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {visible.map((c) => (
           <li key={c.id}>
             <Link
@@ -43,11 +43,11 @@ export function CatalogBannerCards({
               className="group relative block overflow-hidden rounded-[14px] border transition-opacity hover:opacity-95"
               style={{ borderColor }}
             >
-              <div className="aspect-video w-full" style={{ background: surfaceColor }}>
+              <div className="aspect-[4/5] w-full" style={{ background: surfaceColor }}>
                 {c.cover_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={c.cover_url.startsWith("http") ? c.cover_url : urls.api(c.cover_url)}
+                    src={c.cover_url}
                     alt=""
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                   />

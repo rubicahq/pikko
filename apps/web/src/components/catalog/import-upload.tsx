@@ -18,6 +18,7 @@ export function ImportUpload({
   const router = useRouter();
   const [catalogName, setCatalogName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [imageMode, setImageMode] = useState<"crop" | "first_page" | "none">("crop");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,12 +61,13 @@ export function ImportUpload({
       fd.append("source", source);
       if (source === "pdf") {
         fd.append("catalog_name", catalogName.trim());
+        fd.append("image_mode", imageMode);
       }
       const res = await fetch(urls.api(`/api/v1/stores/${storeId}/catalog-imports`), {
         method: "POST",
         credentials: "include",
         headers: {
-          "Idempotency-Key": `web-${source}-${storeId}-${file.name}-${file.size}-${file.lastModified}`,
+          "Idempotency-Key": `web-${source}-${storeId}-${file.name}-${file.size}-${file.lastModified}-${imageMode}`,
         },
         body: fd,
       });
@@ -122,6 +124,20 @@ export function ImportUpload({
               Required. Upload stays locked until you set a name.
             </p>
           </div>
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Product photos</legend>
+            {[
+              { value: "crop", label: "Crop each item", detail: "Uses each item's detected area on its PDF page. Items without an area have no photo." },
+              { value: "first_page", label: "Use the first page", detail: "The same full first page is used for every product." },
+              { value: "none", label: "No photos", detail: "Products are created without a photo." },
+            ].map((option) => (
+              <label key={option.value} className="flex gap-3 rounded-md border border-border p-3 text-sm">
+                <input type="radio" name="image_mode" value={option.value} checked={imageMode === option.value} onChange={() => setImageMode(option.value as typeof imageMode)} />
+                <span><span className="block font-medium">{option.label}</span><span className="block text-foreground-secondary">{option.detail}</span></span>
+              </label>
+            ))}
+            <p className="text-xs text-foreground-secondary">Estimated AI use for every option is 1 PDF page credit per page. Crop and first-page photos add 0 AI page credits. Exact total is shown after upload.</p>
+          </fieldset>
           <div className="space-y-2">
             <Label htmlFor="pdf">PDF file</Label>
             <input

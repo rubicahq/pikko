@@ -704,7 +704,7 @@ func (s *Service) GetProduct(ctx context.Context, storeID, productID uuid.UUID, 
 	if err != nil {
 		return nil, err
 	}
-	if publicOnly && p.Status != "published" {
+	if publicOnly && p.Status != "published" && p.Status != "unlisted" {
 		return nil, ErrNotFound
 	}
 	if err := s.attachImages(ctx, &p); err != nil {
@@ -956,7 +956,7 @@ func (s *Service) SetupChecklist(ctx context.Context, storeID uuid.UUID) (map[st
 }
 
 func validStatus(s string) bool {
-	return s == "draft" || s == "published" || s == "archived"
+	return s == "draft" || s == "published" || s == "unlisted" || s == "archived"
 }
 
 func validAvail(s string) bool {
