@@ -8,10 +8,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/campaigns"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 type CampaignHandlers struct {
 	Campaigns *campaigns.Service
+	Ent       *entitlements.Service
 }
 
 func (h *CampaignHandlers) mapErr(w http.ResponseWriter, r *http.Request, err error) {
@@ -38,6 +40,16 @@ func (h *CampaignHandlers) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CampaignHandlers) Create(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureCampaigns); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitCampaigns, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in campaigns.CreateInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")

@@ -190,15 +190,23 @@ func TestOnboardingResumeAndIdempotentCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := storeSvc.CreateStoreFromDraft(context.Background(), userID)
+	_, err = storeSvc.SavePlanStep(context.Background(), userID, "premium", "monthly")
 	if err != nil {
 		t.Fatal(err)
 	}
+	res, err := storeSvc.CreateStoreFromDraft(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := res.Store
 	_, err = storeSvc.CreateStoreFromDraft(context.Background(), userID)
 	if err == nil {
 		t.Fatal("second create should fail without draft")
 	}
 	if st.Theme != "pikko_signature" || st.PublicationStatus != "draft" || st.CheckoutEnabled {
 		t.Fatalf("defaults wrong: %+v", st)
+	}
+	if res.PlanCode != "premium" || res.BillingCycle != "monthly" {
+		t.Fatalf("plan not returned: %+v", res)
 	}
 }

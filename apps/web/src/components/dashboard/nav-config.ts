@@ -364,6 +364,15 @@ export const SETTINGS_WORKSPACE: WorkspaceDef = {
       permission: "stores.settings",
     },
     {
+      id: "subscription",
+      label: "Subscription & Billing",
+      href: "settings?tab=subscription",
+      matchPrefixes: ["settings"],
+      search: { key: "tab", value: "subscription" },
+      implemented: true,
+      permission: "stores.settings",
+    },
+    {
       id: "whatsapp",
       label: "WhatsApp Templates",
       href: "messages",

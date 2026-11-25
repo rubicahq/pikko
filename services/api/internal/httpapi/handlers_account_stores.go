@@ -9,6 +9,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/account"
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
@@ -50,6 +51,7 @@ type StoreHandlers struct {
 	Stores *stores.Service
 	URLs   *urls.Generator
 	Cfg    *config.Config
+	Ent    *entitlements.Service
 }
 
 func (h *StoreHandlers) decorate(st *stores.Store) {
@@ -80,6 +82,11 @@ func (h *StoreHandlers) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.writeStoreErr(w, r, err)
 		return
+	}
+	if h.Ent != nil {
+		_, _ = h.Ent.ActivateTestBypass(r.Context(), st.ID, UserID(r), entitlements.ActivateInput{
+			PlanCode: in.PlanCode, BillingCycle: in.BillingCycle,
+		})
 	}
 	h.decorate(st)
 	writeJSON(w, http.StatusCreated, map[string]any{"store": st})
@@ -202,11 +209,37 @@ func (h *StoreHandlers) SaveSellingModel(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]any{"draft": d})
 }
 
-func (h *StoreHandlers) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
-	st, err := h.Stores.CreateStoreFromDraft(r.Context(), UserID(r))
+func (h *StoreHandlers) SavePlan(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		PlanCode     string `json:"plan_code"`
+		BillingCycle string `json:"billing_cycle"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	d, err := h.Stores.SavePlanStep(r.Context(), UserID(r), body.PlanCode, body.BillingCycle)
 	if err != nil {
 		h.writeStoreErr(w, r, err)
 		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"draft": d})
+}
+
+func (h *StoreHandlers) CompleteOnboarding(w http.ResponseWriter, r *http.Request) {
+	res, err := h.Stores.CreateStoreFromDraft(r.Context(), UserID(r))
+	if err != nil {
+		h.writeStoreErr(w, r, err)
+		return
+	}
+	st := res.Store
+	if h.Ent != nil {
+		if _, err := h.Ent.ActivateTestBypass(r.Context(), st.ID, UserID(r), entitlements.ActivateInput{
+			PlanCode: res.PlanCode, BillingCycle: res.BillingCycle,
+		}); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
 	}
 	h.decorate(st)
 	writeJSON(w, http.StatusCreated, map[string]any{"store": st})

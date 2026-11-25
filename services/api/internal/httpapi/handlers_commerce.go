@@ -14,6 +14,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/campaigns"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
 
@@ -22,6 +23,7 @@ type CommerceHandlers struct {
 	Campaigns *campaigns.Service
 	URLs      *urls.Generator
 	Cfg       *config.Config
+	Ent       *entitlements.Service
 }
 
 func commerceInvalidInputMessage(err error) string {
@@ -307,6 +309,22 @@ func (h *CommerceHandlers) CheckoutSubmit(w http.ResponseWriter, r *http.Request
 		h.mapErr(w, r, err)
 		return
 	}
+	if h.Ent != nil && h.Commerce != nil && h.Commerce.DB != nil {
+		var sid uuid.UUID
+		err := h.Commerce.DB.QueryRow(r.Context(), `
+			SELECT id FROM stores WHERE slug=$1 AND archived_at IS NULL
+		`, slug).Scan(&sid)
+		if err == nil {
+			if err := h.Ent.RequireFeature(r.Context(), sid, entitlements.FeatureCheckout); err != nil {
+				writeEntitlementErr(w, r, err)
+				return
+			}
+			if err := h.Ent.RequireLimit(r.Context(), sid, entitlements.LimitOrdersPerMonth, 1); err != nil {
+				writeEntitlementErr(w, r, err)
+				return
+			}
+		}
+	}
 	var in commerce.CheckoutSubmitInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
@@ -319,6 +337,9 @@ func (h *CommerceHandlers) CheckoutSubmit(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.mapErr(w, r, err)
 		return
+	}
+	if h.Ent != nil && res != nil && res.Order != nil {
+		_ = h.Ent.IncrementUsage(r.Context(), res.Order.StoreID, entitlements.LimitOrdersPerMonth, 1)
 	}
 	writeJSON(w, http.StatusCreated, res)
 }

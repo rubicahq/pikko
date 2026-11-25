@@ -8,14 +8,26 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/imports"
 )
 
 type ImportHandlers struct {
 	Imports *imports.Service
+	Ent     *entitlements.Service
 }
 
 func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureCatalogs); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitCatalogs, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	const maxMem = 32 << 20
 	if err := r.ParseMultipartForm(maxMem); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid multipart upload.")
@@ -43,6 +55,12 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 			Size:           hdr.Size,
 		})
 	} else {
+		if h.Ent != nil {
+			if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureAIPDFImport); err != nil {
+				writeEntitlementErr(w, r, err)
+				return
+			}
+		}
 		catalogName := strings.TrimSpace(r.FormValue("catalog_name"))
 		if catalogName == "" {
 			catalogName = strings.TrimSpace(r.FormValue("title"))

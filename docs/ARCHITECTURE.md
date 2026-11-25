@@ -48,6 +48,7 @@ Packages under `services/api/internal/` are **logical modules**, not separate de
 | `notifications` / `analytics` | In-app notifications + overview metrics |
 | `email` / `jobs` | Email jobs + job_queue + outbox worker |
 | `money` / `urls` / `config` / `httpapi` | Cross-cutting |
+| `entitlements` | Store subscriptions, plan catalog, usage limits, testing activation |
 
 ### 2.2 Target modules (additive; do not invent microservices)
 

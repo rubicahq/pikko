@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 	"github.com/rubicahq/pikko/services/api/internal/team"
 )
@@ -16,6 +17,7 @@ import (
 type TeamHandlers struct {
 	Team *team.Service
 	Cfg  *config.Config
+	Ent  *entitlements.Service
 }
 
 func (h *TeamHandlers) setSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
@@ -63,6 +65,16 @@ func (h *TeamHandlers) ListInvites(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TeamHandlers) CreateInvite(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureTeam); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+		if err := h.Ent.RequireLimit(r.Context(), StoreID(r), entitlements.LimitTeamMembers, 1); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in team.CreateInviteInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")

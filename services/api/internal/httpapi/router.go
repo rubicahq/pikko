@@ -18,6 +18,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
 	"github.com/rubicahq/pikko/services/api/internal/email"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/files"
 	"github.com/rubicahq/pikko/services/api/internal/flipbook"
 	"github.com/rubicahq/pikko/services/api/internal/imports"
@@ -78,13 +79,17 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 		importSvc.Limits = imports.DefaultLimits()
 	}
 
+	entSvc := &entitlements.Service{DB: d.DB, Cfg: d.Cfg}
+	billingH := &BillingHandlers{Ent: entSvc}
+	adminBillingH := &AdminBillingHandlers{Ent: entSvc, Tok: d.Cfg.SubscriptionAdminToken}
+
 	authH := &AuthHandlers{Auth: authSvc, Cfg: d.Cfg}
 	accountH := &AccountHandlers{Account: accountSvc}
-	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg}
+	storeH := &StoreHandlers{Stores: storeSvc, URLs: urlGen, Cfg: d.Cfg, Ent: entSvc}
 	teamSvc := &team.Service{DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger}
-	teamH := &TeamHandlers{Team: teamSvc, Cfg: d.Cfg}
-	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen}
-	impH := &ImportHandlers{Imports: importSvc}
+	teamH := &TeamHandlers{Team: teamSvc, Cfg: d.Cfg, Ent: entSvc}
+	p2 := &Phase2Handlers{Storefront: storefrontSvc, Catalog: catalogSvc, Files: filesSvc, URLs: urlGen, Ent: entSvc}
+	impH := &ImportHandlers{Imports: importSvc, Ent: entSvc}
 	flipSvc := &flipbook.Service{DB: d.DB}
 	flipH := &FlipbookHandlers{Flipbook: flipSvc, Catalog: catalogSvc, URLs: urlGen}
 	catalogDocSvc := &catalogs.Service{DB: d.DB}
@@ -98,12 +103,12 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 		Notifier: notifSvc,
 	}
 	campaignSvc := &campaigns.Service{DB: d.DB}
-	campaignH := &CampaignHandlers{Campaigns: campaignSvc}
-	commerceH := &CommerceHandlers{Commerce: commerceSvc, Campaigns: campaignSvc, URLs: urlGen, Cfg: d.Cfg}
+	campaignH := &CampaignHandlers{Campaigns: campaignSvc, Ent: entSvc}
+	commerceH := &CommerceHandlers{Commerce: commerceSvc, Campaigns: campaignSvc, URLs: urlGen, Cfg: d.Cfg, Ent: entSvc}
 	portalSvc := &portal.Service{
 		DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger, Commerce: commerceSvc,
 	}
-	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc, Portal: portalSvc}
+	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc, Portal: portalSvc, Ent: entSvc}
 	portalH := &PortalHandlers{Portal: portalSvc, Cfg: d.Cfg}
 	waSvc := &whatsapp.Service{DB: d.DB, URLs: urlGen}
 	waH := &WhatsAppHandlers{WA: waSvc}
@@ -139,7 +144,14 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/onboarding/draft", authMW.Require(http.HandlerFunc(storeH.GetDraft)))
 	mux.Handle("POST /api/v1/onboarding/identity", authMW.Require(http.HandlerFunc(storeH.SaveIdentity)))
 	mux.Handle("POST /api/v1/onboarding/selling-model", authMW.Require(http.HandlerFunc(storeH.SaveSellingModel)))
+	mux.Handle("POST /api/v1/onboarding/plan", authMW.Require(http.HandlerFunc(storeH.SavePlan)))
 	mux.Handle("POST /api/v1/onboarding/complete", authMW.Require(http.HandlerFunc(storeH.CompleteOnboarding)))
+
+	mux.HandleFunc("GET /api/v1/billing/plans", billingH.ListPlans)
+	mux.HandleFunc("GET /api/v1/admin/subscription/plans", adminBillingH.ListPlans)
+	mux.HandleFunc("PATCH /api/v1/admin/subscription/plans/{planCode}", adminBillingH.PatchPlan)
+	mux.HandleFunc("PUT /api/v1/admin/subscription/flags", adminBillingH.PatchFlags)
+	mux.HandleFunc("POST /api/v1/admin/stores/{storeID}/subscription/overrides", adminBillingH.SetStoreOverride)
 
 	// Explicit store-scoped routes with membership + optional permission checks
 	storeAuthed := func(h http.HandlerFunc) http.Handler {
@@ -148,6 +160,11 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	storePerm := func(perm rbac.Permission, h http.HandlerFunc) http.Handler {
 		return authMW.Require(storeMW.RequirePermission(perm)(h))
 	}
+
+	mux.Handle("GET /api/v1/stores/{storeID}/subscription", storePerm(rbac.PermStoresSettings, billingH.GetStoreSubscription))
+	mux.Handle("POST /api/v1/stores/{storeID}/subscription/activate", storePerm(rbac.PermStoresSettings, billingH.Activate))
+	mux.Handle("POST /api/v1/stores/{storeID}/subscription/change", storePerm(rbac.PermStoresSettings, billingH.Change))
+	mux.Handle("GET /api/v1/stores/{storeID}/subscription/usage", storePerm(rbac.PermStoresRead, billingH.Usage))
 
 	mux.Handle("GET /api/v1/stores/{storeID}", storePerm(rbac.PermStoresRead, storeH.Get))
 	mux.Handle("PATCH /api/v1/stores/{storeID}", storePerm(rbac.PermStoresSettings, storeH.Patch))
