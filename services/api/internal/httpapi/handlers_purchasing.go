@@ -38,7 +38,7 @@ func (h *CommerceHandlers) StorePurchasing(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	q := r.URL.Query()
-	f := commerce.PurchasingFilter{GroupBy: q.Get("group_by")}
+	f := commerce.PurchasingFilter{GroupBy: q.Get("group_by"), Source: q.Get("source")}
 	if v := q.Get("batch_id"); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
@@ -76,7 +76,12 @@ func (h *CommerceHandlers) StorePurchasing(w http.ResponseWriter, r *http.Reques
 		h.mapErr(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"purchasing": list})
+	attributes, err := h.Commerce.ListPurchasingAttributes(r.Context(), StoreID(r), f.Source)
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"purchasing": list, "groupable_attributes": attributes})
 }
 
 func (h *CommerceHandlers) UnavailableImpact(w http.ResponseWriter, r *http.Request) {

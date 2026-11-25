@@ -9,11 +9,144 @@ import (
 )
 
 type PurchasingFilter struct {
+	Source     string // orders (default) | wishlist
 	BatchID    *uuid.UUID
 	CampaignID *uuid.UUID
 	VendorID   *uuid.UUID
 	BrandID    *uuid.UUID
 	GroupBy    string // variant (default) | vendor | brand | campaign
+}
+
+type PurchasingAttribute struct {
+	ID    uuid.UUID `json:"id"`
+	Label string    `json:"label"`
+}
+
+// ListPurchasingAttributes returns only product attributes applied to products
+// present in the selected demand source.
+func (s *Service) ListPurchasingAttributes(ctx context.Context, storeID uuid.UUID, source string) ([]PurchasingAttribute, error) {
+	join := `JOIN order_items oi ON oi.product_id=pav.product_id AND oi.store_id=pav.store_id
+		JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id AND o.order_status NOT IN ('cancelled') AND o.preorder_batch_id IS NOT NULL`
+	if source == "wishlist" {
+		join = `JOIN wishlist_items w ON w.product_id=pav.product_id AND w.store_id=pav.store_id`
+	}
+	rows, err := s.DB.Query(ctx, `SELECT DISTINCT ad.id, ad.label FROM attribute_definitions ad
+		JOIN product_attribute_values pav ON pav.attribute_id=ad.id AND pav.store_id=ad.store_id
+		`+join+` WHERE ad.store_id=$1 ORDER BY ad.label`, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PurchasingAttribute{}
+	for rows.Next() {
+		var a PurchasingAttribute
+		if err := rows.Scan(&a.ID, &a.Label); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+func (s *Service) purchasingAttributeLabel(ctx context.Context, storeID, productID, attributeID uuid.UUID) (string, error) {
+	var label string
+	err := s.DB.QueryRow(ctx, `SELECT COALESCE(NULLIF(string_agg(ao.label, ', ' ORDER BY ao.sort_order, ao.label), ''),
+		pav.value_text, pav.value_number::text, pav.value_boolean::text, 'Unspecified')
+		FROM product_attribute_values pav
+		LEFT JOIN attribute_options ao ON ao.id=ANY(pav.value_option_ids) AND ao.store_id=pav.store_id
+		WHERE pav.store_id=$1 AND pav.product_id=$2 AND pav.attribute_id=$3
+		GROUP BY pav.value_text, pav.value_number, pav.value_boolean`, storeID, productID, attributeID).Scan(&label)
+	if err != nil {
+		return "Unspecified", nil
+	}
+	return label, nil
+}
+
+func (s *Service) aggregateWishlistPurchasing(ctx context.Context, storeID uuid.UUID, f PurchasingFilter) ([]PurchasingLine, error) {
+	args := []any{storeID}
+	where := `w.store_id=$1`
+	if f.CampaignID != nil {
+		args = append(args, *f.CampaignID)
+		where += ` AND w.campaign_id=$2`
+	}
+	rows, err := s.DB.Query(ctx, `SELECT w.product_id, w.variant_id, p.name, p.sku,
+		NULLIF(pv.option_key,''), p.brand_id, br.name, w.campaign_id, c.name, COUNT(*)::int
+		FROM wishlist_items w JOIN products p ON p.id=w.product_id AND p.store_id=w.store_id
+		JOIN campaigns c ON c.id=w.campaign_id AND c.store_id=w.store_id
+		LEFT JOIN product_variants pv ON pv.id=w.variant_id AND pv.store_id=w.store_id
+		LEFT JOIN brands br ON br.id=p.brand_id AND br.store_id=p.store_id
+		WHERE `+where+` GROUP BY w.product_id,w.variant_id,p.name,p.sku,pv.option_key,p.brand_id,br.name,w.campaign_id,c.name
+		ORDER BY c.name,p.name`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	lines := []PurchasingLine{}
+	for rows.Next() {
+		var l PurchasingLine
+		if err := rows.Scan(&l.ProductID, &l.VariantID, &l.ProductName, &l.SKU, &l.VariantLabel, &l.BrandID, &l.BrandName, &l.CampaignID, &l.BatchName, &l.RequiredQty); err != nil {
+			return nil, err
+		}
+		lines = append(lines, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	filtered := lines[:0]
+	for _, line := range lines {
+		line.VendorID, line.VendorName = s.preferredVendor(ctx, storeID, line.ProductID)
+		if f.VendorID != nil && (line.VendorID == nil || *line.VendorID != *f.VendorID) {
+			continue
+		}
+		if f.BrandID != nil && (line.BrandID == nil || *line.BrandID != *f.BrandID) {
+			continue
+		}
+		filtered = append(filtered, line)
+	}
+	return s.decoratePurchasingGroups(ctx, storeID, filtered, f.GroupBy)
+}
+
+func (s *Service) decoratePurchasingGroups(ctx context.Context, storeID uuid.UUID, lines []PurchasingLine, groupBy string) ([]PurchasingLine, error) {
+	if strings.HasPrefix(groupBy, "attribute:") {
+		id, err := uuid.Parse(strings.TrimPrefix(groupBy, "attribute:"))
+		if err != nil {
+			return nil, ErrInvalidInput
+		}
+		var exists bool
+		if err = s.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM attribute_definitions WHERE store_id=$1 AND id=$2)`, storeID, id).Scan(&exists); err != nil {
+			return nil, err
+		}
+		if !exists {
+			return nil, ErrInvalidInput
+		}
+		for i := range lines {
+			lines[i].GroupLabel, err = s.purchasingAttributeLabel(ctx, storeID, lines[i].ProductID, id)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else if groupBy == "brand" || groupBy == "vendor" || groupBy == "campaign" {
+		for i := range lines {
+			switch groupBy {
+			case "brand":
+				if lines[i].BrandName != nil {
+					lines[i].GroupLabel = *lines[i].BrandName
+				}
+			case "vendor":
+				if lines[i].VendorName != nil {
+					lines[i].GroupLabel = *lines[i].VendorName
+				}
+			case "campaign":
+				if lines[i].BatchName != nil {
+					lines[i].GroupLabel = *lines[i].BatchName
+				}
+			}
+			if lines[i].GroupLabel == "" {
+				lines[i].GroupLabel = "Unspecified"
+			}
+		}
+	}
+	return lines, nil
 }
 
 type PurchasingEligibility struct {
@@ -96,6 +229,12 @@ func (s *Service) ListPurchasingEligibility(ctx context.Context, storeID uuid.UU
 // AggregatePurchasing consolidates demand by exact variant (default), optionally
 // filtered by campaign / batch / vendor / brand (PUR-01, PUR-04, PUR-05, VEN-03).
 func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f PurchasingFilter) ([]PurchasingLine, error) {
+	if f.Source == "wishlist" {
+		return s.aggregateWishlistPurchasing(ctx, storeID, f)
+	}
+	if f.Source != "" && f.Source != "orders" {
+		return nil, ErrInvalidInput
+	}
 	groupBy := strings.ToLower(strings.TrimSpace(f.GroupBy))
 	if groupBy == "" {
 		groupBy = "variant"
@@ -244,10 +383,7 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 		out = append(out, line)
 	}
 
-	if groupBy == "vendor" || groupBy == "brand" || groupBy == "campaign" {
-		out = collapsePurchasingLines(out, groupBy)
-	}
-	return out, nil
+	return s.decoratePurchasingGroups(ctx, storeID, out, groupBy)
 }
 
 func (s *Service) preferredVendor(ctx context.Context, storeID, productID uuid.UUID) (*uuid.UUID, *string) {

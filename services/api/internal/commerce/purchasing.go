@@ -31,16 +31,17 @@ type PurchasingLine struct {
 	ReceivedQty    int        `json:"received_qty"`
 	OutstandingQty int        `json:"outstanding_qty"` // required - purchased (floored at 0)
 	Version        int        `json:"version,omitempty"`
+	GroupLabel     string     `json:"group_label,omitempty"`
 }
 
 type UpdatePurchasingInput struct {
-	ProductID      uuid.UUID  `json:"product_id"`
-	VariantID      *uuid.UUID `json:"variant_id,omitempty"`
-	VendorID       *uuid.UUID `json:"vendor_id,omitempty"`
-	PurchasedQty   *int       `json:"purchased_qty,omitempty"`
-	UnavailableQty *int       `json:"unavailable_qty,omitempty"`
-	Notes          *string    `json:"notes,omitempty"`
-	ExpectedVersion *int      `json:"expected_version,omitempty"`
+	ProductID       uuid.UUID  `json:"product_id"`
+	VariantID       *uuid.UUID `json:"variant_id,omitempty"`
+	VendorID        *uuid.UUID `json:"vendor_id,omitempty"`
+	PurchasedQty    *int       `json:"purchased_qty,omitempty"`
+	UnavailableQty  *int       `json:"unavailable_qty,omitempty"`
+	Notes           *string    `json:"notes,omitempty"`
+	ExpectedVersion *int       `json:"expected_version,omitempty"`
 }
 
 type AllocateInput struct {

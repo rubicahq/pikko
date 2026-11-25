@@ -53,7 +53,10 @@ type PurchasingLine = {
   received_qty: number;
   outstanding_qty: number;
   version?: number;
+  group_label?: string;
 };
+
+type GroupableAttribute = { id: string; label: string };
 
 type Vendor = { id: string; name: string; status: string };
 
@@ -66,6 +69,8 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   const [tab, setTab] = useState<Tab>(receivingRequested ? "receiving" : "requirements");
   const [eligibility, setEligibility] = useState<Eligibility[]>([]);
   const [lines, setLines] = useState<PurchasingLine[]>([]);
+  const [attributes, setAttributes] = useState<GroupableAttribute[]>([]);
+  const [source, setSource] = useState<"orders" | "wishlist">("orders");
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [batchId, setBatchId] = useState("");
   const [vendorId, setVendorId] = useState("");
@@ -103,10 +108,11 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         apiFetch<{ eligibility: Eligibility[] }>(
           `/api/v1/stores/${storeId}/purchasing/eligibility`,
         ),
-        apiFetch<{ purchasing: PurchasingLine[] }>(
+        apiFetch<{ purchasing: PurchasingLine[]; groupable_attributes: GroupableAttribute[] }>(
           `/api/v1/stores/${storeId}/purchasing?${new URLSearchParams({
-            ...(batchId ? { batch_id: batchId } : {}),
+            ...(source === "orders" && batchId ? { batch_id: batchId } : {}),
             ...(vendorId ? { vendor_id: vendorId } : {}),
+            source,
             group_by: groupBy,
           }).toString()}`,
         ),
@@ -117,12 +123,17 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
       ]);
       setEligibility(elig.eligibility || []);
       setLines(purch.purchasing || []);
+      setAttributes(purch.groupable_attributes || []);
       setVendors((vend.vendors || []).filter((v) => v.status === "active"));
       setReceiving(recv.receiving || []);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load purchasing.");
     }
-  }, [storeId, batchId, vendorId, groupBy]);
+  }, [storeId, batchId, vendorId, groupBy, source]);
+
+  const displayLines = useMemo(() => groupBy === "variant"
+    ? lines
+    : [...lines].sort((a, b) => (a.group_label || "").localeCompare(b.group_label || "") || a.product_name.localeCompare(b.product_name)), [lines, groupBy]);
 
   useEffect(() => {
     void load();
@@ -202,7 +213,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
     <div className="mx-auto max-w-dashboard space-y-8">
       <PageHeader
         title="Purchasing"
-        description="Aggregate paid demand by exact variant, record purchases per vendor, allocate arrivals, and hand off to receiving."
+        description="Review order demand and customer wishlist interest by product or attribute. Record purchases from orders and hand off to receiving."
         actions={
           <>
             <Button asChild variant="outline">
@@ -248,7 +259,17 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
 
       {tab === "requirements" ? (
         <div className="space-y-4">
+          <div className="flex gap-2" aria-label="Demand source">
+            {(["orders", "wishlist"] as const).map((value) => (
+              <button key={value} type="button" aria-pressed={source === value}
+                onClick={() => { setSource(value); setGroupBy("variant"); }}
+                className={source === value ? "rounded-md bg-ink px-4 py-2 text-sm font-semibold text-foreground-inverse" : "rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground-secondary"}>
+                {value === "orders" ? "Orders" : "Wishlist"}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-background-subtle/60 p-4">
+            {source === "orders" ? <>
             <label className="space-y-1 text-sm">
               <span className="text-foreground-muted">Batch</span>
               <select
@@ -264,6 +285,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                 ))}
               </select>
             </label>
+            </> : null}
             <label className="space-y-1 text-sm">
               <span className="text-foreground-muted">Vendor</span>
               <select
@@ -288,30 +310,33 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
               >
                 <option value="variant">Exact variant</option>
                 <option value="vendor">By vendor</option>
-                <option value="brand">By brand</option>
+                <option value="brand">By native brand</option>
                 <option value="campaign">By campaign</option>
+                {attributes.map((attribute) => <option key={attribute.id} value={`attribute:${attribute.id}`}>By {attribute.label}</option>)}
               </select>
             </label>
-            <Button type="button" variant="outline" disabled={busy || !batchId} onClick={() => void createReceivingFromBatch()}>
+            {source === "orders" ? <Button type="button" variant="outline" disabled={busy || !batchId} onClick={() => void createReceivingFromBatch()}>
               Start receiving
-            </Button>
+            </Button> : null}
           </div>
 
           {lines.length === 0 ? (
             <EmptyState
-              title="No purchasing demand yet"
-              description="Close a preorder batch with paid orders, or create admin orders linked to a campaign batch."
+              title={source === "wishlist" ? "No wishlist interest yet" : "No purchasing demand yet"}
+              description={source === "wishlist" ? "Products saved by customers in live shopping will appear here." : "Close a preorder batch with paid orders, or create admin orders linked to a campaign batch."}
             />
           ) : (
             <Table stickyHeader>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead sticky>Product / variant</TableHead>
-                  <TableHead sticky>Batch</TableHead>
+                  {groupBy !== "variant" ? <TableHead sticky>Group</TableHead> : null}
+                  <TableHead sticky>{source === "wishlist" ? "Live shopping" : "Batch"}</TableHead>
                   <TableHead sticky>Vendor</TableHead>
                   <TableHead sticky className="text-right">
-                    Required
+                    {source === "wishlist" ? "Wishlisted" : "Required"}
                   </TableHead>
+                  {source === "orders" ? <>
                   <TableHead sticky className="text-right">
                     Unpaid
                   </TableHead>
@@ -328,10 +353,11 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                     Outstanding
                   </TableHead>
                   <TableHead sticky />
+                  </> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {lines.map((line) => {
+                {displayLines.map((line) => {
                   const key = lineKey(line);
                   return (
                     <TableRow key={key}>
@@ -341,6 +367,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                           {[line.variant_label, line.brand_name, line.sku].filter(Boolean).join(" · ") || "—"}
                         </div>
                       </TableCell>
+                      {groupBy !== "variant" ? <TableCell className="font-medium">{line.group_label || "Unspecified"}</TableCell> : null}
                       <TableCell className="text-sm text-foreground-secondary">
                         {line.batch_name || "—"}
                       </TableCell>
@@ -348,6 +375,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                         {line.vendor_name || "Unassigned"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{line.required_qty}</TableCell>
+                      {source === "orders" ? <>
                       <TableCell className="text-right tabular-nums">{line.unpaid_demand}</TableCell>
                       <TableCell className="text-right">
                         <Input
@@ -380,6 +408,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                           Save
                         </Button>
                       </TableCell>
+                      </> : null}
                     </TableRow>
                   );
                 })}
