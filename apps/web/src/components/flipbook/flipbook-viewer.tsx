@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CartBadge } from "@/components/storefront/cart-badge";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { addToCart } from "@/lib/cart";
@@ -237,10 +238,9 @@ export function FlipbookViewer({
           <span className="mx-1.5">/</span>
           Catalog
         </p>
-        <h1 className="mt-3 text-2xl font-semibold text-foreground">Catalog coming soon</h1>
+        <h1 className="mt-3 text-2xl font-semibold text-foreground">Catalog unavailable</h1>
         <p className="mt-2 text-sm text-foreground-secondary">
-          This store has not published flipbook pages yet. Browse products from the storefront home
-          instead.
+          This catalog has no published pages. Browse the store for available products.
         </p>
         <a
           href={urls.storefrontPath(storeSlug)}
@@ -265,6 +265,7 @@ export function FlipbookViewer({
           <p className="text-xs text-foreground-secondary">{title}</p>
         </div>
         <div className="flex items-center gap-1">
+          <CartBadge storeSlug={storeSlug} color="#15191E" />
           <Button type="button" variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
             <Minus className="h-4 w-4" strokeWidth={1.75} />
           </Button>
@@ -277,7 +278,7 @@ export function FlipbookViewer({
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
+      <div className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-0 lg:h-[calc(100dvh-65px)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
         <section className="relative flex flex-col items-center justify-center overflow-hidden p-4 lg:border-r lg:border-border">
           <Button
             type="button"
@@ -304,7 +305,7 @@ export function FlipbookViewer({
 
           <div
             className={cn(
-              "relative max-h-[70vh] w-full max-w-3xl origin-center border border-border bg-background shadow-none transition-transform duration-300 lg:max-h-[80vh]",
+              "relative w-fit max-w-full origin-center bg-background shadow-none transition-transform duration-300",
               !reducedMotion && flipping && "opacity-90",
             )}
             style={{
@@ -330,14 +331,14 @@ export function FlipbookViewer({
             aria-label={title}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={page.image_url} alt="" className="h-auto w-full select-none" draggable={false} />
+            <img src={page.image_url} alt="" className="block h-auto max-h-[70dvh] w-auto max-w-full select-none lg:max-h-[calc(100dvh-120px)]" draggable={false} />
             {(page.hotspots || [])
               .filter((hs) => !hs.list_only)
               .map((hs) => (
                 <button
                   key={hs.id}
                   type="button"
-                  className="absolute min-h-[28px] min-w-[28px] border border-brand/70 bg-brand/10 transition-colors hover:bg-brand/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
+                  className="group absolute min-h-[28px] min-w-[28px] border border-transparent bg-transparent transition-colors hover:border-brand hover:bg-brand/10 focus-visible:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
                   style={{
                     left: `${hs.x_pct}%`,
                     top: `${hs.y_pct}%`,
@@ -346,7 +347,13 @@ export function FlipbookViewer({
                   }}
                   aria-label={hs.product_name ? `Open ${hs.product_name}` : "Open product"}
                   onClick={() => hs.product_id && openProduct(hs.product_id)}
-                />
+                >
+                  {hs.product_name && (
+                    <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-max max-w-[min(16rem,80vw)] -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md group-hover:block group-focus-visible:block">
+                      {hs.product_name} · Add to cart
+                    </span>
+                  )}
+                </button>
               ))}
           </div>
 
@@ -363,14 +370,14 @@ export function FlipbookViewer({
           </div>
         </section>
 
-        <aside className="flex flex-col border-t border-border bg-background lg:border-t-0">
-          <div className="border-b border-border px-4 py-3">
+        <aside className="flex min-h-0 flex-col border-t border-border bg-background lg:overflow-hidden lg:border-t-0">
+          <div className="shrink-0 border-b border-border px-4 py-3">
             <h2 className="text-sm font-semibold text-foreground">Items on this page</h2>
             <p className="text-xs text-foreground-secondary">
               Page {index + 1} of {pages.length}
             </p>
           </div>
-          <ul className="flex-1 space-y-0 overflow-y-auto p-2" aria-live="polite">
+          <ul className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain p-2" aria-live="polite">
             {pageItems.length === 0 && (
               <li className="px-3 py-8 text-center text-sm text-foreground-secondary">
                 Tidak ada item di halaman ini

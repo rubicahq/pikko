@@ -285,7 +285,7 @@ export type Product = {
   availability: string;
   inventory_mode: string;
   stock_quantity?: number | null;
-  status: "draft" | "published" | "archived";
+  status: "draft" | "published" | "unlisted" | "archived";
   images?: ProductImage[];
   primary_image_url?: string;
   created_at: string;

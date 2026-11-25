@@ -243,7 +243,9 @@ func (s *Service) assertCoverFile(ctx context.Context, storeID, fileID uuid.UUID
 // ListPublishedForStorefront returns published catalogs for banner cards (newest first).
 func (s *Service) ListPublishedForStorefront(ctx context.Context, storeID uuid.UUID) ([]PublicCatalog, error) {
 	rows, err := s.DB.Query(ctx, `
-		SELECT c.id, c.title, c.cover_file_id, c.created_at,
+		SELECT c.id, c.title, COALESCE(c.cover_file_id, (SELECT p.image_file_id FROM catalog_pages p
+		       WHERE p.catalog_id=c.id AND p.status='published'
+		       ORDER BY p.display_order, p.page_number NULLS LAST LIMIT 1)), c.created_at,
 		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id AND p.status='published'),0)
 		FROM catalogs c
 		WHERE c.store_id=$1 AND c.status='published'
@@ -286,7 +288,9 @@ func (s *Service) GetPublished(ctx context.Context, storeID, catalogID uuid.UUID
 	var c PublicCatalog
 	var coverID *uuid.UUID
 	err := s.DB.QueryRow(ctx, `
-		SELECT c.id, c.title, c.cover_file_id, c.created_at,
+		SELECT c.id, c.title, COALESCE(c.cover_file_id, (SELECT p.image_file_id FROM catalog_pages p
+		       WHERE p.catalog_id=c.id AND p.status='published'
+		       ORDER BY p.display_order, p.page_number NULLS LAST LIMIT 1)), c.created_at,
 		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id AND p.status='published'),0)
 		FROM catalogs c
 		WHERE c.id=$1 AND c.store_id=$2 AND c.status='published'

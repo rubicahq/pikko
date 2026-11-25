@@ -352,6 +352,7 @@ export function ProductForm({
         >
           <option value="draft">Draft</option>
           <option value="published">Published</option>
+          <option value="unlisted">Unlisted · catalog only</option>
           <option value="archived">Archived</option>
         </select>
       </div>
