@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession, serverFetch } from "@/lib/server-api";
+import { getSession, getStore, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { Badge } from "@/components/ui/badge";
 import { CustomerNotesForm } from "@/components/customers/customer-notes-form";
+import { CustomerPortalLink } from "@/components/customers/customer-portal-link";
 
 type CustomerDetail = {
   id: string;
@@ -35,12 +36,22 @@ export default async function CustomerDetailPage({
   const session = await getSession();
   if (!session) redirect(urls.auth());
 
-  const data = await serverFetch<{ customer: CustomerDetail }>(
-    `/api/v1/stores/${storeId}/customers/${customerId}`,
-  );
+  const [data, store] = await Promise.all([
+    serverFetch<{ customer: CustomerDetail; portal_url?: string; store_slug?: string }>(
+      `/api/v1/stores/${storeId}/customers/${customerId}`,
+    ),
+    getStore(storeId),
+  ]);
   if (!data?.customer) redirect(urls.storeCustomers(storeId));
   const c = data.customer;
   const orders = c.orders || [];
+  const portalUrl =
+    data.portal_url ||
+    (data.store_slug
+      ? urls.portalAbsolute(data.store_slug)
+      : store?.slug
+        ? urls.portalAbsolute(store.slug)
+        : null);
 
   return (
     <div className="mx-auto max-w-dashboard">
@@ -54,6 +65,12 @@ export default async function CustomerDetailPage({
       <p className="mt-2 text-sm text-foreground-secondary">
         {[c.phone, c.email].filter(Boolean).join(" · ") || "No contact yet"}
       </p>
+
+      {portalUrl ? (
+        <section className="mt-6 rounded-[10px] border border-border bg-background-subtle/40 p-5">
+          <CustomerPortalLink url={portalUrl} />
+        </section>
+      ) : null}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <div className="rounded-[10px] border border-border p-5">

@@ -86,6 +86,10 @@ export const urls = {
     `${storefront()}/${slug}/live/${liveSlug}`,
   tracking: (token: string) => `/track/${encodeURIComponent(token)}`,
   trackingAbsolute: (token: string) => `${storefront()}/track/${encodeURIComponent(token)}`,
+  /** Stable customer portal home — shareable / reusable (not a one-time magic link). */
+  portal: (storeSlug: string) => `/portal/${encodeURIComponent(storeSlug)}`,
+  portalAbsolute: (storeSlug: string) =>
+    `${storefront()}/portal/${encodeURIComponent(storeSlug)}`,
   api: (path: string) => {
     const base = api();
     const p = path.startsWith("/") ? path : `/${path}`;

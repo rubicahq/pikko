@@ -218,8 +218,8 @@ Source `live_quick_add`; campaign quota + finite stock enforced under row locks.
 | POST | `/stores/{storeID}/order-entry/csv-preview` |
 | POST | `/stores/{storeID}/order-entry/csv-import` |
 | GET | `/stores/{storeID}/customers` |
-| POST | `/stores/{storeID}/customers` | name + phone/WA only; returns `portal_url` + one-time `portal_access_url` |
-| GET/PATCH | `/stores/{storeID}/customers/{customerID}` |
+| POST | `/stores/{storeID}/customers` | name + phone/WA only; returns stable `portal_url` + one-time `portal_access_url` |
+| GET/PATCH | `/stores/{storeID}/customers/{customerID}` | GET also returns stable `portal_url` + `store_slug` for sharing |
 
 ### 2.8 Notifications + analytics
 

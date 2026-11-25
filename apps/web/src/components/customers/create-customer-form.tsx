@@ -8,11 +8,13 @@ import { urls } from "@/lib/urls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CustomerPortalLink } from "@/components/customers/customer-portal-link";
 
 type CreateResult = {
   customer: { id: string; name: string; phone?: string | null };
   portal_url?: string;
   portal_access_url?: string;
+  store_slug?: string;
 };
 
 export function CreateCustomerForm({ storeId }: { storeId: string }) {
@@ -52,12 +54,16 @@ export function CreateCustomerForm({ storeId }: { storeId: string }) {
     }
   }
 
+  const shareUrl =
+    created?.portal_url ||
+    (created?.store_slug ? urls.portalAbsolute(created.store_slug) : undefined);
+
   return (
     <div className="space-y-4 rounded-xl border border-border bg-background-subtle/60 p-4">
       <div>
         <h2 className="text-base font-medium text-foreground">Add customer</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Name and WhatsApp/phone only — no order required. You&apos;ll get a portal link to open or share.
+          Name and WhatsApp/phone only — no order required. You&apos;ll get a portal link to share.
         </p>
       </div>
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
@@ -90,33 +96,23 @@ export function CreateCustomerForm({ storeId }: { storeId: string }) {
       </form>
       {error ? <p className="text-sm text-error">{error}</p> : null}
       {created ? (
-        <div className="space-y-2 rounded-lg border border-border bg-background px-4 py-3 text-sm">
+        <div className="space-y-3 rounded-lg border border-border bg-background px-4 py-3 text-sm">
           <p className="font-medium text-foreground">
             Created {created.customer.name}
             {created.customer.phone ? ` · ${created.customer.phone}` : ""}
           </p>
+          {shareUrl ? <CustomerPortalLink url={shareUrl} /> : null}
           {created.portal_access_url ? (
-            <p>
+            <p className="text-sm text-foreground-secondary">
               <a
                 href={created.portal_access_url}
                 target="_blank"
                 rel="noreferrer"
                 className="font-medium text-foreground underline underline-offset-2"
               >
-                Open customer portal
+                Open as this customer
               </a>
-              <span className="text-foreground-muted"> (one-time link)</span>
-            </p>
-          ) : created.portal_url ? (
-            <p>
-              <a
-                href={created.portal_url}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-foreground underline underline-offset-2"
-              >
-                Open portal home
-              </a>
+              <span className="text-foreground-muted"> — one-time merchant preview link</span>
             </p>
           ) : null}
           <p>
