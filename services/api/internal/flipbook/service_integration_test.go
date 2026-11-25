@@ -228,6 +228,20 @@ func TestFlipbookPublishAndPublicHotspots(t *testing.T) {
 		t.Fatalf("create hotspot want 410 got %d %s", rr.Code, rr.Body.String())
 	}
 
+	// Merchant hotspot write stays retired; seed an existing hotspot row (legacy import)
+	// so public catalog can still expose hover/wishlist targets.
+	pageUUID, err := uuid.Parse(pageID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = pool.Exec(context.Background(), `
+		INSERT INTO catalog_page_hotspots (store_id, catalog_page_id, product_id, x_pct, y_pct, width_pct, height_pct)
+		VALUES ($1, $2, $3, 10, 10, 20, 15)
+	`, stA.ID, pageUUID, created.Product.ID)
+	if err != nil {
+		t.Fatalf("seed hotspot: %v", err)
+	}
+
 	pubBody, _ := json.Marshal(map[string]any{"status": "published"})
 	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+stA.ID.String()+"/catalog-pages/status", bytes.NewReader(pubBody))
 	req.Header.Set("Authorization", "Bearer "+tokA)
@@ -256,15 +270,17 @@ func TestFlipbookPublishAndPublicHotspots(t *testing.T) {
 		Pages []struct {
 			ID       string `json:"id"`
 			ImageURL string `json:"image_url"`
-			Hotspots []any  `json:"hotspots"`
+			Hotspots []struct {
+				ProductID string `json:"product_id"`
+			} `json:"hotspots"`
 		} `json:"pages"`
 	}
 	_ = json.Unmarshal(rr.Body.Bytes(), &pub)
 	if len(pub.Pages) < 1 || pub.Pages[0].ImageURL == "" {
 		t.Fatalf("expected public page image, got %+v", pub)
 	}
-	if len(pub.Pages[0].Hotspots) > 0 {
-		t.Fatalf("etalase must omit hotspots, got %+v", pub)
+	if len(pub.Pages[0].Hotspots) < 1 || pub.Pages[0].Hotspots[0].ProductID != created.Product.ID {
+		t.Fatalf("expected public hotspot for wishlist hover, got %+v", pub)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/flip-a/catalog/products/"+created.Product.ID, nil)

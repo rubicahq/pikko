@@ -91,14 +91,6 @@ func (h *FlipbookHandlers) DeleteHotspot(w http.ResponseWriter, r *http.Request)
 		"Catalog hotspots are disabled. Flipbooks are display-only etalase.")
 }
 
-func stripPublicCommerce(pages []flipbook.Page) []flipbook.Page {
-	for i := range pages {
-		pages[i].Hotspots = nil
-		pages[i].Items = nil
-	}
-	return pages
-}
-
 func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
 	store, pages, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
@@ -110,6 +102,8 @@ func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request)
 		writeError(w, r, http.StatusInternalServerError, "catalog_failed", "Unable to load catalog.")
 		return
 	}
+	// Hotspots/items stay in public JSON for scheduled-live wishlist hover on storefront.
+	// Cart / PublicHotspotProduct remain retired; AI import stays disabled.
 	writeJSON(w, http.StatusOK, map[string]any{
 		"store": map[string]any{
 			"id":          store.ID,
@@ -118,7 +112,7 @@ func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request)
 			"whatsapp":    store.WhatsApp,
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog",
 		},
-		"pages": stripPublicCommerce(pages),
+		"pages": pages,
 	})
 }
 
@@ -148,12 +142,13 @@ func (h *FlipbookHandlers) PublicCatalogDoc(w http.ResponseWriter, r *http.Reque
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog/" + catalogID.String(),
 		},
 		"catalog_id": catalogID,
-		"pages":      stripPublicCommerce(pages),
+		"pages":      pages,
 	})
 }
 
-// PublicHotspotProduct is soft-deprecated: catalog flipbooks are display-only.
+// PublicHotspotProduct stays retired (no cart / contact checkout hook).
+// Live wishlist uses hotspot product_id from the public pages payload instead.
 func (h *FlipbookHandlers) PublicHotspotProduct(w http.ResponseWriter, r *http.Request) {
 	writeError(w, r, http.StatusGone, "catalog_hotspots_disabled",
-		"Catalog product actions are disabled. Flipbooks are display-only etalase.")
+		"Catalog product cart actions are disabled. Use live wishlist from hotspot data.")
 }
