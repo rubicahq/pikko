@@ -147,7 +147,6 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	pdf := pdfutil.MinimalPDF()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	_ = mw.WriteField("extract_images", "true")
 	fw, err := mw.CreateFormFile("file", "catalog.pdf")
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +179,6 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	// Idempotent replay
 	var buf2 bytes.Buffer
 	mw2 := multipart.NewWriter(&buf2)
-	_ = mw2.WriteField("extract_images", "true")
 	fw2, _ := mw2.CreateFormFile("file", "catalog.pdf")
 	_, _ = fw2.Write(pdf)
 	_ = mw2.Close()
@@ -317,7 +315,6 @@ func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
 	pdf := pdfutil.MinimalPDF()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	_ = mw.WriteField("extract_images", "true")
 	fw, _ := mw.CreateFormFile("file", "catalog.pdf")
 	_, _ = fw.Write(pdf)
 	_ = mw.Close()

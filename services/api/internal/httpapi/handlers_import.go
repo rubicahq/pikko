@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -44,12 +43,7 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 			Size:           hdr.Size,
 		})
 	} else {
-		extract := true
-		if v := r.FormValue("extract_images"); v != "" {
-			extract, _ = strconv.ParseBool(v)
-		}
 		job, err = h.Imports.Start(r.Context(), StoreID(r), UserID(r), imports.StartInput{
-			ExtractImages:  extract,
 			IdempotencyKey: r.Header.Get("Idempotency-Key"),
 			Filename:       hdr.Filename,
 			DeclaredType:   hdr.Header.Get("Content-Type"),

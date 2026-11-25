@@ -141,7 +141,6 @@ type Service struct {
 }
 
 type StartInput struct {
-	ExtractImages  bool   `json:"extract_images"`
 	IdempotencyKey string `json:"idempotency_key"`
 	Filename       string
 	DeclaredType   string
@@ -210,9 +209,9 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO catalog_import_jobs (
 			store_id, created_by, source_type, pdf_file_id, extract_images, status, page_count, idempotency_key
-		) VALUES ($1,$2,'pdf',$3,$4,'pending',$5,$6)
+		) VALUES ($1,$2,'pdf',$3,false,'pending',$4,$5)
 		RETURNING id
-	`, storeID, userID, f.ID, in.ExtractImages, pages, idem).Scan(&jobID)
+	`, storeID, userID, f.ID, pages, idem).Scan(&jobID)
 	if err != nil {
 		return nil, err
 	}
@@ -875,7 +874,6 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 	`, storeID, jobID)
 	_, _ = s.DB.Exec(ctx, `DELETE FROM catalog_import_items WHERE job_id=$1 AND store_id=$2`, jobID, storeID)
 
-	pageIDByNumber := map[int]uuid.UUID{}
 	aiPages := make([]ai.PageImage, 0, len(pages))
 	for _, p := range pages {
 		sf, err := s.Files.Upload(ctx, storeID, uuid.Nil, "catalog_page",
@@ -884,16 +882,13 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, err)
 		}
-		var pageID uuid.UUID
-		err = s.DB.QueryRow(ctx, `
+		_, err = s.DB.Exec(ctx, `
 			INSERT INTO catalog_pages (store_id, image_file_id, display_order, status, source_import_job_id, page_number)
 			VALUES ($1,$2,$3,'draft',$4,$5)
-			RETURNING id
-		`, storeID, sf.ID, p.PageNumber-1, jobID, p.PageNumber).Scan(&pageID)
+		`, storeID, sf.ID, p.PageNumber-1, jobID, p.PageNumber)
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, err)
 		}
-		pageIDByNumber[p.PageNumber] = pageID
 		aiPages = append(aiPages, ai.PageImage{
 			PageNumber: p.PageNumber,
 			MIMEType:   "image/png",
@@ -924,9 +919,8 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		s.setProgress(ctx, storeID, jobID, pct, "analyzing", &pageNum, &totalPages)
 
 		result, err := extractor.ExtractCatalog(ctx, ai.ExtractRequest{
-			Pages:         []ai.PageImage{pageImg},
-			ExtractImages: job.ExtractImages,
-			MaxItems:      lim.MaxItems - count,
+			Pages:    []ai.PageImage{pageImg},
+			MaxItems: lim.MaxItems - count,
 		})
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, fmt.Errorf("AI extraction failed on page %d: %w", pageNum, err))
@@ -947,15 +941,6 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 				variant = json.RawMessage(`{}`)
 			}
 			var imageID *uuid.UUID
-			if job.ExtractImages && ex.PageNumber != nil {
-				if pid, ok := pageIDByNumber[*ex.PageNumber]; ok {
-					var fid uuid.UUID
-					err := s.DB.QueryRow(ctx, `SELECT image_file_id FROM catalog_pages WHERE id=$1 AND store_id=$2`, pid, storeID).Scan(&fid)
-					if err == nil {
-						imageID = &fid
-					}
-				}
-			}
 			if ex.Uncertain || (ex.Warning != nil && strings.TrimSpace(*ex.Warning) != "") {
 				warnCount++
 			}
