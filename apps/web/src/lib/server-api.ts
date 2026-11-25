@@ -149,6 +149,7 @@ export async function getPublicStore(slug: string) {
       storefront: StorefrontConfig;
     };
     storefront_url: string;
+    hide_platform_branding?: boolean;
   }>(`/api/v1/public/stores/${slug}`, false);
 }
 

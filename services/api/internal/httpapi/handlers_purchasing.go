@@ -7,9 +7,24 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
+func (h *CommerceHandlers) requirePurchasing(w http.ResponseWriter, r *http.Request) bool {
+	if h.Ent == nil {
+		return true
+	}
+	if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeaturePurchasing); err != nil {
+		writeEntitlementErr(w, r, err)
+		return false
+	}
+	return true
+}
+
 func (h *CommerceHandlers) PurchasingEligibility(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePurchasing(w, r) {
+		return
+	}
 	list, err := h.Commerce.ListPurchasingEligibility(r.Context(), StoreID(r))
 	if err != nil {
 		h.mapErr(w, r, err)
@@ -19,6 +34,9 @@ func (h *CommerceHandlers) PurchasingEligibility(w http.ResponseWriter, r *http.
 }
 
 func (h *CommerceHandlers) StorePurchasing(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePurchasing(w, r) {
+		return
+	}
 	q := r.URL.Query()
 	f := commerce.PurchasingFilter{GroupBy: q.Get("group_by")}
 	if v := q.Get("batch_id"); v != "" {

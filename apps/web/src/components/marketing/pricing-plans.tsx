@@ -18,18 +18,35 @@ type Plan = {
   limits: Record<string, number>;
 };
 
-const HIGHLIGHT_FEATURES = [
-  { key: "storefront", label: "Storefront & checkout" },
-  { key: "catalogs", label: "Catalogs & flipbook" },
-  { key: "campaigns", label: "Campaigns & preorders" },
-  { key: "ai_pdf_import", label: "AI PDF import" },
-  { key: "team", label: "Team members" },
-  { key: "analytics", label: "Analytics" },
-  { key: "live_shopping", label: "Live shopping ops" },
-  { key: "purchasing", label: "Purchasing & receiving" },
-  { key: "whatsapp_templates", label: "WhatsApp templates" },
-  { key: "product_attributes", label: "Product attributes" },
-];
+/** Released differentiators only — do not advertise unreleased keys. */
+const PLAN_BULLETS: Record<string, string[]> = {
+  basic: [
+    "Full sell & fulfill journey",
+    "Storefront, themes, catalogs & flipbook",
+    "AI PDF catalog extraction",
+    "Preorders, live shopping, campaigns",
+    "Purchasing, packing by order, shipments",
+    "Customer portal, payments & basic analytics",
+  ],
+  standard: [
+    "Everything in Basic",
+    "Remove Pikko branding",
+    "Team collaboration",
+    "Quick order entry",
+    "Product bulk import",
+    "Pack by customer · consolidated payments",
+  ],
+  premium: [
+    "Everything in Standard",
+    "Order bulk ops (CSV)",
+    "Store credit (when enabled)",
+    "Higher usage limits",
+  ],
+  ultimate: [
+    "Everything in Premium",
+    "Highest usage limits",
+  ],
+};
 
 function formatIdr(n: number) {
   return new Intl.NumberFormat("id-ID", {
@@ -66,7 +83,7 @@ export function PricingPlans() {
         </h1>
         <p className="mt-5 max-w-reading text-lg leading-relaxed text-foreground-secondary">
           Four store-based plans in IDR. Annual billing includes two months free. No platform
-          transaction fee.
+          transaction fee. Basic already includes the full sell and fulfill journey.
           {testing
             ? " Testing mode is on — activate any plan at Rp0 from onboarding or Settings."
             : null}
@@ -96,6 +113,7 @@ export function PricingPlans() {
       <div className="mt-12 grid gap-6 lg:grid-cols-4">
         {plans.map((p, i) => {
           const price = cycle === "monthly" ? p.price_monthly : p.price_annual;
+          const bullets = PLAN_BULLETS[p.code] || [p.description];
           return (
             <Reveal key={p.code} delayMs={i * 60}>
               <div
@@ -119,23 +137,17 @@ export function PricingPlans() {
                 <p className="mt-4 text-sm leading-relaxed text-foreground-secondary">
                   {p.description}
                 </p>
-                <ul className="mt-6 flex-1 space-y-2 text-sm">
-                  {HIGHLIGHT_FEATURES.map((f) => (
-                    <li
-                      key={f.key}
-                      className={
-                        p.features[f.key]
-                          ? "text-foreground"
-                          : "text-foreground-muted line-through"
-                      }
-                    >
-                      {f.label}
-                    </li>
+                <ul className="mt-6 flex-1 space-y-2 text-sm text-foreground">
+                  {bullets.map((b) => (
+                    <li key={b}>{b}</li>
                   ))}
                 </ul>
                 <p className="mt-4 text-xs text-foreground-muted">
-                  Up to {formatLimit(p.limits.orders_per_month ?? -1)} orders/mo ·{" "}
-                  {formatLimit(p.limits.active_products ?? -1)} products
+                  {formatLimit(p.limits.orders_per_month ?? 0)} orders/mo ·{" "}
+                  {formatLimit(p.limits.active_products ?? 0)} products ·{" "}
+                  {formatLimit(p.limits.catalogs ?? 0)} catalogs ·{" "}
+                  {formatLimit(p.limits.team_members ?? 0)} team ·{" "}
+                  {formatLimit(p.limits.ai_pdf_pages_per_month ?? 0)} AI PDF pages/mo
                 </p>
                 <div className="mt-6">
                   <Button
@@ -156,8 +168,7 @@ export function PricingPlans() {
       </div>
 
       <p className="mt-12 text-center text-sm text-foreground-muted">
-        Basic includes the full sell and fulfill journey. Higher plans inherit lower-plan features.
-        Unreleased features are not listed.
+        Higher plans inherit lower-plan features. Only released product capabilities are listed.
       </p>
     </>
   );

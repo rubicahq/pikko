@@ -47,6 +47,12 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 
 	var job *imports.Job
 	if isCSV {
+		if h.Ent != nil {
+			if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureBulkImport); err != nil {
+				writeEntitlementErr(w, r, err)
+				return
+			}
+		}
 		job, err = h.Imports.StartCSV(r.Context(), StoreID(r), UserID(r), imports.CSVStartInput{
 			IdempotencyKey: r.Header.Get("Idempotency-Key"),
 			Filename:       hdr.Filename,
@@ -75,6 +81,12 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if err != nil {
+		var lim *entitlements.LimitError
+		var feat *entitlements.FeatureError
+		if errors.As(err, &lim) || errors.As(err, &feat) {
+			writeEntitlementErr(w, r, err)
+			return
+		}
 		if errors.Is(err, imports.ErrInvalidInput) || strings.Contains(err.Error(), "invalid input") {
 			writeError(w, r, http.StatusBadRequest, "invalid_input", publicImportErr(err))
 			return

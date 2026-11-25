@@ -422,6 +422,11 @@ func (s *Service) RequireFeature(ctx context.Context, storeID uuid.UUID, feature
 	return nil
 }
 
+// HasFeature reports whether the store is entitled to featureKey (false on error).
+func (s *Service) HasFeature(ctx context.Context, storeID uuid.UUID, featureKey string) bool {
+	return s.RequireFeature(ctx, storeID, featureKey) == nil
+}
+
 func isOpsSafeFeature(key string) bool {
 	switch key {
 	case FeatureOrders, FeaturePayments, FeatureFinance, FeatureRefunds,

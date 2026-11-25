@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 func (h *CommerceHandlers) mapFinanceErr(w http.ResponseWriter, r *http.Request, err error) bool {
@@ -89,6 +91,12 @@ func (h *CommerceHandlers) RecordPayment(w http.ResponseWriter, r *http.Request)
 	if in.OrderID == uuid.Nil {
 		if orderID, err := uuid.Parse(r.PathValue("orderID")); err == nil {
 			in.OrderID = orderID
+		}
+	}
+	if h.Ent != nil && strings.EqualFold(strings.TrimSpace(in.PaymentKind), commerce.PaymentKindConsolidated) {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureConsolidatedPayments); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
 		}
 	}
 	pay, err := h.Commerce.RecordPayment(r.Context(), StoreID(r), UserID(r), in)
@@ -250,6 +258,12 @@ func (h *CommerceHandlers) GetStoreCredit(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CommerceHandlers) GrantStoreCredit(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureStoreCredit); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in commerce.GrantStoreCreditInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")

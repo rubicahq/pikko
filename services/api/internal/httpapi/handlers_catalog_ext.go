@@ -68,6 +68,12 @@ func (h *Phase2Handlers) ListVendors(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Phase2Handlers) CreateVendor(w http.ResponseWriter, r *http.Request) {
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureVendors); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
 	var in catalog.VendorInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")

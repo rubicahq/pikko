@@ -38,7 +38,21 @@ func (h *CommerceHandlers) CreateAdminOrder(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusCreated, res)
 }
 
+func (h *CommerceHandlers) requireQuickOrder(w http.ResponseWriter, r *http.Request) bool {
+	if h.Ent == nil {
+		return true
+	}
+	if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureQuickOrder); err != nil {
+		writeEntitlementErr(w, r, err)
+		return false
+	}
+	return true
+}
+
 func (h *CommerceHandlers) ValidateOrderLines(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	var body struct {
 		Items []commerce.CartLineInput `json:"items"`
 	}
@@ -55,6 +69,9 @@ func (h *CommerceHandlers) ValidateOrderLines(w http.ResponseWriter, r *http.Req
 }
 
 func (h *CommerceHandlers) SuggestOrderCatalog(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	list, err := h.Commerce.SuggestCatalog(r.Context(), StoreID(r), r.URL.Query().Get("q"), limit)
 	if err != nil {
@@ -65,6 +82,9 @@ func (h *CommerceHandlers) SuggestOrderCatalog(w http.ResponseWriter, r *http.Re
 }
 
 func (h *CommerceHandlers) ListOrderDrafts(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	list, err := h.Commerce.ListOrderDrafts(r.Context(), StoreID(r), UserID(r))
 	if err != nil {
 		h.mapErr(w, r, err)
@@ -74,6 +94,9 @@ func (h *CommerceHandlers) ListOrderDrafts(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CommerceHandlers) GetOrderDraft(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	draftID, err := uuid.Parse(r.PathValue("draftID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
@@ -88,6 +111,9 @@ func (h *CommerceHandlers) GetOrderDraft(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *CommerceHandlers) SaveOrderDraft(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	var in commerce.SaveDraftInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
@@ -115,6 +141,9 @@ func (h *CommerceHandlers) SaveOrderDraft(w http.ResponseWriter, r *http.Request
 }
 
 func (h *CommerceHandlers) ValidateOrderDraft(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	draftID, err := uuid.Parse(r.PathValue("draftID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
@@ -129,6 +158,9 @@ func (h *CommerceHandlers) ValidateOrderDraft(w http.ResponseWriter, r *http.Req
 }
 
 func (h *CommerceHandlers) DeleteOrderDraft(w http.ResponseWriter, r *http.Request) {
+	if !h.requireQuickOrder(w, r) {
+		return
+	}
 	draftID, err := uuid.Parse(r.PathValue("draftID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
@@ -141,13 +173,30 @@ func (h *CommerceHandlers) DeleteOrderDraft(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
+func (h *CommerceHandlers) requireBulkOps(w http.ResponseWriter, r *http.Request) bool {
+	if h.Ent == nil {
+		return true
+	}
+	if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureBulkOps); err != nil {
+		writeEntitlementErr(w, r, err)
+		return false
+	}
+	return true
+}
+
 func (h *CommerceHandlers) OrderCSVTemplate(w http.ResponseWriter, r *http.Request) {
+	if !h.requireBulkOps(w, r) {
+		return
+	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="pikko-order-import-template.csv"`)
 	_, _ = w.Write([]byte(commerce.OrderCSVTemplate))
 }
 
 func (h *CommerceHandlers) PreviewOrderCSV(w http.ResponseWriter, r *http.Request) {
+	if !h.requireBulkOps(w, r) {
+		return
+	}
 	if err := r.ParseMultipartForm(3 << 20); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Expected multipart form with file.")
 		return
@@ -174,6 +223,9 @@ func (h *CommerceHandlers) PreviewOrderCSV(w http.ResponseWriter, r *http.Reques
 }
 
 func (h *CommerceHandlers) ImportOrderCSV(w http.ResponseWriter, r *http.Request) {
+	if !h.requireBulkOps(w, r) {
+		return
+	}
 	if err := r.ParseMultipartForm(3 << 20); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_input", "Expected multipart form with file.")
 		return
