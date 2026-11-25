@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	router, worker := httpapi.NewRouter(httpapi.Deps{
+	router, worker, extras := httpapi.NewRouterWithExtras(httpapi.Deps{
 		Cfg:     cfg,
 		DB:      pool,
 		Logger:  logger,
@@ -63,6 +63,7 @@ func main() {
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go worker.Run(workerCtx)
+	go runSystemHealthLoops(workerCtx, extras)
 
 	go func() {
 		logger.Info("api_listening", "addr", cfg.APIAddr, "env", cfg.AppEnv, "email_mode", cfg.EmailMode, "ai_configured", cfg.AIAPIKey != "")
@@ -81,4 +82,34 @@ func main() {
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
 	logger.Info("api_stopped")
+}
+
+func runSystemHealthLoops(ctx context.Context, extras httpapi.RouterExtras) {
+	if extras.Checker == nil || extras.Health == nil {
+		return
+	}
+	run := func() {
+		_, _ = extras.Checker.RunChecks(context.Background())
+		extras.Health.CleanupRetention(context.Background())
+		if extras.Alerter != nil {
+			_ = extras.Alerter.EvaluateRules(context.Background())
+		}
+	}
+	// Initial delay so listen is up; then every 2 minutes.
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(3 * time.Second):
+	}
+	run()
+	t := time.NewTicker(2 * time.Minute)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			run()
+		}
+	}
 }

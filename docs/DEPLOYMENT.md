@@ -17,7 +17,7 @@ Checkout path on the server: `~/pikko` (separate from `~/emplicon`).
 ### DNS / Cloudflare (current)
 
 - NS: Cloudflare
-- A records (DNS-only / grey cloud): `pikko.site`, `app.`, `shop.`, `api.` → `43.163.99.95`
+- A records (DNS-only / grey cloud): `pikko.site`, `app.`, `shop.`, `api.`, `hq.` → `43.163.99.95`
 - Keep **DNS-only** until HTTPS is verified; enable Cloudflare Proxied afterward if desired (then use Full / Full Strict)
 - `www.pikko.site` is optional (no A record required for the current cert)
 
@@ -87,8 +87,15 @@ Services: `postgres`, `migrate` (one-shot), `api`, `web`, optional `proxy` on `:
 ```bash
 sudo certbot certonly --webroot \
   -w /home/ubuntu/emplicon/deploy/acme-webroot \
-  -d pikko.site -d app.pikko.site -d shop.pikko.site -d api.pikko.site \
+  -d pikko.site -d app.pikko.site -d shop.pikko.site -d api.pikko.site -d hq.pikko.site \
   --agree-tos -m kya@rubica.co.id
+
+# Expanding an existing cert with hq.pikko.site:
+# sudo certbot certonly --webroot -w /home/ubuntu/emplicon/deploy/acme-webroot \
+#   --cert-name pikko.site --expand \
+#   -d pikko.site -d app.pikko.site -d shop.pikko.site -d api.pikko.site -d hq.pikko.site \
+#   --agree-tos -m kya@rubica.co.id
+# Then copy PEMs into ~/emplicon/deploy/ssl/pikko/ and reload nginx.
 ```
 
 3. Copy into the nginx SSL mount and install renew hook (already present on the VPS as `pikko.sh`):

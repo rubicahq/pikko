@@ -3,8 +3,9 @@
 #
 # Prerequisites:
 #   1) Cloudflare DNS A records (DNS-only until HTTPS verified) for
-#      pikko.site, app.pikko.site, shop.pikko.site, api.pikko.site → VPS IP
-#   2) Let's Encrypt cert copied to ~/emplicon/deploy/ssl/pikko/{fullchain,privkey}.pem
+#      pikko.site, app.pikko.site, shop.pikko.site, api.pikko.site, hq.pikko.site → VPS IP
+#   2) Let's Encrypt cert (include hq.pikko.site SAN) copied to
+#      ~/emplicon/deploy/ssl/pikko/{fullchain,privkey}.pem
 #   3) pikko-web + pikko-api attached to network emplicon_emplicon
 #
 # Attach (additive; does not restart Emplicon):
@@ -17,7 +18,7 @@
 # HTTP → HTTPS (ACME challenge stays on :80)
 server {
     listen 80;
-    server_name pikko.site app.pikko.site shop.pikko.site api.pikko.site;
+    server_name pikko.site app.pikko.site shop.pikko.site api.pikko.site hq.pikko.site;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/acme;
@@ -31,7 +32,7 @@ server {
 
 server {
     listen 443 ssl;
-    server_name pikko.site app.pikko.site shop.pikko.site;
+    server_name pikko.site app.pikko.site shop.pikko.site hq.pikko.site;
     ssl_certificate     /etc/nginx/ssl/pikko/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/pikko/privkey.pem;
     client_max_body_size 20m;
