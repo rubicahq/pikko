@@ -1,15 +1,54 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, Plus, Settings2 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import type { Store } from "@/lib/api";
+import { storeIconSrc, storeNameInitial } from "@/lib/store-icon";
 import { urls } from "@/lib/urls";
 import { cn } from "@/lib/utils";
 
-function initial(name: string) {
-  return (name.trim()[0] || "S").toUpperCase();
+function StoreGlyph({
+  store,
+  size = "md",
+}: {
+  store?: Pick<Store, "id" | "name" | "store_icon_file_id" | "store_icon_url"> | null;
+  size?: "sm" | "md";
+}) {
+  const [broken, setBroken] = useState(false);
+  const src = store ? storeIconSrc(store) : undefined;
+  useEffect(() => {
+    setBroken(false);
+  }, [src, store?.id]);
+  const box =
+    size === "sm"
+      ? "h-7 w-7 rounded-sm text-xs"
+      : "h-8 w-8 rounded-md text-sm";
+
+  if (store && src && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        className={cn(box, "shrink-0 object-cover bg-surface")}
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center bg-surface font-medium text-foreground",
+        box,
+      )}
+    >
+      {store ? storeNameInitial(store.name) : "?"}
+    </span>
+  );
 }
 
 export function StoreSwitcher({
@@ -35,9 +74,7 @@ export function StoreSwitcher({
             compact ? "justify-center px-0 py-2" : "px-3 py-2",
           )}
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-surface text-sm font-medium text-foreground">
-            {active ? initial(active.name) : "?"}
-          </span>
+          <StoreGlyph store={active} />
           {!compact ? (
             <>
               <span className="min-w-0 flex-1">
@@ -70,9 +107,7 @@ export function StoreSwitcher({
               )}
               onSelect={() => router.push(urls.storeOverview(store.id))}
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-surface text-xs font-medium">
-                {initial(store.name)}
-              </span>
+              <StoreGlyph store={store} size="sm" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate">{store.name}</span>
                 {store.role ? (

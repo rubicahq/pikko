@@ -42,6 +42,8 @@ type Store struct {
 	Role               string     `json:"role,omitempty"`
 	Permissions        []string   `json:"permissions,omitempty"`
 	StorefrontURL      string     `json:"storefront_url,omitempty"`
+	StoreIconFileID    *uuid.UUID `json:"store_icon_file_id,omitempty"`
+	StoreIconURL       string     `json:"store_icon_url,omitempty"`
 }
 
 type OnboardingDraft struct {
@@ -65,9 +67,12 @@ type Service struct {
 func (s *Service) ListForUser(ctx context.Context, userID uuid.UUID, includeArchived bool) ([]Store, error) {
 	q := `
 		SELECT s.id, s.name, s.slug, s.category, s.selling_model, s.currency, s.timezone, s.locale,
-		       s.theme, s.publication_status, s.checkout_enabled, s.archived_at, s.created_at, s.updated_at, m.role
+		       s.theme, s.publication_status, s.checkout_enabled, s.archived_at, s.created_at, s.updated_at, m.role,
+		       COALESCE(draft.store_icon_file_id, pub.store_icon_file_id) AS store_icon_file_id
 		FROM stores s
 		JOIN store_memberships m ON m.store_id = s.id
+		LEFT JOIN storefront_configs draft ON draft.store_id = s.id AND draft.channel = 'draft'
+		LEFT JOIN storefront_configs pub ON pub.store_id = s.id AND pub.channel = 'published'
 		WHERE m.user_id=$1 AND m.status='active'
 	`
 	if !includeArchived {
@@ -85,6 +90,7 @@ func (s *Service) ListForUser(ctx context.Context, userID uuid.UUID, includeArch
 		if err := rows.Scan(
 			&st.ID, &st.Name, &st.Slug, &st.Category, &st.SellingModel, &st.Currency, &st.Timezone, &st.Locale,
 			&st.Theme, &st.PublicationStatus, &st.CheckoutEnabled, &st.ArchivedAt, &st.CreatedAt, &st.UpdatedAt, &st.Role,
+			&st.StoreIconFileID,
 		); err != nil {
 			return nil, err
 		}
@@ -97,13 +103,17 @@ func (s *Service) GetAuthorized(ctx context.Context, userID, storeID uuid.UUID) 
 	var st Store
 	err := s.DB.QueryRow(ctx, `
 		SELECT s.id, s.name, s.slug, s.category, s.selling_model, s.currency, s.timezone, s.locale,
-		       s.theme, s.publication_status, s.checkout_enabled, s.archived_at, s.created_at, s.updated_at, m.role
+		       s.theme, s.publication_status, s.checkout_enabled, s.archived_at, s.created_at, s.updated_at, m.role,
+		       COALESCE(draft.store_icon_file_id, pub.store_icon_file_id) AS store_icon_file_id
 		FROM stores s
 		JOIN store_memberships m ON m.store_id = s.id
+		LEFT JOIN storefront_configs draft ON draft.store_id = s.id AND draft.channel = 'draft'
+		LEFT JOIN storefront_configs pub ON pub.store_id = s.id AND pub.channel = 'published'
 		WHERE s.id=$1 AND m.user_id=$2 AND m.status='active'
 	`, storeID, userID).Scan(
 		&st.ID, &st.Name, &st.Slug, &st.Category, &st.SellingModel, &st.Currency, &st.Timezone, &st.Locale,
 		&st.Theme, &st.PublicationStatus, &st.CheckoutEnabled, &st.ArchivedAt, &st.CreatedAt, &st.UpdatedAt, &st.Role,
+		&st.StoreIconFileID,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrForbidden
