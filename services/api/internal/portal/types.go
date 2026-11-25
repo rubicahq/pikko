@@ -19,13 +19,13 @@ const (
 )
 
 type Customer struct {
-	ID           uuid.UUID `json:"id"`
-	StoreID      uuid.UUID `json:"store_id"`
-	Name         string    `json:"name"`
-	Email        string    `json:"email"`
-	Phone        *string   `json:"phone,omitempty"`
-	TotalOrders  int       `json:"total_orders"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	StoreID     uuid.UUID `json:"store_id"`
+	Name        string    `json:"name"`
+	Email       *string   `json:"email,omitempty"`
+	Phone       *string   `json:"phone,omitempty"`
+	TotalOrders int       `json:"total_orders"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type Session struct {

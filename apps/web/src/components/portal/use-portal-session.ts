@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 
 export type PortalSession = {
-  customer: { id: string; name: string; email: string };
+  customer: { id: string; name: string; email?: string | null; phone?: string | null };
   store: { id: string; name: string; slug: string; primary_color?: string };
 };
 

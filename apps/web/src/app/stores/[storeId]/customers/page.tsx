@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
+import { CreateCustomerForm } from "@/components/customers/create-customer-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -19,7 +20,7 @@ import {
 type CustomerRow = {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
   total_orders: number;
   completed_order_value_idr: number;
@@ -48,8 +49,10 @@ export default async function CustomersPage({
     <div className="mx-auto max-w-dashboard space-y-8">
       <PageHeader
         title="Customers"
-        description="Store-scoped customer records created from orders."
+        description="Store-scoped customers from orders or added with name and WhatsApp only."
       />
+
+      <CreateCustomerForm storeId={storeId} />
 
       <FilterBar>
         <form method="get" className="w-full max-w-md">
@@ -65,7 +68,7 @@ export default async function CustomersPage({
       {customers.length === 0 ? (
         <EmptyState
           title="No customers yet"
-          description="Customers appear automatically when orders are placed."
+          description="Add a customer above, or they appear automatically when orders are placed."
         />
       ) : (
         <Table stickyHeader>
@@ -101,8 +104,12 @@ export default async function CustomersPage({
                   ) : null}
                 </TableCell>
                 <TableCell>
-                  <p>{c.email}</p>
-                  {c.phone ? <p className="text-foreground-secondary">{c.phone}</p> : null}
+                  {c.phone ? <p>{c.phone}</p> : null}
+                  {c.email ? (
+                    <p className={c.phone ? "text-foreground-secondary" : undefined}>{c.email}</p>
+                  ) : !c.phone ? (
+                    <p className="text-foreground-muted">—</p>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{c.total_orders}</TableCell>
                 <TableCell className="text-right tabular-nums">

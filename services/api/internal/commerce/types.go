@@ -313,18 +313,18 @@ type Evidence struct {
 }
 
 type Customer struct {
-	ID                      uuid.UUID  `json:"id"`
-	StoreID                 uuid.UUID  `json:"store_id"`
-	Name                    string     `json:"name"`
-	Email                   string     `json:"email"`
-	Phone                   *string    `json:"phone,omitempty"`
-	FirstOrderAt            *time.Time `json:"first_order_at,omitempty"`
-	LastOrderAt             *time.Time `json:"last_order_at,omitempty"`
-	TotalOrders             int        `json:"total_orders"`
-	CompletedOrderValueIDR  int64      `json:"completed_order_value_idr"`
-	InternalNotes           *string    `json:"internal_notes,omitempty"`
-	CreatedAt               time.Time  `json:"created_at"`
-	UpdatedAt               time.Time  `json:"updated_at"`
+	ID                     uuid.UUID  `json:"id"`
+	StoreID                uuid.UUID  `json:"store_id"`
+	Name                   string     `json:"name"`
+	Email                  *string    `json:"email,omitempty"`
+	Phone                  *string    `json:"phone,omitempty"`
+	FirstOrderAt           *time.Time `json:"first_order_at,omitempty"`
+	LastOrderAt            *time.Time `json:"last_order_at,omitempty"`
+	TotalOrders            int        `json:"total_orders"`
+	CompletedOrderValueIDR int64      `json:"completed_order_value_idr"`
+	InternalNotes          *string    `json:"internal_notes,omitempty"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type TrackingView struct {
