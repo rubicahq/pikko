@@ -72,8 +72,8 @@ func (c *OpenAICompatClient) ExtractCatalog(ctx context.Context, req ExtractRequ
 
 	parts := []any{
 		map[string]any{"type": "text", "text": fmt.Sprintf(
-			"Extract up to %d catalog items from these page images. extract_images=%v. Return JSON only.",
-			req.MaxItems, req.ExtractImages,
+			"Extract up to %d catalog items from these page images. Return JSON only.",
+			req.MaxItems,
 		)},
 	}
 	for _, p := range req.Pages {

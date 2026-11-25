@@ -152,7 +152,7 @@ Integrity: historical orders preserve original product info; archiving/editing n
 
 ## 18. AI CATALOG IMPORT
 Accelerator, not primary positioning. Entry: Add manually; Import PDF; Import CSV (when available).
-PDF flow: upload; validate type/size; choose whether to extract images; async import job; AI extracts; images extracted/cropped where possible; review interface; merchant edits/removes; confirms selected; saved as DRAFT products; merchant publishes later. Fields: name, description, brand, price, SKU, category, image, variant info. Do not fabricate missing values; flag uncertain results.
+PDF flow: upload; validate type/size; async import job; AI extracts items per page; page images kept for flipbook (no product-image crop path); review interface; merchant edits/removes; confirms selected; saved as DRAFT products; merchant publishes later. Fields: name, description, brand, price, SKU, category, variant info. Do not fabricate missing values; flag uncertain results.
 Limits (configurable defaults): one PDF per job; 25 MB; 50 pages; 500 items; validate vs infra/AI provider; not commercial entitlements.
 Status: Pending, Processing, Review required, Completed, Failed; progress and retry.
 Review UI: image, name, price, brand, SKU, warnings, editable fields, checkbox; bulk category/tag assignment.

@@ -76,9 +76,8 @@ type PageImage struct {
 }
 
 type ExtractRequest struct {
-	Pages         []PageImage
-	ExtractImages bool
-	MaxItems      int
+	Pages    []PageImage
+	MaxItems int
 }
 
 type ExtractResult struct {
