@@ -338,6 +338,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersRead, commerceH.ListCustomers))
 	mux.Handle("POST /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersWrite, p5.CreateCustomer))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersRead, p5.GetCustomer))
+	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}/wishlist", storePerm(rbac.PermCustomersRead, commerceH.ListCustomerWishlist))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersWrite, p5.PatchCustomer))
 	mux.Handle("POST /api/v1/stores/{storeID}/customers/{customerID}/portal-access/rotate", storePerm(rbac.PermCustomersWrite, p5.RotateCustomerPortalAccess))
 	mux.Handle("GET /api/v1/stores/{storeID}/address-change-requests", storePerm(rbac.PermCustomersRead, portalH.MerchantListAddressChanges))
@@ -423,6 +424,9 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/products/{productSlug}/preorders", commerceH.PublicProductBatches)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/live", commerceH.PublicLiveCampaigns)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/live/{liveSlug}", commerceH.PublicLiveCampaign)
+	mux.HandleFunc("POST /api/v1/public/stores/{slug}/live/{liveSlug}/wishlist", commerceH.PublicAddWishlist)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/live/{liveSlug}/wishlist", commerceH.PublicListWishlist)
+	mux.HandleFunc("DELETE /api/v1/public/stores/{slug}/live/{liveSlug}/wishlist/{itemID}", commerceH.PublicRemoveWishlist)
 
 	// Phase 3: public checkout + tracking
 	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/preview", commerceH.CheckoutPreview)

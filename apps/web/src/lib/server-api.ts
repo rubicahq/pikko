@@ -241,6 +241,7 @@ export async function getPublicLive(slug: string, liveSlug: string) {
       closes_at: string;
       operational_status: string;
       is_accepting_orders: boolean;
+      wishlist_enabled?: boolean;
       products?: {
         product_id: string;
         product_name: string;
@@ -251,6 +252,12 @@ export async function getPublicLive(slug: string, liveSlug: string) {
         remaining_qty?: number | null;
         featured: boolean;
         availability: string;
+      }[];
+      catalogs?: {
+        id: string;
+        title: string;
+        page_count: number;
+        status: string;
       }[];
     };
   }>(`/api/v1/public/stores/${slug}/live/${liveSlug}`, false);

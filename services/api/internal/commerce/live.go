@@ -53,22 +53,24 @@ type LiveVariant struct {
 }
 
 type LiveSession struct {
-	ID                  uuid.UUID          `json:"id"`
-	StoreID             uuid.UUID          `json:"store_id"`
-	Name                string             `json:"name"`
-	Slug                string             `json:"slug"`
-	Description         *string            `json:"description,omitempty"`
-	OpensAt             time.Time          `json:"opens_at"`
-	ClosesAt            time.Time          `json:"closes_at"`
-	PublicationStatus   string             `json:"publication_status"`
-	OperationalStatus   string             `json:"operational_status"`
-	LiveQuickAddEnabled bool               `json:"live_quick_add_enabled"`
-	LiveShowOrderFeed   bool               `json:"live_show_order_feed"`
-	IsAcceptingOrders   bool               `json:"is_accepting_orders"`
-	OrderCount          int                `json:"order_count"`
-	ItemCount           int                `json:"item_count"`
-	GMVIDR              int64              `json:"gmv_idr"`
-	Products            []LiveProductStock `json:"products,omitempty"`
+	ID                  uuid.UUID            `json:"id"`
+	StoreID             uuid.UUID            `json:"store_id"`
+	Name                string               `json:"name"`
+	Slug                string               `json:"slug"`
+	Description         *string              `json:"description,omitempty"`
+	OpensAt             time.Time            `json:"opens_at"`
+	ClosesAt            time.Time            `json:"closes_at"`
+	PublicationStatus   string               `json:"publication_status"`
+	OperationalStatus   string               `json:"operational_status"`
+	LiveQuickAddEnabled bool                 `json:"live_quick_add_enabled"`
+	LiveShowOrderFeed   bool                 `json:"live_show_order_feed"`
+	IsAcceptingOrders   bool                 `json:"is_accepting_orders"`
+	WishlistEnabled     bool                 `json:"wishlist_enabled"`
+	OrderCount          int                  `json:"order_count"`
+	ItemCount           int                  `json:"item_count"`
+	GMVIDR              int64                `json:"gmv_idr"`
+	Products            []LiveProductStock   `json:"products,omitempty"`
+	Catalogs            []LiveCatalogSummary `json:"catalogs,omitempty"`
 }
 
 type LiveFeedEntry struct {
@@ -170,6 +172,8 @@ func (s *Service) assertLiveOpen(ctx context.Context, storeID, campaignID uuid.U
 		sess.OperationalStatus == "open" &&
 		!now.Before(sess.OpensAt) && now.Before(sess.ClosesAt) &&
 		closedEarly == nil
+	sess.WishlistEnabled = sess.PublicationStatus == "published" &&
+		sess.OperationalStatus == "scheduled"
 	return sess, nil
 }
 
@@ -196,6 +200,11 @@ func (s *Service) GetLiveSession(ctx context.Context, storeID, campaignID uuid.U
 			return nil, err
 		}
 		sess.Products = products
+		catalogs, err := s.ListLiveCatalogs(ctx, storeID, campaignID)
+		if err != nil {
+			return nil, err
+		}
+		sess.Catalogs = catalogs
 	}
 	return &sess, nil
 }

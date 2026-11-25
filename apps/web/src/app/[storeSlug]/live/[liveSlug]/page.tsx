@@ -7,6 +7,7 @@ import { storefrontIconsMetadata } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
+import { WishlistButton } from "@/components/storefront/wishlist-button";
 
 type Props = { params: Promise<{ storeSlug: string; liveSlug: string }> };
 
@@ -38,6 +39,9 @@ export default async function PublicLivePage({ params }: Props) {
   const sf = store.storefront;
   const live = liveData.live;
   const open = live.is_accepting_orders || live.operational_status === "open";
+  const wishlistEnabled =
+    live.wishlist_enabled === true || live.operational_status === "scheduled";
+  const catalogs = live.catalogs || [];
 
   return (
     <div className="min-h-screen" style={{ background: sf.background_color, color: sf.text_color }}>
@@ -70,8 +74,35 @@ export default async function PublicLivePage({ params }: Props) {
           }).format(new Date(live.closes_at))}{" "}
           (Asia/Jakarta)
         </p>
-        {!open ? (
+        {wishlistEnabled ? (
+          <p className="mt-4 text-sm opacity-80">
+            Live belum dibuka. Jelajahi katalog dan simpan item ke wishlist — checkout tersedia saat
+            sesi dibuka.
+          </p>
+        ) : !open ? (
           <p className="mt-4 text-sm opacity-80">This live session is not accepting new orders.</p>
+        ) : null}
+
+        {catalogs.length > 0 ? (
+          <section className="mt-8">
+            <h2 className="text-lg font-medium">Catalogs</h2>
+            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+              {catalogs.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/${storeSlug}/catalog`}
+                    className="block rounded-md border p-4 transition-opacity hover:opacity-90"
+                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                  >
+                    <p className="font-medium">{c.title}</p>
+                    <p className="mt-1 text-xs opacity-70">
+                      {c.page_count ? `${c.page_count} pages` : "Catalog"} · browse
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         <ul className="mt-10 grid gap-6 md:grid-cols-2">
@@ -101,18 +132,30 @@ export default async function PublicLivePage({ params }: Props) {
                   {p.remaining_qty != null ? ` · ${p.remaining_qty} left` : ""}
                 </p>
               ) : null}
-              <div className="mt-4">
-                <AddToCartButton
-                  storeSlug={storeSlug}
-                  productId={p.product_id}
-                  productSlug={p.product_slug}
-                  name={p.product_name}
-                  priceIdr={p.effective_price_idr}
-                  primaryColor={sf.primary_color || "#FF3D00"}
-                  buttonFg={sf.background_color || "#FFFFFF"}
-                  disabled={!open || (p.remaining_qty != null && p.remaining_qty <= 0)}
-                  readyStockEligible
-                />
+              <div className="mt-4 space-y-3">
+                {wishlistEnabled ? (
+                  <WishlistButton
+                    storeSlug={storeSlug}
+                    liveSlug={liveSlug}
+                    productId={p.product_id}
+                    productName={p.product_name}
+                    primaryColor={sf.primary_color || "#FF3D00"}
+                    buttonFg={sf.background_color || "#FFFFFF"}
+                    enabled
+                  />
+                ) : (
+                  <AddToCartButton
+                    storeSlug={storeSlug}
+                    productId={p.product_id}
+                    productSlug={p.product_slug}
+                    name={p.product_name}
+                    priceIdr={p.effective_price_idr}
+                    primaryColor={sf.primary_color || "#FF3D00"}
+                    buttonFg={sf.background_color || "#FFFFFF"}
+                    disabled={!open || (p.remaining_qty != null && p.remaining_qty <= 0)}
+                    readyStockEligible
+                  />
+                )}
               </div>
             </li>
           ))}
