@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Sparkles } from "lucide-react";
 import { urls } from "@/lib/urls";
 import { NotificationBell } from "@/components/notifications/notification-bell";
-import { HEADER_UTILITIES } from "@/components/dashboard/nav-config";
+import { CONNIE_NAV, HEADER_UTILITIES } from "@/components/dashboard/nav-config";
 import { cn } from "@/lib/utils";
 
 function can(
@@ -30,10 +30,22 @@ export function HeaderUtilities({
     HEADER_UTILITIES.notifications.implemented &&
     can(HEADER_UTILITIES.notifications.permission, permissions);
 
-  if (!showMessages && !showNotifications) return null;
-
   return (
     <div className="flex shrink-0 items-center gap-1">
+      <div
+        title="Ask Connie — coming soon"
+        className={cn(
+          "inline-flex h-9 max-w-[11rem] items-center gap-1.5 rounded-md bg-warm-feature px-2.5",
+          "text-sm font-medium text-foreground",
+        )}
+        aria-disabled
+      >
+        <Sparkles className="h-4 w-4 shrink-0 text-brand" strokeWidth={1.75} />
+        <span className="truncate">{CONNIE_NAV.label}</span>
+        <span className="rounded-sm bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+          Soon
+        </span>
+      </div>
       {showMessages ? (
         <Link
           href={urls.storeMessages(storeId)}

@@ -374,9 +374,10 @@ export const SETTINGS_WORKSPACE: WorkspaceDef = {
   ],
 };
 
+/** Ask Connie lives in the global header (not sidebar). Visual only until AI ships. */
 export const CONNIE_NAV = {
   id: "connie",
-  label: "Connie",
+  label: "Ask Connie",
   icon: Sparkles,
   implemented: false as const,
   comingSoon: true as const,
@@ -390,6 +391,7 @@ export const ACCOUNT_NAV = {
 
 /** Routes that live only in the header (not primary sidebar). */
 export const HEADER_UTILITIES = {
+  askConnie: CONNIE_NAV,
   messages: {
     href: "messages",
     permission: "notifications.read",

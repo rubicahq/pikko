@@ -8,7 +8,6 @@ import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import {
-  CONNIE_NAV,
   liveSettingsWorkspace,
   matchWorkspace,
   storeHref,
@@ -19,7 +18,7 @@ import { urls } from "@/lib/urls";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 export function MobileNav({
   user,
@@ -82,16 +81,6 @@ export function MobileNav({
           />
         </div>
         <div className="mt-auto space-y-1 border-t border-border p-3">
-          <div
-            className="flex h-11 items-center gap-3 rounded-md bg-warm-feature px-3 text-sm font-medium text-foreground"
-            title="Connie — coming soon"
-          >
-            <Sparkles className="h-5 w-5 shrink-0 text-brand" strokeWidth={1.75} />
-            <span>{CONNIE_NAV.label}</span>
-            <span className="ml-auto rounded-sm bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-              Soon
-            </span>
-          </div>
           {storeId && settings ? (
             <Link
               href={storeHref(storeId, settings.defaultHref)}
