@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublicLive, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
+import { storefrontIconsMetadata } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${liveData.live.name} · ${storeData.store.name}`,
     description: liveData.live.description || `Live shopping ${liveData.live.name}`,
     alternates: { canonical: urls.storefrontLiveAbsolute(storeSlug, liveSlug) },
+    icons: storefrontIconsMetadata(storeData.store.id, storeData.store.storefront),
   };
 }
 

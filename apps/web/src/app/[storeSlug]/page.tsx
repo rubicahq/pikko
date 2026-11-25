@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getPublicBatches, getPublicLives, getPublicProducts, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { safeCssColor } from "@/lib/safe-css-color";
+import { storefrontIconsMetadata, storefrontLogoSrc } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
 
@@ -19,11 +20,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = data.store.name;
   const description =
     sf.description || `Shop ${data.store.name} on Pikko.`;
-  const favicon = sf.favicon_file_id
-    ? urls.publicFile(data.store.id, sf.favicon_file_id)
-    : sf.logo_file_id
-      ? urls.publicFile(data.store.id, sf.logo_file_id)
-      : undefined;
   return {
     title,
     description,
@@ -34,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       url: urls.storefront(storeSlug),
       siteName: data.store.name,
     },
-    icons: favicon ? { icon: favicon } : undefined,
+    icons: storefrontIconsMetadata(data.store.id, sf),
     robots: { index: true, follow: true },
   };
 }
@@ -53,9 +49,7 @@ export default async function PublicStorePage({ params }: Props) {
   ]);
   const openBatches = batches.filter((b) => b.operational_status === "open" || b.operational_status === "scheduled");
   const openLives = lives.filter((l) => l.operational_status === "open" || l.operational_status === "scheduled");
-  const logoSrc = sf.logo_file_id
-    ? urls.publicFile(store.id, sf.logo_file_id)
-    : sf.logo_url;
+  const logoSrc = storefrontLogoSrc(store.id, sf);
   const bg = safeCssColor(sf.background_color, "#FFFFFF");
   const text = safeCssColor(sf.text_color, "#15191E");
   const primary = safeCssColor(sf.primary_color, "#FF3D00");

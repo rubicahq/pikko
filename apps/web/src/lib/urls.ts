@@ -123,10 +123,15 @@ export const urls = {
   },
   dashboardAbsolute: (path: string) =>
     `${dashboard()}${path.startsWith("/") ? path : `/${path}`}`,
+  /**
+   * Browser-facing file URLs must stay same-origin relative.
+   * Never prefix with API_BASE_URL — on the web container that is the Docker
+   * hostname `http://api:8080`, which browsers cannot resolve (broken logo/favicon).
+   */
   file: (storeId: string, fileId: string) =>
-    urls.api(`/api/v1/stores/${storeId}/files/${fileId}`),
+    `/api/v1/stores/${storeId}/files/${fileId}`,
   publicFile: (storeId: string, fileId: string) =>
-    urls.api(`/api/v1/public/files/${storeId}/${fileId}`),
+    `/api/v1/public/files/${storeId}/${fileId}`,
 };
 
 export const RESERVED_STOREFRONT_SLUGS = new Set([
