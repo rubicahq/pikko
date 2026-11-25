@@ -11,10 +11,12 @@ import (
 	"time"
 )
 
-const DefaultMaxTokens = 65536
+// DefaultMaxTokens is capped for OpenAI-compatible gateways (SumoPod/Gemini).
+// 65536 was rejected or truncated by some models and wasted retries.
+const DefaultMaxTokens = 16384
 const maxEmptyRetries = 3
 
-// OpenAICompatClient talks to an OpenAI-compatible chat completions API (e.. SumoPod).
+// OpenAICompatClient talks to an OpenAI-compatible chat completions API (e.g. SumoPod).
 // API keys must only come from env — never log or persist the key.
 type OpenAICompatClient struct {
 	BaseURL    string
@@ -70,27 +72,66 @@ func (c *OpenAICompatClient) ExtractCatalog(ctx context.Context, req ExtractRequ
 		maxTokens = DefaultMaxTokens
 	}
 
+	var all []ExtractedItem
+	var lastRaw json.RawMessage
+
+	for _, page := range req.Pages {
+		if req.MaxItems > 0 && len(all) >= req.MaxItems {
+			break
+		}
+		tiles, err := prepareVisionTiles(page)
+		if err != nil {
+			return nil, fmt.Errorf("prepare page %d for vision: %w", page.PageNumber, err)
+		}
+		for ti, tile := range tiles {
+			tileMax := 80
+			if req.MaxItems > 0 {
+				tileMax = req.MaxItems - len(all)
+				if tileMax <= 0 {
+					break
+				}
+			}
+			items, raw, err := c.extractOnce(ctx, tile.PageImage, tileMax, maxTokens)
+			if err != nil {
+				return nil, fmt.Errorf("AI extraction failed on page %d tile %d: %w", page.PageNumber, ti+1, err)
+			}
+			lastRaw = raw
+			for i := range items {
+				if items[i].PageNumber == nil {
+					p := page.PageNumber
+					items[i].PageNumber = &p
+				}
+				mapTileBBoxToPage(&items[i], tile)
+				items[i].NormalizeConfidence()
+				clampBBox(&items[i])
+			}
+			all = mergeExtractedItems(all, items)
+			if req.MaxItems > 0 && len(all) > req.MaxItems {
+				all = all[:req.MaxItems]
+				break
+			}
+		}
+	}
+
+	return &ExtractResult{Items: all, Raw: lastRaw}, nil
+}
+
+func (c *OpenAICompatClient) extractOnce(ctx context.Context, page PageImage, maxItems, maxTokens int) ([]ExtractedItem, json.RawMessage, error) {
 	parts := []any{
 		map[string]any{"type": "text", "text": fmt.Sprintf(
-			"Extract up to %d catalog items from these page images. Return JSON only.",
-			req.MaxItems,
+			"Extract EVERY distinct sellable catalog item visible in this page image (up to %d). Dense jastip/poster grids often have 20–30 dashed cells — return one item per cell. Return JSON only.",
+			maxItems,
 		)},
-	}
-	for _, p := range req.Pages {
-		mime := p.MIMEType
-		if mime == "" {
-			mime = "image/png"
-		}
-		parts = append(parts, map[string]any{
+		map[string]any{
 			"type": "text",
-			"text": fmt.Sprintf("Page %d:", p.PageNumber),
-		})
-		parts = append(parts, map[string]any{
+			"text": fmt.Sprintf("Page %d:", page.PageNumber),
+		},
+		map[string]any{
 			"type": "image_url",
 			"image_url": map[string]string{
-				"url": fmt.Sprintf("data:%s;base64,%s", mime, p.Base64Data),
+				"url": fmt.Sprintf("data:%s;base64,%s", mimeOrJPEG(page.MIMEType), page.Base64Data),
 			},
-		})
+		},
 	}
 
 	payload := chatRequest{
@@ -104,8 +145,9 @@ func (c *OpenAICompatClient) ExtractCatalog(ctx context.Context, req ExtractRequ
 	}
 
 	var lastErr error
+	var contentParts []string
 	for attempt := 0; attempt < maxEmptyRetries; attempt++ {
-		content, err := c.chat(ctx, payload)
+		content, finish, err := c.chat(ctx, payload)
 		if err != nil {
 			lastErr = err
 			continue
@@ -114,35 +156,54 @@ func (c *OpenAICompatClient) ExtractCatalog(ctx context.Context, req ExtractRequ
 			lastErr = fmt.Errorf("empty AI response")
 			continue
 		}
-		items, raw, err := parseExtraction(content)
+		contentParts = append(contentParts, content)
+		joined := strings.Join(contentParts, "")
+		items, raw, err := parseExtraction(joined)
 		if err != nil {
+			// Truncated mid-JSON: ask the model to continue from the cut.
+			if finish == "length" || finish == "max_tokens" {
+				lastErr = err
+				payload.Messages = append(payload.Messages,
+					chatMessage{Role: "assistant", Content: content},
+					chatMessage{Role: "user", Content: "Continue the JSON exactly where you left off. Output only the continuation, no markdown."},
+				)
+				continue
+			}
 			lastErr = err
+			contentParts = contentParts[:0] // reset — non-truncation parse error
 			continue
 		}
-		if req.MaxItems > 0 && len(items) > req.MaxItems {
-			items = items[:req.MaxItems]
+		if maxItems > 0 && len(items) > maxItems {
+			items = items[:maxItems]
 		}
 		for i := range items {
 			items[i].NormalizeConfidence()
 			clampBBox(&items[i])
 		}
-		return &ExtractResult{Items: items, Raw: raw}, nil
+		return items, raw, nil
 	}
 	if lastErr == nil {
 		lastErr = fmt.Errorf("AI extraction failed")
 	}
-	return nil, lastErr
+	return nil, nil, lastErr
 }
 
-func (c *OpenAICompatClient) chat(ctx context.Context, payload chatRequest) (string, error) {
+func mimeOrJPEG(mime string) string {
+	if mime == "" {
+		return "image/jpeg"
+	}
+	return mime
+}
+
+func (c *OpenAICompatClient) chat(ctx context.Context, payload chatRequest) (content string, finishReason string, err error) {
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	endpoint := c.BaseURL + "/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
@@ -150,25 +211,25 @@ func (c *OpenAICompatClient) chat(ctx context.Context, payload chatRequest) (str
 
 	res, err := c.HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 16<<20))
 	if res.StatusCode >= 300 {
 		// Never include Authorization or API key material in errors.
-		return "", fmt.Errorf("AI provider status %d: %s", res.StatusCode, truncate(string(raw), 400))
+		return "", "", fmt.Errorf("AI provider status %d: %s", res.StatusCode, truncate(string(raw), 400))
 	}
 	var out chatResponse
 	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", fmt.Errorf("invalid AI response JSON")
+		return "", "", fmt.Errorf("invalid AI response JSON")
 	}
 	if out.Error != nil && out.Error.Message != "" {
-		return "", fmt.Errorf("AI provider error: %s", truncate(out.Error.Message, 200))
+		return "", "", fmt.Errorf("AI provider error: %s", truncate(out.Error.Message, 200))
 	}
 	if len(out.Choices) == 0 {
-		return "", fmt.Errorf("empty AI response")
+		return "", "", fmt.Errorf("empty AI response")
 	}
-	return out.Choices[0].Message.Content, nil
+	return out.Choices[0].Message.Content, out.Choices[0].FinishReason, nil
 }
 
 func parseExtraction(content string) ([]ExtractedItem, json.RawMessage, error) {
@@ -185,11 +246,17 @@ func parseExtraction(content string) ([]ExtractedItem, json.RawMessage, error) {
 	var envelope struct {
 		Items []ExtractedItem `json:"items"`
 	}
-	if err := json.Unmarshal([]byte(content), &envelope); err != nil {
-		return nil, nil, fmt.Errorf("AI JSON parse: %w", err)
+	if err := json.Unmarshal([]byte(content), &envelope); err == nil {
+		raw := json.RawMessage(content)
+		return envelope.Items, raw, nil
 	}
-	raw := json.RawMessage(content)
-	return envelope.Items, raw, nil
+	// Some models return a bare array.
+	var arr []ExtractedItem
+	if err := json.Unmarshal([]byte(content), &arr); err == nil {
+		wrapped, _ := json.Marshal(map[string]any{"items": arr})
+		return arr, wrapped, nil
+	}
+	return nil, nil, fmt.Errorf("AI JSON parse: expected {\"items\":[...]} or array")
 }
 
 func truncate(s string, n int) string {

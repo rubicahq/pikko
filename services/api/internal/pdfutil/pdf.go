@@ -18,6 +18,10 @@ const (
 	DefaultMaxBytes  = 25 << 20 // 25 MB
 	DefaultMaxPages  = 50
 	DefaultMaxItems  = 500
+	// DefaultScaleTo caps the longest page edge in pixels. A1 catalogs at
+	// fixed 120 DPI explode to ~2800×4000 and blow vision payloads; scale-to
+	// keeps flipbook + AI readable without huge PNGs.
+	DefaultScaleTo = 2200
 )
 
 var pdfMagic = []byte("%PDF-")
@@ -63,17 +67,16 @@ type Renderer interface {
 // PopplerRenderer uses pdftoppm when available.
 type PopplerRenderer struct {
 	Bin string // default pdftoppm
-	DPI int
+	// ScaleTo sets pdftoppm -scale-to (longest edge). Preferred over DPI for
+	// large poster pages (A1). When 0, DPI is used.
+	ScaleTo int
+	DPI     int
 }
 
 func (r *PopplerRenderer) RenderPages(pdf []byte, maxPages int) ([]PageImage, error) {
 	bin := r.Bin
 	if bin == "" {
 		bin = "pdftoppm"
-	}
-	dpi := r.DPI
-	if dpi <= 0 {
-		dpi = 120
 	}
 	if _, err := exec.LookPath(bin); err != nil {
 		return nil, fmt.Errorf("pdftoppm not available")
@@ -89,7 +92,17 @@ func (r *PopplerRenderer) RenderPages(pdf []byte, maxPages int) ([]PageImage, er
 		return nil, err
 	}
 	outPrefix := filepath.Join(dir, "page")
-	args := []string{"-png", "-r", strconv.Itoa(dpi)}
+	args := []string{"-png"}
+	scaleTo := r.ScaleTo
+	if scaleTo > 0 {
+		args = append(args, "-scale-to", strconv.Itoa(scaleTo))
+	} else {
+		dpi := r.DPI
+		if dpi <= 0 {
+			dpi = 120
+		}
+		args = append(args, "-r", strconv.Itoa(dpi))
+	}
 	if maxPages > 0 {
 		args = append(args, "-f", "1", "-l", strconv.Itoa(maxPages))
 	}
@@ -135,7 +148,20 @@ func (r *PopplerRenderer) RenderPages(pdf []byte, maxPages int) ([]PageImage, er
 	return pages, nil
 }
 
-// PlaceholderRenderer generates solid PNG pages (tests / fallback without poppler).
+// UnavailableRenderer fails loudly when poppler is missing (production).
+// Prefer this over PlaceholderRenderer so Add Catalog never "succeeds" on blank pages.
+type UnavailableRenderer struct {
+	Err error
+}
+
+func (r *UnavailableRenderer) RenderPages(pdf []byte, maxPages int) ([]PageImage, error) {
+	if r != nil && r.Err != nil {
+		return nil, r.Err
+	}
+	return nil, fmt.Errorf("pdftoppm (poppler-utils) is required for PDF catalog import")
+}
+
+// PlaceholderRenderer generates solid PNG pages (tests only).
 type PlaceholderRenderer struct {
 	Width  int
 	Height int
@@ -181,12 +207,15 @@ func solidPNG(w, h int, c color.RGBA) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// NewRenderer prefers poppler; falls back to placeholders.
+// NewRenderer prefers poppler; returns UnavailableRenderer when missing so
+// import jobs fail with a clear error instead of blank placeholder pages.
 func NewRenderer() Renderer {
 	if _, err := exec.LookPath("pdftoppm"); err == nil {
-		return &PopplerRenderer{DPI: 120}
+		return &PopplerRenderer{ScaleTo: DefaultScaleTo}
 	}
-	return &PlaceholderRenderer{}
+	return &UnavailableRenderer{
+		Err: fmt.Errorf("pdftoppm (poppler-utils) is required for PDF catalog import — install poppler-utils in the API image/runtime"),
+	}
 }
 
 // MinimalPDF returns a tiny valid 1-page PDF for tests.

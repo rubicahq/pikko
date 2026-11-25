@@ -55,7 +55,8 @@ services:
       IMPORT_MAX_ITEMS: ${IMPORT_MAX_ITEMS:-500}
     ports:
       - "127.0.0.1:8100:8080"
-    mem_limit: 512m
+    # PDF rasterization (A1 jastip pages + pdftoppm) needs headroom above 512m.
+    mem_limit: 1024m
 
   web:
     container_name: pikko-web

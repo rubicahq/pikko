@@ -166,15 +166,16 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	if len(title) > 200 {
 		return nil, fmt.Errorf("%w: catalog name must be 200 characters or fewer", ErrInvalidInput)
 	}
-	if in.Size <= 0 {
-		return nil, fmt.Errorf("%w: choose a PDF file to upload", ErrInvalidInput)
-	}
+	// Multipart FileHeader.Size can be 0/-1 when Content-Length is omitted; measure after read.
 	if in.Size > lim.MaxPDFBytes {
 		return nil, fmt.Errorf("%w: PDF exceeds the %d MB size limit", ErrInvalidInput, lim.MaxPDFBytes/(1<<20))
 	}
 	head := make([]byte, 512)
 	n, _ := io.ReadFull(in.Reader, head)
 	head = head[:n]
+	if n == 0 {
+		return nil, fmt.Errorf("%w: choose a PDF file to upload", ErrInvalidInput)
+	}
 	if !pdfutil.IsPDF(head) {
 		return nil, fmt.Errorf("%w: file must be a PDF (application/pdf)", ErrInvalidInput)
 	}
@@ -184,6 +185,9 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	full, err := io.ReadAll(io.LimitReader(body, lim.MaxPDFBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(full) == 0 {
+		return nil, fmt.Errorf("%w: choose a PDF file to upload", ErrInvalidInput)
 	}
 	if int64(len(full)) > lim.MaxPDFBytes {
 		return nil, fmt.Errorf("%w: PDF exceeds the %d MB size limit", ErrInvalidInput, lim.MaxPDFBytes/(1<<20))
