@@ -82,19 +82,20 @@ export function OrderItemsAndRevisions({
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[10px] border border-border p-5">
-        <h2 className="text-base font-medium">Items</h2>
-        {error ? <p className="mt-2 text-sm text-error">{error}</p> : null}
-        <ul className="mt-3 space-y-3 text-sm">
+    <div className="space-y-4">
+      <section className="rounded-[10px] border border-border p-4">
+        <h2 className="text-sm font-medium">Items</h2>
+        {error ? <p className="mt-1.5 text-caption text-error">{error}</p> : null}
+        <ul className="mt-2 divide-y divide-border text-caption">
           {rows.map((it) => (
-            <li key={it.id} className="border-b border-border pb-3 last:border-0">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium">
-                    {it.product_name} × {it.quantity}
+            <li key={it.id} className="py-2 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {it.product_name}{" "}
+                    <span className="font-normal text-foreground-secondary">× {it.quantity}</span>
                   </p>
-                  <p className="text-caption text-foreground-muted">
+                  <p className="text-caption leading-tight text-foreground-muted">
                     {formatIDR(it.unit_price_idr)}
                     {it.sku ? ` · ${it.sku}` : ""}
                     {it.original_quantity !== it.quantity
@@ -104,14 +105,16 @@ export function OrderItemsAndRevisions({
                     {` · alloc ${it.allocated_qty} · packed ${it.packed_qty}`}
                   </p>
                 </div>
-                <span className="tabular-nums">{formatIDR(it.line_total_idr)}</span>
+                <span className="shrink-0 tabular-nums text-foreground">
+                  {formatIDR(it.line_total_idr)}
+                </span>
               </div>
               {canWrite ? (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <Input
                     type="number"
                     min={1}
-                    className="h-9 w-24"
+                    className="h-7 w-20 px-1.5 text-caption"
                     defaultValue={it.quantity}
                     onChange={(e) =>
                       setQtyDraft((prev) => ({
@@ -136,18 +139,20 @@ export function OrderItemsAndRevisions({
         </ul>
       </section>
 
-      <section className="rounded-[10px] border border-border p-5">
-        <h2 className="text-base font-medium">Revision history</h2>
+      <section className="rounded-[10px] border border-border p-4">
+        <h2 className="text-sm font-medium">Revision history</h2>
         {revisions.length === 0 ? (
-          <p className="mt-3 text-sm text-foreground-secondary">No revisions yet.</p>
+          <p className="mt-2 text-caption text-foreground-secondary">No revisions yet.</p>
         ) : (
-          <ol className="mt-3 space-y-2 text-sm">
+          <ol className="mt-2 space-y-1.5 text-caption">
             {revisions.map((r) => (
-              <li key={r.id} className="flex gap-3">
-                <span className="w-8 tabular-nums text-foreground-muted">#{r.revision_number}</span>
-                <div>
+              <li key={r.id} className="flex gap-2">
+                <span className="w-7 shrink-0 tabular-nums text-foreground-muted">
+                  #{r.revision_number}
+                </span>
+                <div className="min-w-0">
                   <p>{r.summary}</p>
-                  <p className="text-caption text-foreground-muted">
+                  <p className="leading-tight text-foreground-muted">
                     {r.change_type.replaceAll("_", " ")}
                     {r.reason ? ` · ${r.reason}` : ""}
                     {" · "}

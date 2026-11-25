@@ -92,10 +92,10 @@ export default async function OrderDetailPage({
         </div>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <section className="rounded-[10px] border border-border p-5">
-          <h2 className="text-base font-medium">Customer</h2>
-          <dl className="mt-3 space-y-2 text-sm">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <section className="rounded-[10px] border border-border p-4">
+          <h2 className="text-sm font-medium">Customer</h2>
+          <dl className="mt-2 space-y-1.5 text-caption">
             <div>
               <dt className="text-foreground-secondary">Name</dt>
               <dd>{o.customer_name}</dd>
@@ -137,16 +137,16 @@ export default async function OrderDetailPage({
           </dl>
         </section>
 
-        <section className="rounded-[10px] border border-border p-5">
-          <h2 className="text-base font-medium">Fulfillment</h2>
-          <p className="mt-3 text-sm capitalize">{o.fulfillment_method.replaceAll("_", " ")}</p>
+        <section className="rounded-[10px] border border-border p-4">
+          <h2 className="text-sm font-medium">Fulfillment</h2>
+          <p className="mt-2 text-caption capitalize">{o.fulfillment_method.replaceAll("_", " ")}</p>
           {o.shipping_line1 ? (
-            <p className="mt-2 text-sm text-foreground-secondary">
+            <p className="mt-1 text-caption text-foreground-secondary">
               {o.shipping_line1}
               {o.shipping_city ? `, ${o.shipping_city}` : ""}
             </p>
           ) : null}
-          <div className="mt-4 space-y-1 border-t border-border pt-3 text-sm">
+          <div className="mt-3 space-y-0.5 border-t border-border pt-2.5 text-caption">
             <div className="flex justify-between">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatIDR(o.subtotal_idr)}</span>
@@ -163,7 +163,7 @@ export default async function OrderDetailPage({
                 <span className="tabular-nums">{formatIDR(o.shipping_fee_idr)}</span>
               </div>
             ) : null}
-            <div className="flex justify-between pt-1 text-sm font-medium">
+            <div className="flex justify-between pt-0.5 text-sm font-medium">
               <span>Total</span>
               <span className="tabular-nums">{formatIDR(o.total_idr)}</span>
             </div>
@@ -171,7 +171,7 @@ export default async function OrderDetailPage({
         </section>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <OrderRelationsEditor
           storeId={storeId}
           orderId={o.id}
@@ -181,7 +181,7 @@ export default async function OrderDetailPage({
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <OrderItemsAndRevisions
           storeId={storeId}
           orderId={o.id}
@@ -191,9 +191,9 @@ export default async function OrderDetailPage({
       </div>
 
       {p ? (
-        <section className="mt-6 rounded-[10px] border border-border p-5">
-          <h2 className="text-base font-medium">Payment</h2>
-          <p className="mt-2 text-sm capitalize">
+        <section className="mt-4 rounded-[10px] border border-border p-4">
+          <h2 className="text-sm font-medium">Payment</h2>
+          <p className="mt-1.5 text-caption capitalize">
             {p.method_type === "paid_by_admin"
               ? "Paid by admin"
               : (p.method_type || "bank transfer").replaceAll("_", " ")}
@@ -201,16 +201,16 @@ export default async function OrderDetailPage({
             {p.status.replaceAll("_", " ")}
           </p>
           {p.method_type === "paid_by_admin" ? (
-            <p className="mt-1 text-sm text-foreground-secondary">
+            <p className="mt-1 text-caption text-foreground-secondary">
               {p.note || "Marked paid by admin"} · {formatIDR(p.amount_idr)}
             </p>
           ) : (
             <>
-              <p className="mt-1 text-sm text-foreground-secondary">
+              <p className="mt-1 text-caption text-foreground-secondary">
                 {p.bank_name_snapshot} · {p.account_number_snapshot} · {formatIDR(p.amount_idr)}
               </p>
               {(p.evidence || []).length ? (
-                <ul className="mt-4 space-y-2 text-sm">
+                <ul className="mt-3 space-y-1.5 text-caption">
                   {p.evidence!.map((ev) => (
                     <li key={ev.id}>
                       <a
@@ -228,7 +228,7 @@ export default async function OrderDetailPage({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-3 text-sm text-foreground-secondary">No payment proof yet.</p>
+                <p className="mt-2 text-caption text-foreground-secondary">No payment proof yet.</p>
               )}
             </>
           )}

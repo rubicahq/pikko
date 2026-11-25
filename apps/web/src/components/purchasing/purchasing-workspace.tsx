@@ -68,6 +68,9 @@ const STATUS_OPTIONS: { value: LineStatus; label: string }[] = [
   { value: "unavailable", label: "Unavailable" },
 ];
 
+const compactHead = "h-9 px-3 text-caption";
+const compactCell = "h-auto px-3 py-1.5 text-caption";
+
 export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   const [eligibility, setEligibility] = useState<Eligibility[]>([]);
   const [lines, setLines] = useState<PurchasingLine[]>([]);
@@ -208,52 +211,54 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   }
 
   return (
-    <div className="mx-auto max-w-dashboard space-y-8">
+    <div className="mx-auto max-w-dashboard space-y-5">
       <PageHeader
         title="Purchasing"
         description="Paid order demand (including Paid by admin) and wishlist interest. Update status per line or in bulk; group by customer or attributes."
         actions={
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" size="sm">
             <Link href={urls.storeAttributes(storeId)}>Attributes</Link>
           </Button>
         }
       />
 
       {error ? (
-        <p className="rounded-lg border border-error-border bg-error-bg px-4 py-3 text-sm text-error">
+        <p className="rounded-lg border border-error-border bg-error-bg px-3 py-2 text-sm text-error">
           {error}
         </p>
       ) : null}
 
-      <div className="space-y-4">
-        <div className="flex gap-2" aria-label="Demand source">
-          {(["orders", "wishlist"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={source === value}
-              onClick={() => {
-                setSource(value);
-                setGroupBy("variant");
-                setSelected({});
-              }}
-              className={
-                source === value
-                  ? "rounded-md bg-ink px-4 py-2 text-sm font-semibold text-foreground-inverse"
-                  : "rounded-md border border-border bg-background px-4 py-2 text-sm text-foreground-secondary"
-              }
-            >
-              {value === "orders" ? "Orders" : "Wishlist"}
-            </button>
-          ))}
-        </div>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-background-subtle/60 px-3 py-2.5">
+          <div className="flex gap-1.5 pb-0.5" aria-label="Demand source">
+            {(["orders", "wishlist"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={source === value}
+                onClick={() => {
+                  setSource(value);
+                  setGroupBy("variant");
+                  setSelected({});
+                }}
+                className={
+                  source === value
+                    ? "rounded-md bg-ink px-3 py-1.5 text-caption font-semibold text-foreground-inverse"
+                    : "rounded-md border border-border bg-background px-3 py-1.5 text-caption text-foreground-secondary"
+                }
+              >
+                {value === "orders" ? "Orders" : "Wishlist"}
+              </button>
+            ))}
+          </div>
 
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-background-subtle/60 p-4">
+          <div className="hidden h-8 w-px shrink-0 bg-border sm:block" aria-hidden />
+
           {source === "orders" ? (
-            <label className="space-y-1 text-sm">
+            <label className="space-y-0.5 text-caption">
               <span className="text-foreground-muted">Batch</span>
               <select
-                className="block h-10 min-w-[12rem] rounded-md border border-border bg-background px-3"
+                className="block h-9 min-w-[11rem] rounded-md border border-border bg-background px-2.5 text-caption"
                 value={batchId}
                 onChange={(e) => setBatchId(e.target.value)}
               >
@@ -266,10 +271,10 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
               </select>
             </label>
           ) : null}
-          <label className="space-y-1 text-sm">
+          <label className="space-y-0.5 text-caption">
             <span className="text-foreground-muted">Group</span>
             <select
-              className="block h-10 min-w-[10rem] rounded-md border border-border bg-background px-3"
+              className="block h-9 min-w-[9rem] rounded-md border border-border bg-background px-2.5 text-caption"
               value={groupBy}
               onChange={(e) => {
                 setGroupBy(e.target.value);
@@ -290,12 +295,12 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         </div>
 
         {source === "orders" && selectedKeys.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background px-4 py-3">
-            <span className="text-sm text-foreground-secondary">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-background px-3 py-2">
+            <span className="text-caption text-foreground-secondary">
               {selectedKeys.length} selected
             </span>
             <select
-              className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+              className="h-8 rounded-md border border-border bg-background px-2 text-caption"
               value={bulkStatus}
               onChange={(e) => setBulkStatus(e.target.value as LineStatus)}
             >
@@ -340,11 +345,11 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
             }
           />
         ) : (
-          <Table stickyHeader>
+          <Table stickyHeader className="text-caption">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 {source === "orders" ? (
-                  <TableHead sticky className="w-10">
+                  <TableHead sticky className={`${compactHead} w-9`}>
                     <input
                       type="checkbox"
                       aria-label="Select all"
@@ -353,33 +358,43 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                     />
                   </TableHead>
                 ) : null}
-                <TableHead sticky>Product / variant</TableHead>
-                {groupBy !== "variant" ? <TableHead sticky>Group</TableHead> : null}
-                <TableHead sticky>
+                <TableHead sticky className={compactHead}>
+                  Product / variant
+                </TableHead>
+                {groupBy !== "variant" ? (
+                  <TableHead sticky className={compactHead}>
+                    Group
+                  </TableHead>
+                ) : null}
+                <TableHead sticky className={compactHead}>
                   {source === "wishlist" ? "Live shopping" : "Batch"}
                 </TableHead>
                 {source === "orders" && groupBy === "customer" ? (
-                  <TableHead sticky>Customer</TableHead>
+                  <TableHead sticky className={compactHead}>
+                    Customer
+                  </TableHead>
                 ) : null}
-                <TableHead sticky className="text-right">
+                <TableHead sticky className={`${compactHead} text-right`}>
                   {source === "wishlist" ? "Wishlisted" : "Required"}
                 </TableHead>
                 {source === "orders" ? (
                   <>
-                    <TableHead sticky className="text-right">
+                    <TableHead sticky className={`${compactHead} text-right`}>
                       Unpaid
                     </TableHead>
-                    <TableHead sticky>Status</TableHead>
-                    <TableHead sticky className="text-right">
+                    <TableHead sticky className={compactHead}>
+                      Status
+                    </TableHead>
+                    <TableHead sticky className={`${compactHead} text-right`}>
                       Purchased
                     </TableHead>
-                    <TableHead sticky className="text-right">
+                    <TableHead sticky className={`${compactHead} text-right`}>
                       Unavailable
                     </TableHead>
-                    <TableHead sticky className="text-right">
+                    <TableHead sticky className={`${compactHead} text-right`}>
                       Outstanding
                     </TableHead>
-                    <TableHead sticky />
+                    <TableHead sticky className={compactHead} />
                   </>
                 ) : null}
               </TableRow>
@@ -390,7 +405,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                 return (
                   <TableRow key={key}>
                     {source === "orders" ? (
-                      <TableCell>
+                      <TableCell className={compactCell}>
                         <input
                           type="checkbox"
                           aria-label={`Select ${line.product_name}`}
@@ -401,40 +416,40 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                         />
                       </TableCell>
                     ) : null}
-                    <TableCell>
+                    <TableCell className={compactCell}>
                       <div className="font-medium text-foreground">{line.product_name}</div>
-                      <div className="text-xs text-foreground-muted">
+                      <div className="text-caption leading-tight text-foreground-muted">
                         {[line.variant_label, line.brand_name, line.sku]
                           .filter(Boolean)
                           .join(" · ") || "—"}
                       </div>
                     </TableCell>
                     {groupBy !== "variant" ? (
-                      <TableCell className="font-medium">
+                      <TableCell className={`${compactCell} font-medium`}>
                         {line.group_label || "Unspecified"}
                       </TableCell>
                     ) : null}
-                    <TableCell className="text-sm text-foreground-secondary">
+                    <TableCell className={`${compactCell} text-foreground-secondary`}>
                       {line.batch_name || (source === "orders" ? "Ready stock" : "—")}
                     </TableCell>
                     {source === "orders" && groupBy === "customer" ? (
-                      <TableCell className="text-sm">
+                      <TableCell className={compactCell}>
                         {line.customer_name || "—"}
                       </TableCell>
                     ) : null}
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className={`${compactCell} text-right tabular-nums`}>
                       {line.required_qty}
                     </TableCell>
                     {source === "orders" ? (
                       <>
-                        <TableCell className="text-right tabular-nums">
+                        <TableCell className={`${compactCell} text-right tabular-nums`}>
                           {line.unpaid_demand}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                        <TableCell className={compactCell}>
+                          <div className="flex items-center gap-1.5">
                             <StatusBadge status={line.line_status || "pending"} />
                             <select
-                              className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+                              className="h-7 rounded-md border border-border bg-background px-1.5 text-caption"
                               value={
                                 line.line_status === "partial"
                                   ? "pending"
@@ -453,10 +468,10 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                             </select>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className={`${compactCell} text-right`}>
                           {line.batch_id ? (
                             <Input
-                              className="ml-auto h-9 w-20 text-right"
+                              className="ml-auto h-7 w-16 px-1.5 text-right text-caption"
                               value={drafts[key] ?? String(line.purchased_qty)}
                               onChange={(e) =>
                                 setDrafts((d) => ({ ...d, [key]: e.target.value }))
@@ -466,10 +481,10 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                             <span className="tabular-nums">{line.purchased_qty}</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className={`${compactCell} text-right`}>
                           {line.batch_id ? (
                             <Input
-                              className="ml-auto h-9 w-20 text-right"
+                              className="ml-auto h-7 w-16 px-1.5 text-right text-caption"
                               value={unavailDrafts[key] ?? String(line.unavailable_qty)}
                               onChange={(e) =>
                                 setUnavailDrafts((d) => ({
@@ -482,10 +497,10 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                             <span className="tabular-nums">{line.unavailable_qty}</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        <TableCell className={`${compactCell} text-right tabular-nums`}>
                           {line.outstanding_qty}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className={`${compactCell} text-right`}>
                           {line.batch_id ? (
                             <Button
                               type="button"

@@ -102,6 +102,41 @@ func TestEvaluateRulesPercentRounding(t *testing.T) {
 	}
 }
 
+func TestEvaluateRulesConditionalTiersFirstMatch(t *testing.T) {
+	vid := uuid.New()
+	rules := []BusinessRule{{
+		ID: uuid.New(), RuleType: RuleHandlingFee, ScopeType: ScopeStore, VersionID: &vid,
+		Config: RuleConfig{
+			FeeMode: FeeModeConditional,
+			Tiers: []HandlingFeeTier{
+				{MinSubtotalIDR: 200_000, FeeFixedIDR: 10_000},
+				{MinSubtotalIDR: 100_000, FeeFixedIDR: 5_000},
+			},
+		},
+	}}
+
+	cases := []struct {
+		subtotal int64
+		wantFee  int64
+	}{
+		{240_000, 10_000},
+		{200_001, 10_000},
+		{200_000, 5_000}, // not > 200k → second tier
+		{120_000, 5_000},
+		{100_000, 0}, // not > 100k
+		{50_000, 0},
+	}
+	for _, tc := range cases {
+		eval, err := EvaluateRules(rules, "ready_stock", nil, tc.subtotal, 1, 0)
+		if err != nil {
+			t.Fatalf("subtotal %d: %v", tc.subtotal, err)
+		}
+		if eval.HandlingFeeIDR != tc.wantFee {
+			t.Fatalf("subtotal %d: want fee %d, got %d", tc.subtotal, tc.wantFee, eval.HandlingFeeIDR)
+		}
+	}
+}
+
 func TestResolveCartGroup(t *testing.T) {
 	b1, b2 := uuid.New(), uuid.New()
 	_, _, err := resolveCartGroup([]CartLineInput{
