@@ -255,3 +255,17 @@ export async function getPublicLive(slug: string, liveSlug: string) {
     };
   }>(`/api/v1/public/stores/${slug}/live/${liveSlug}`, false);
 }
+
+export async function getPublicCatalogs(slug: string) {
+  const data = await serverFetch<{
+    catalogs: {
+      id: string;
+      title: string;
+      cover_url?: string;
+      page_count: number;
+      created_at: string;
+    }[];
+    total: number;
+  }>(`/api/v1/public/stores/${slug}/catalogs`, false);
+  return data?.catalogs || [];
+}

@@ -9,10 +9,12 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
 	"github.com/rubicahq/pikko/services/api/internal/catalogs"
+	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
 
 type CatalogDocHandlers struct {
 	Catalogs *catalogs.Service
+	URLs     *urls.Generator
 }
 
 func (h *CatalogDocHandlers) List(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +197,33 @@ func (h *CatalogDocHandlers) ListForPreorder(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"catalogs": list})
+}
+
+// PublicCatalogs lists published catalogs for storefront banner cards.
+func (h *CatalogDocHandlers) PublicCatalogs(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	storeID, err := h.Catalogs.ResolvePublishedStoreID(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, catalogs.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
+			return
+		}
+		writeError(w, r, http.StatusInternalServerError, "list_failed", "Unable to list catalogs.")
+		return
+	}
+	list, err := h.Catalogs.ListPublishedForStorefront(r.Context(), storeID)
+	if err != nil {
+		writeError(w, r, http.StatusInternalServerError, "list_failed", "Unable to list catalogs.")
+		return
+	}
+	if list == nil {
+		list = []catalogs.PublicCatalog{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"catalogs":     list,
+		"total":        len(list),
+		"catalogs_url": h.URLs.Storefront(slug) + "/catalogs",
+	})
 }
 
 type ProductRelationHandlers struct {

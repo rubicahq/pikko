@@ -411,15 +411,7 @@ type PublicStore struct {
 
 // PublicByStoreSlug returns published flipbook pages for a published store.
 func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (store PublicStore, pages []Page, err error) {
-	err = s.DB.QueryRow(ctx, `
-		SELECT s.id, s.name, sf.whatsapp
-		FROM stores s
-		LEFT JOIN storefront_configs sf ON sf.store_id = s.id AND sf.channel = 'published'
-		WHERE s.slug=$1 AND s.archived_at IS NULL AND s.publication_status='published'
-	`, slug).Scan(&store.ID, &store.Name, &store.WhatsApp)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return PublicStore{}, nil, ErrNotFound
-	}
+	store, err = s.resolvePublicStore(ctx, slug)
 	if err != nil {
 		return PublicStore{}, nil, err
 	}
@@ -427,8 +419,55 @@ func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (store Pub
 	if err != nil {
 		return PublicStore{}, nil, err
 	}
+	return store, filterPublicPages(store.ID, pages), nil
+}
+
+// PublicByCatalog returns published pages for one published catalog document.
+func (s *Service) PublicByCatalog(ctx context.Context, slug string, catalogID uuid.UUID) (store PublicStore, pages []Page, err error) {
+	store, err = s.resolvePublicStore(ctx, slug)
+	if err != nil {
+		return PublicStore{}, nil, err
+	}
+	var status string
+	err = s.DB.QueryRow(ctx, `
+		SELECT status FROM catalogs WHERE id=$1 AND store_id=$2
+	`, catalogID, store.ID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicStore{}, nil, ErrNotFound
+	}
+	if err != nil {
+		return PublicStore{}, nil, err
+	}
+	if status != "published" {
+		return PublicStore{}, nil, ErrNotFound
+	}
+	pages, err = s.ListPagesForCatalog(ctx, store.ID, catalogID, true)
+	if err != nil {
+		return PublicStore{}, nil, err
+	}
+	return store, filterPublicPages(store.ID, pages), nil
+}
+
+func (s *Service) resolvePublicStore(ctx context.Context, slug string) (PublicStore, error) {
+	var store PublicStore
+	err := s.DB.QueryRow(ctx, `
+		SELECT s.id, s.name, sf.whatsapp
+		FROM stores s
+		LEFT JOIN storefront_configs sf ON sf.store_id = s.id AND sf.channel = 'published'
+		WHERE s.slug=$1 AND s.archived_at IS NULL AND s.publication_status='published'
+	`, slug).Scan(&store.ID, &store.Name, &store.WhatsApp)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PublicStore{}, ErrNotFound
+	}
+	if err != nil {
+		return PublicStore{}, err
+	}
+	return store, nil
+}
+
+func filterPublicPages(storeID uuid.UUID, pages []Page) []Page {
 	for i := range pages {
-		pages[i].ImageURL = publicFileURL(store.ID, pages[i].ImageFileID)
+		pages[i].ImageURL = publicFileURL(storeID, pages[i].ImageFileID)
 		filtered := pages[i].Hotspots[:0]
 		for _, h := range pages[i].Hotspots {
 			if h.ProductID != nil && h.ProductStatus == "published" {
@@ -438,7 +477,41 @@ func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (store Pub
 		pages[i].Hotspots = filtered
 		pages[i].Items = pageItemsFromHotspots(filtered)
 	}
-	return store, pages, nil
+	return pages
+}
+
+// ListPagesForCatalog returns pages belonging to a catalog document.
+func (s *Service) ListPagesForCatalog(ctx context.Context, storeID, catalogID uuid.UUID, publishedOnly bool) ([]Page, error) {
+	q := `
+		SELECT id, store_id, image_file_id, display_order, status, source_import_job_id, catalog_id, page_number, created_at, updated_at
+		FROM catalog_pages WHERE store_id=$1 AND catalog_id=$2`
+	if publishedOnly {
+		q += ` AND status='published'`
+	}
+	q += ` ORDER BY display_order, page_number NULLS LAST, created_at`
+	rows, err := s.DB.Query(ctx, q, storeID, catalogID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Page
+	for rows.Next() {
+		var p Page
+		if err := rows.Scan(&p.ID, &p.StoreID, &p.ImageFileID, &p.DisplayOrder, &p.Status, &p.SourceImportJobID, &p.CatalogID, &p.PageNumber, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		p.ImageURL = publicFileURL(storeID, p.ImageFileID)
+		out = append(out, p)
+	}
+	for i := range out {
+		hs, err := s.listHotspots(ctx, storeID, out[i].ID, publishedOnly)
+		if err != nil {
+			return nil, err
+		}
+		out[i].Hotspots = hs
+		out[i].Items = pageItemsFromHotspots(hs)
+	}
+	return out, rows.Err()
 }
 
 // MerchantList attaches merchant file URLs.

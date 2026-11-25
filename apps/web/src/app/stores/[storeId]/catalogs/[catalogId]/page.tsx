@@ -4,6 +4,8 @@ import { getSession, getStore, serverFetch } from "@/lib/server-api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { CatalogDetailLinks } from "@/components/catalog/catalog-detail-links";
+import { CatalogCoverEditor } from "@/components/catalog/catalog-cover-editor";
+import { CatalogStatusControls } from "@/components/catalog/catalog-status-controls";
 import { urls } from "@/lib/urls";
 
 const CATALOG_ID_UUID =
@@ -15,6 +17,7 @@ type CatalogDoc = {
   status: string;
   page_count: number;
   source_import_job_id?: string;
+  cover_file_id?: string | null;
   campaign_ids?: string[];
   preorder_batch_ids?: string[];
   created_at: string;
@@ -74,6 +77,18 @@ export default async function CatalogDetailPage({
           </div>
         </div>
       </div>
+
+      <CatalogCoverEditor
+        storeId={storeId}
+        catalogId={catalog.id}
+        coverFileId={catalog.cover_file_id}
+      />
+
+      <CatalogStatusControls
+        storeId={storeId}
+        catalogId={catalog.id}
+        status={catalog.status}
+      />
 
       <CatalogDetailLinks
         storeId={storeId}

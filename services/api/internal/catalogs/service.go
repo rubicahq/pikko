@@ -19,16 +19,27 @@ var (
 
 // Catalog is a reusable PDF catalog document (pages + optional campaign/preorder links).
 type Catalog struct {
-	ID                 uuid.UUID  `json:"id"`
-	StoreID            uuid.UUID  `json:"store_id"`
-	Title              string     `json:"title"`
-	Status             string     `json:"status"`
-	SourceImportJobID  *uuid.UUID `json:"source_import_job_id,omitempty"`
-	PageCount          int        `json:"page_count"`
-	CampaignIDs        []uuid.UUID `json:"campaign_ids,omitempty"`
-	PreorderBatchIDs   []uuid.UUID `json:"preorder_batch_ids,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                uuid.UUID   `json:"id"`
+	StoreID           uuid.UUID   `json:"store_id"`
+	Title             string      `json:"title"`
+	Status            string      `json:"status"`
+	SourceImportJobID *uuid.UUID  `json:"source_import_job_id,omitempty"`
+	CoverFileID       *uuid.UUID  `json:"cover_file_id,omitempty"`
+	CoverURL          string      `json:"cover_url,omitempty"`
+	PageCount         int         `json:"page_count"`
+	CampaignIDs       []uuid.UUID `json:"campaign_ids,omitempty"`
+	PreorderBatchIDs  []uuid.UUID `json:"preorder_batch_ids,omitempty"`
+	CreatedAt         time.Time   `json:"created_at"`
+	UpdatedAt         time.Time   `json:"updated_at"`
+}
+
+// PublicCatalog is the storefront banner card payload.
+type PublicCatalog struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	CoverURL  string    `json:"cover_url,omitempty"`
+	PageCount int       `json:"page_count"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Service struct {
@@ -37,6 +48,26 @@ type Service struct {
 
 type CreateFromImportInput struct {
 	Title string
+}
+
+func publicFileURL(storeID, fileID uuid.UUID) string {
+	return fmt.Sprintf("/api/v1/public/files/%s/%s", storeID, fileID)
+}
+
+func merchantFileURL(storeID, fileID uuid.UUID) string {
+	return fmt.Sprintf("/api/v1/stores/%s/files/%s", storeID, fileID)
+}
+
+func (c *Catalog) setCoverURL(public bool) {
+	if c.CoverFileID == nil {
+		c.CoverURL = ""
+		return
+	}
+	if public {
+		c.CoverURL = publicFileURL(c.StoreID, *c.CoverFileID)
+	} else {
+		c.CoverURL = merchantFileURL(c.StoreID, *c.CoverFileID)
+	}
 }
 
 // EnsureFromImport creates (or returns) a catalog for a completed/review import and links its pages.
@@ -89,7 +120,8 @@ func (s *Service) GetByImportJob(ctx context.Context, storeID, jobID uuid.UUID) 
 
 func (s *Service) List(ctx context.Context, storeID uuid.UUID) ([]Catalog, error) {
 	rows, err := s.DB.Query(ctx, `
-		SELECT c.id, c.store_id, c.title, c.status, c.source_import_job_id, c.created_at, c.updated_at,
+		SELECT c.id, c.store_id, c.title, c.status, c.source_import_job_id, c.cover_file_id,
+		       c.created_at, c.updated_at,
 		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id),0)
 		FROM catalogs c
 		WHERE c.store_id=$1 AND c.status <> 'archived'
@@ -102,9 +134,13 @@ func (s *Service) List(ctx context.Context, storeID uuid.UUID) ([]Catalog, error
 	var out []Catalog
 	for rows.Next() {
 		var c Catalog
-		if err := rows.Scan(&c.ID, &c.StoreID, &c.Title, &c.Status, &c.SourceImportJobID, &c.CreatedAt, &c.UpdatedAt, &c.PageCount); err != nil {
+		if err := rows.Scan(
+			&c.ID, &c.StoreID, &c.Title, &c.Status, &c.SourceImportJobID, &c.CoverFileID,
+			&c.CreatedAt, &c.UpdatedAt, &c.PageCount,
+		); err != nil {
 			return nil, err
 		}
+		c.setCoverURL(false)
 		out = append(out, c)
 	}
 	for i := range out {
@@ -118,12 +154,14 @@ func (s *Service) List(ctx context.Context, storeID uuid.UUID) ([]Catalog, error
 func (s *Service) Get(ctx context.Context, storeID, catalogID uuid.UUID) (*Catalog, error) {
 	var c Catalog
 	err := s.DB.QueryRow(ctx, `
-		SELECT c.id, c.store_id, c.title, c.status, c.source_import_job_id, c.created_at, c.updated_at,
+		SELECT c.id, c.store_id, c.title, c.status, c.source_import_job_id, c.cover_file_id,
+		       c.created_at, c.updated_at,
 		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id),0)
 		FROM catalogs c
 		WHERE c.id=$1 AND c.store_id=$2
 	`, catalogID, storeID).Scan(
-		&c.ID, &c.StoreID, &c.Title, &c.Status, &c.SourceImportJobID, &c.CreatedAt, &c.UpdatedAt, &c.PageCount,
+		&c.ID, &c.StoreID, &c.Title, &c.Status, &c.SourceImportJobID, &c.CoverFileID,
+		&c.CreatedAt, &c.UpdatedAt, &c.PageCount,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -131,6 +169,7 @@ func (s *Service) Get(ctx context.Context, storeID, catalogID uuid.UUID) (*Catal
 	if err != nil {
 		return nil, err
 	}
+	c.setCoverURL(false)
 	if err := s.attachLinks(ctx, &c); err != nil {
 		return nil, err
 	}
@@ -138,8 +177,10 @@ func (s *Service) Get(ctx context.Context, storeID, catalogID uuid.UUID) (*Catal
 }
 
 type PatchInput struct {
-	Title  *string `json:"title"`
-	Status *string `json:"status"`
+	Title       *string    `json:"title"`
+	Status      *string    `json:"status"`
+	CoverFileID *uuid.UUID `json:"cover_file_id,omitempty"`
+	ClearCover  bool       `json:"clear_cover,omitempty"`
 }
 
 func (s *Service) Patch(ctx context.Context, storeID, catalogID uuid.UUID, in PatchInput) (*Catalog, error) {
@@ -163,13 +204,103 @@ func (s *Service) Patch(ctx context.Context, storeID, catalogID uuid.UUID, in Pa
 		}
 		status = st
 	}
+	cover := cur.CoverFileID
+	if in.ClearCover {
+		cover = nil
+	} else if in.CoverFileID != nil {
+		if err := s.assertCoverFile(ctx, storeID, *in.CoverFileID); err != nil {
+			return nil, err
+		}
+		cover = in.CoverFileID
+	}
 	_, err = s.DB.Exec(ctx, `
-		UPDATE catalogs SET title=$3, status=$4, updated_at=now() WHERE id=$1 AND store_id=$2
-	`, catalogID, storeID, title, status)
+		UPDATE catalogs SET title=$3, status=$4, cover_file_id=$5, updated_at=now()
+		WHERE id=$1 AND store_id=$2
+	`, catalogID, storeID, title, status, cover)
 	if err != nil {
 		return nil, err
 	}
 	return s.Get(ctx, storeID, catalogID)
+}
+
+func (s *Service) assertCoverFile(ctx context.Context, storeID, fileID uuid.UUID) error {
+	var purpose string
+	err := s.DB.QueryRow(ctx, `
+		SELECT purpose FROM stored_files WHERE id=$1 AND store_id=$2
+	`, fileID, storeID).Scan(&purpose)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("%w: cover file not found", ErrInvalidInput)
+	}
+	if err != nil {
+		return err
+	}
+	if purpose != "catalog_cover" {
+		return fmt.Errorf("%w: cover file must use catalog_cover purpose", ErrInvalidInput)
+	}
+	return nil
+}
+
+// ListPublishedForStorefront returns published catalogs for banner cards (newest first).
+func (s *Service) ListPublishedForStorefront(ctx context.Context, storeID uuid.UUID) ([]PublicCatalog, error) {
+	rows, err := s.DB.Query(ctx, `
+		SELECT c.id, c.title, c.cover_file_id, c.created_at,
+		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id AND p.status='published'),0)
+		FROM catalogs c
+		WHERE c.store_id=$1 AND c.status='published'
+		ORDER BY c.created_at DESC
+	`, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PublicCatalog
+	for rows.Next() {
+		var c PublicCatalog
+		var coverID *uuid.UUID
+		if err := rows.Scan(&c.ID, &c.Title, &coverID, &c.CreatedAt, &c.PageCount); err != nil {
+			return nil, err
+		}
+		if coverID != nil {
+			c.CoverURL = publicFileURL(storeID, *coverID)
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// ResolvePublishedStoreID looks up a published store by slug.
+func (s *Service) ResolvePublishedStoreID(ctx context.Context, slug string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := s.DB.QueryRow(ctx, `
+		SELECT id FROM stores
+		WHERE slug=$1 AND archived_at IS NULL AND publication_status='published'
+	`, slug).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotFound
+	}
+	return id, err
+}
+
+// GetPublished returns one published catalog for a store (public).
+func (s *Service) GetPublished(ctx context.Context, storeID, catalogID uuid.UUID) (*PublicCatalog, error) {
+	var c PublicCatalog
+	var coverID *uuid.UUID
+	err := s.DB.QueryRow(ctx, `
+		SELECT c.id, c.title, c.cover_file_id, c.created_at,
+		       COALESCE((SELECT COUNT(*) FROM catalog_pages p WHERE p.catalog_id=c.id AND p.status='published'),0)
+		FROM catalogs c
+		WHERE c.id=$1 AND c.store_id=$2 AND c.status='published'
+	`, catalogID, storeID).Scan(&c.ID, &c.Title, &coverID, &c.CreatedAt, &c.PageCount)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if coverID != nil {
+		c.CoverURL = publicFileURL(storeID, *coverID)
+	}
+	return &c, nil
 }
 
 func (s *Service) AttachCampaign(ctx context.Context, storeID, catalogID, campaignID uuid.UUID) error {
