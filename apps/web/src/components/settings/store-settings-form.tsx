@@ -118,11 +118,16 @@ export function StoreSettingsForm({
       <div className="grid gap-4 md:grid-cols-3">
         {(
           [
-            ["logo", "Logo", cfg.logo_url],
-            ["favicon", "Favicon", cfg.favicon_url],
-            ["store_icon", "Store icon", cfg.store_icon_url],
+            ["logo", "Logo", cfg.logo_url, "image/png,image/jpeg,image/webp,image/svg+xml"],
+            [
+              "favicon",
+              "Favicon",
+              cfg.favicon_url,
+              "image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon",
+            ],
+            ["store_icon", "Store icon", cfg.store_icon_url, "image/png,image/jpeg,image/webp"],
           ] as const
-        ).map(([purpose, label, preview]) => (
+        ).map(([purpose, label, preview, accept]) => (
           <div key={purpose} className="space-y-2 rounded-lg border border-border p-4">
             <Label htmlFor={`settings-${purpose}`}>{label}</Label>
             {preview ? (
@@ -136,7 +141,7 @@ export function StoreSettingsForm({
             <Input
               id={`settings-${purpose}`}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon"
+              accept={accept}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -147,6 +152,13 @@ export function StoreSettingsForm({
                 }
               }}
             />
+            <p className="text-xs text-foreground-muted">
+              {purpose === "favicon"
+                ? "Up to 2 MB. PNG/JPEG/WebP convert to a multi-size favicon automatically."
+                : purpose === "store_icon"
+                  ? "Up to 2 MB. PNG, JPEG, or WebP."
+                  : "Up to 2 MB. PNG, JPEG, WebP, or SVG."}
+            </p>
           </div>
         ))}
       </div>

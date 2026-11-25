@@ -227,21 +227,21 @@ export function StorefrontEditor({
 
               {(
                 [
-                  ["logo", "Logo"],
-                  ["favicon", "Favicon"],
-                  ["store_icon", "Store icon"],
+                  ["logo", "Logo", "image/png,image/jpeg,image/webp,image/svg+xml"],
+                  [
+                    "favicon",
+                    "Favicon",
+                    "image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon",
+                  ],
+                  ["store_icon", "Store icon", "image/png,image/jpeg,image/webp"],
                 ] as const
-              ).map(([purpose, label]) => (
+              ).map(([purpose, label, accept]) => (
                 <div key={purpose} className="space-y-2">
                   <Label htmlFor={purpose}>{label}</Label>
                   <Input
                     id={purpose}
                     type="file"
-                    accept={
-                      purpose === "favicon"
-                        ? "image/png,image/x-icon,image/svg+xml,image/webp"
-                        : "image/png,image/jpeg,image/webp,image/svg+xml"
-                    }
+                    accept={accept}
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
@@ -252,6 +252,11 @@ export function StorefrontEditor({
                       }
                     }}
                   />
+                  <p className="text-xs text-foreground-muted">
+                    {purpose === "favicon"
+                      ? "Up to 2 MB — converted to a multi-size favicon on upload."
+                      : "Up to 2 MB."}
+                  </p>
                 </div>
               ))}
             </>

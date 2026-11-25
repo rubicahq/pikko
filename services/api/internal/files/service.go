@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/rubicahq/pikko/services/api/internal/favicon"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 )
 
@@ -39,7 +40,8 @@ type Service struct {
 }
 
 func (s *Service) Upload(ctx context.Context, storeID, userID uuid.UUID, purpose, filename, declaredType string, r io.Reader, size int64) (*File, error) {
-	if _, ok := storage.PurposeLimits[purpose]; !ok {
+	limits, ok := storage.PurposeLimits[purpose]
+	if !ok {
 		return nil, ErrInvalidInput
 	}
 	head := make([]byte, 512)
@@ -49,15 +51,43 @@ func (s *Service) Upload(ctx context.Context, storeID, userID uuid.UUID, purpose
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
-	key := storage.StoreScopedKey(storeID, purpose, filename)
-	body := io.MultiReader(bytes.NewReader(head), r)
-	if err := s.Storage.Put(ctx, key, body, ct); err != nil {
+
+	body := io.Reader(io.MultiReader(bytes.NewReader(head), r))
+	storeSize := size
+	storeCT := ct
+	storeName := filename
+
+	if purpose == "favicon" {
+		rest, err := io.ReadAll(io.LimitReader(r, limits.MaxBytes+1))
+		if err != nil {
+			return nil, fmt.Errorf("%w: unable to read upload", ErrInvalidInput)
+		}
+		full := append(append([]byte{}, head...), rest...)
+		if int64(len(full)) > limits.MaxBytes {
+			return nil, fmt.Errorf("%w: file size exceeds limit", ErrInvalidInput)
+		}
+		converted, outCT, err := favicon.Convert(full, ct)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		}
+		body = bytes.NewReader(converted)
+		storeSize = int64(len(converted))
+		storeCT = outCT
+		if outCT == "image/x-icon" {
+			storeName = "favicon.ico"
+		} else if outCT == "image/svg+xml" && storeName == "" {
+			storeName = "favicon.svg"
+		}
+	}
+
+	key := storage.StoreScopedKey(storeID, purpose, storeName)
+	if err := s.Storage.Put(ctx, key, body, storeCT); err != nil {
 		return nil, err
 	}
 	var f File
 	var orig *string
-	if filename != "" {
-		orig = &filename
+	if storeName != "" {
+		orig = &storeName
 	}
 	var createdBy any
 	if userID != uuid.Nil {
@@ -67,7 +97,7 @@ func (s *Service) Upload(ctx context.Context, storeID, userID uuid.UUID, purpose
 		INSERT INTO stored_files (store_id, purpose, storage_key, content_type, size_bytes, original_filename, created_by)
 		VALUES ($1,$2,$3,$4,$5,$6,$7)
 		RETURNING id, store_id, purpose, storage_key, content_type, size_bytes, original_filename, created_at
-	`, storeID, purpose, key, ct, size, orig, createdBy).Scan(
+	`, storeID, purpose, key, storeCT, storeSize, orig, createdBy).Scan(
 		&f.ID, &f.StoreID, &f.Purpose, &f.StorageKey, &f.ContentType, &f.SizeBytes, &f.OriginalFilename, &f.CreatedAt,
 	)
 	if err != nil {

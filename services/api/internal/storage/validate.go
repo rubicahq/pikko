@@ -14,8 +14,8 @@ type UploadLimits struct {
 
 var PurposeLimits = map[string]UploadLimits{
 	"logo":         {MaxBytes: 2 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp", "image/svg+xml"}},
-	"favicon":      {MaxBytes: 512 << 10, AllowedMIME: []string{"image/png", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/webp"}},
-	"store_icon":   {MaxBytes: 1 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
+	"favicon":      {MaxBytes: 2 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/webp"}},
+	"store_icon":   {MaxBytes: 2 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 	"product":      {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 	"banner":       {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 	"collection":   {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
