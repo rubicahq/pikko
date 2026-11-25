@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 func (h *CommerceHandlers) mapLiveErr(w http.ResponseWriter, r *http.Request, err error) {
@@ -34,7 +35,21 @@ func (h *CommerceHandlers) mapLiveErr(w http.ResponseWriter, r *http.Request, er
 	}
 }
 
+func (h *CommerceHandlers) requireLiveShopping(w http.ResponseWriter, r *http.Request) bool {
+	if h.Ent == nil {
+		return true
+	}
+	if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureLiveShopping); err != nil {
+		writeEntitlementErr(w, r, err)
+		return false
+	}
+	return true
+}
+
 func (h *CommerceHandlers) ListLiveSessions(w http.ResponseWriter, r *http.Request) {
+	if !h.requireLiveShopping(w, r) {
+		return
+	}
 	list, err := h.Commerce.ListLiveSessions(r.Context(), StoreID(r))
 	if err != nil {
 		h.mapLiveErr(w, r, err)
@@ -44,6 +59,9 @@ func (h *CommerceHandlers) ListLiveSessions(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *CommerceHandlers) GetLiveSession(w http.ResponseWriter, r *http.Request) {
+	if !h.requireLiveShopping(w, r) {
+		return
+	}
 	id, err := uuid.Parse(r.PathValue("campaignID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
@@ -96,6 +114,9 @@ func (h *CommerceHandlers) SearchLiveOrders(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *CommerceHandlers) LiveQuickAdd(w http.ResponseWriter, r *http.Request) {
+	if !h.requireLiveShopping(w, r) {
+		return
+	}
 	id, err := uuid.Parse(r.PathValue("campaignID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")

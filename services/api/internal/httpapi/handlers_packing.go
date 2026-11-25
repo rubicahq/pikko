@@ -4,15 +4,30 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 )
 
 func (h *CommerceHandlers) PackingQueue(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
-	out, err := h.Commerce.ListPackingQueue(r.Context(), StoreID(r), q.Get("group_by"), q.Get("status"))
+	groupBy := strings.TrimSpace(strings.ToLower(q.Get("group_by")))
+	if groupBy == "customer" && h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeaturePackingByCustomer); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
+	if h.Ent != nil {
+		if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeaturePacking); err != nil {
+			writeEntitlementErr(w, r, err)
+			return
+		}
+	}
+	out, err := h.Commerce.ListPackingQueue(r.Context(), StoreID(r), groupBy, q.Get("status"))
 	if err != nil {
 		h.mapErr(w, r, err)
 		return

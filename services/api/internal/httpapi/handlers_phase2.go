@@ -411,9 +411,14 @@ func (h *Phase2Handlers) PublicStore(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
 		return
 	}
+	hideBranding := false
+	if h.Ent != nil {
+		hideBranding = h.Ent.HasFeature(r.Context(), ps.ID, entitlements.FeatureRemoveBranding)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"store":          ps,
-		"storefront_url": h.URLs.Storefront(ps.Slug),
+		"store":                   ps,
+		"storefront_url":          h.URLs.Storefront(ps.Slug),
+		"hide_platform_branding":  hideBranding,
 	})
 }
 

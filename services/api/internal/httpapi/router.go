@@ -66,9 +66,11 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	if renderer == nil {
 		renderer = pdfutil.NewRenderer()
 	}
+	entSvc := &entitlements.Service{DB: d.DB, Cfg: d.Cfg}
 	importSvc := &imports.Service{
 		DB: d.DB, Files: filesSvc, Catalog: catalogSvc, Queue: queue, Outbox: outbox,
 		AI: extractor, Renderer: renderer, Storage: d.Storage, Logger: d.Logger,
+		Ent: entSvc,
 		Limits: imports.Limits{
 			MaxPDFBytes: d.Cfg.ImportMaxPDFBytes,
 			MaxPages:    d.Cfg.ImportMaxPages,
@@ -78,8 +80,6 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	if importSvc.Limits.MaxPDFBytes == 0 {
 		importSvc.Limits = imports.DefaultLimits()
 	}
-
-	entSvc := &entitlements.Service{DB: d.DB, Cfg: d.Cfg}
 	billingH := &BillingHandlers{Ent: entSvc}
 	adminBillingH := &AdminBillingHandlers{Ent: entSvc, Tok: d.Cfg.SubscriptionAdminToken}
 

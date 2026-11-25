@@ -201,16 +201,18 @@ export default async function PublicStorePage({ params }: Props) {
         style={{ borderColor: border }}
       >
         <span>{store.name}</span>
-        <span className="inline-flex items-center gap-1.5">
-          Powered by
-          <Image
-            src="/brand/pikko-logo.png"
-            alt="Pikko"
-            width={72}
-            height={29}
-            className="h-3.5 w-auto opacity-90"
-          />
-        </span>
+        {!data.hide_platform_branding ? (
+          <span className="inline-flex items-center gap-1.5">
+            Powered by
+            <Image
+              src="/brand/pikko-logo.png"
+              alt="Pikko"
+              width={72}
+              height={29}
+              className="h-3.5 w-auto opacity-90"
+            />
+          </span>
+        ) : null}
       </footer>
     </div>
   );

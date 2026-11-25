@@ -18,6 +18,7 @@ import (
 
 	"github.com/rubicahq/pikko/services/api/internal/ai"
 	"github.com/rubicahq/pikko/services/api/internal/catalog"
+	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/files"
 	"github.com/rubicahq/pikko/services/api/internal/jobs"
 	"github.com/rubicahq/pikko/services/api/internal/pdfutil"
@@ -139,6 +140,7 @@ type Service struct {
 	Limits    Limits
 	Logger    *slog.Logger
 	Storage   storage.ObjectStore
+	Ent       *entitlements.Service
 }
 
 type StartInput struct {
@@ -199,6 +201,11 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	if pages > lim.MaxPages {
 		return nil, fmt.Errorf("%w: PDF has %d pages; maximum is %d", ErrInvalidInput, pages, lim.MaxPages)
 	}
+	if s.Ent != nil {
+		if err := s.Ent.RequireLimit(ctx, storeID, entitlements.LimitAIPDFPagesPerMonth, int64(pages)); err != nil {
+			return nil, err
+		}
+	}
 
 	f, err := s.Files.Upload(ctx, storeID, userID, "catalog_pdf", in.Filename, "application/pdf", bytes.NewReader(full), int64(len(full)))
 	if err != nil {
@@ -227,6 +234,9 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	`, storeID, userID, f.ID, pages, title, idem).Scan(&jobID)
 	if err != nil {
 		return nil, err
+	}
+	if s.Ent != nil {
+		_ = s.Ent.IncrementUsage(ctx, storeID, entitlements.LimitAIPDFPagesPerMonth, int64(pages))
 	}
 
 	// Name-first: draft catalog exists as soon as the named import starts.

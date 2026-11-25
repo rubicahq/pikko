@@ -89,6 +89,15 @@ export function PackingWorkspace({ storeId }: { storeId: string }) {
       setOrders(data.orders || []);
       setCustomers(data.customers || []);
     } catch (e) {
+      if (
+        e instanceof ApiError &&
+        e.code === "feature_not_entitled" &&
+        groupBy === "customer"
+      ) {
+        setGroupBy("order");
+        setError("Pack by customer requires Standard or higher.");
+        return;
+      }
       setError(e instanceof ApiError ? e.message : "Failed to load packing queue.");
     }
   }, [storeId, groupBy]);
