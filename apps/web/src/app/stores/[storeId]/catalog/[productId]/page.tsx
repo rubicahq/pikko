@@ -6,6 +6,7 @@ import {
   getStoreCategories,
 } from "@/lib/server-api";
 import { ProductForm } from "@/components/catalog/product-form";
+import { ProductRelations } from "@/components/catalog/product-relations";
 import { urls } from "@/lib/urls";
 
 const PRODUCT_ID_UUID =
@@ -31,5 +32,10 @@ export default async function EditProductPage({
     getStoreCategories(storeId),
   ]);
   if (!product) redirect(urls.storeCatalog(storeId));
-  return <ProductForm storeId={storeId} categories={categories} product={product} />;
+  return (
+    <div className="space-y-8">
+      <ProductForm storeId={storeId} categories={categories} product={product} />
+      <ProductRelations storeId={storeId} productId={productId} />
+    </div>
+  );
 }

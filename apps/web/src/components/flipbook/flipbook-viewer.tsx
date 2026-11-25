@@ -24,6 +24,22 @@ export type FlipHotspot = {
   y_pct: number;
   width_pct: number;
   height_pct: number;
+  list_only?: boolean;
+  base_price_idr?: number | null;
+  compare_at_price_idr?: number | null;
+  contact_for_price?: boolean;
+  primary_image_url?: string;
+};
+
+export type FlipPageItem = {
+  product_id: string;
+  product_slug: string;
+  product_name: string;
+  base_price_idr: number;
+  compare_at_price_idr?: number | null;
+  contact_for_price?: boolean;
+  primary_image_url?: string;
+  hotspot_id?: string;
 };
 
 export type FlipPage = {
@@ -31,6 +47,7 @@ export type FlipPage = {
   image_url: string;
   display_order: number;
   hotspots?: FlipHotspot[];
+  items?: FlipPageItem[];
 };
 
 type ProductCard = {
@@ -38,19 +55,53 @@ type ProductCard = {
   name: string;
   slug: string;
   base_price_idr: number;
+  compare_at_price_idr?: number | null;
+  contact_for_price?: boolean;
   description?: string | null;
   variants?: { id: string; effective_price_idr: number; options?: Record<string, string> }[];
   primary_image_url?: string;
 };
 
+function whatsappLink(phone: string | null | undefined, text: string): string | null {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return null;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+function PriceBlock({
+  contact,
+  base,
+  compareAt,
+}: {
+  contact?: boolean;
+  base: number;
+  compareAt?: number | null;
+}) {
+  if (contact) {
+    return <span className="font-medium text-foreground">Hubungi Penjual</span>;
+  }
+  if (compareAt != null && compareAt > base) {
+    return (
+      <span className="inline-flex flex-wrap items-baseline gap-2">
+        <span className="font-medium text-foreground">{formatIDR(base)}</span>
+        <span className="text-xs text-foreground-muted line-through">{formatIDR(compareAt)}</span>
+      </span>
+    );
+  }
+  return <span className="font-medium text-foreground">{formatIDR(base)}</span>;
+}
+
 export function FlipbookViewer({
   storeSlug,
   storeName,
   pages,
+  storeWhatsapp,
 }: {
   storeSlug: string;
   storeName: string;
   pages: FlipPage[];
+  storeWhatsapp?: string | null;
 }) {
   const [index, setIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -74,6 +125,28 @@ export function FlipbookViewer({
   }, []);
 
   const page = pages[index];
+
+  const pageItems = useMemo((): FlipPageItem[] => {
+    if (!page) return [];
+    if (page.items && page.items.length > 0) return page.items;
+    const fromHs: FlipPageItem[] = [];
+    const seen = new Set<string>();
+    for (const hs of page.hotspots || []) {
+      if (!hs.product_id || !hs.product_name || seen.has(hs.product_id)) continue;
+      seen.add(hs.product_id);
+      fromHs.push({
+        product_id: hs.product_id,
+        product_slug: hs.product_slug || "",
+        product_name: hs.product_name,
+        base_price_idr: hs.base_price_idr ?? 0,
+        compare_at_price_idr: hs.compare_at_price_idr,
+        contact_for_price: hs.contact_for_price,
+        primary_image_url: hs.primary_image_url,
+        hotspot_id: hs.id,
+      });
+    }
+    return fromHs;
+  }, [page]);
 
   const go = useCallback(
     (dir: "next" | "prev") => {
@@ -102,14 +175,13 @@ export function FlipbookViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
 
-  async function openHotspot(hs: FlipHotspot) {
-    if (!hs.product_id) return;
+  async function openProduct(productId: string) {
     setHotspotLoading(true);
     setHotspotError(null);
     setCartMsg(null);
     try {
       const res = await fetch(
-        urls.api(`/api/v1/public/stores/${storeSlug}/catalog/products/${hs.product_id}`),
+        urls.api(`/api/v1/public/stores/${storeSlug}/catalog/products/${productId}`),
       );
       if (!res.ok) {
         setHotspotError("This product is unavailable right now.");
@@ -129,7 +201,7 @@ export function FlipbookViewer({
   }
 
   function handleAdd() {
-    if (!product) return;
+    if (!product || product.contact_for_price) return;
     const variant = product.variants?.find((v) => v.id === variantId);
     addToCart({
       storeSlug,
@@ -142,6 +214,13 @@ export function FlipbookViewer({
     });
     setCartMsg("Added to cart — continue to checkout when you are ready.");
   }
+
+  const contactHref = product
+    ? whatsappLink(
+        storeWhatsapp,
+        `Halo, saya tertarik dengan ${product.name} di katalog ${storeName}`,
+      )
+    : null;
 
   const title = useMemo(
     () => `${storeName} catalog — page ${index + 1} of ${pages.length}`,
@@ -198,75 +277,169 @@ export function FlipbookViewer({
         </div>
       </header>
 
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden p-4">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="absolute left-3 z-10 hidden sm:inline-flex"
-          aria-label="Previous page"
-          disabled={index === 0}
-          onClick={() => go("prev")}
-        >
-          <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          className="absolute right-3 z-10 hidden sm:inline-flex"
-          aria-label="Next page"
-          disabled={index >= pages.length - 1}
-          onClick={() => go("next")}
-        >
-          <ChevronRight className="h-5 w-5" strokeWidth={1.75} />
-        </Button>
+      <div className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]">
+        <section className="relative flex flex-col items-center justify-center overflow-hidden p-4 lg:border-r lg:border-border">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute left-3 z-10 hidden sm:inline-flex"
+            aria-label="Previous page"
+            disabled={index === 0}
+            onClick={() => go("prev")}
+          >
+            <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="absolute right-3 z-10 hidden sm:inline-flex lg:right-[calc(0%+12px)]"
+            aria-label="Next page"
+            disabled={index >= pages.length - 1}
+            onClick={() => go("next")}
+          >
+            <ChevronRight className="h-5 w-5" strokeWidth={1.75} />
+          </Button>
 
-        <div
-          className={cn(
-            "relative max-h-[80vh] w-full max-w-3xl origin-center border border-border bg-background shadow-none transition-transform duration-300",
-            !reducedMotion && flipping && "opacity-90",
-          )}
-          style={{
-            transform: `scale(${zoom}) ${
-              !reducedMotion && flipping === "next"
-                ? "perspective(1200px) rotateY(-6deg)"
-                : !reducedMotion && flipping === "prev"
-                  ? "perspective(1200px) rotateY(6deg)"
-                  : ""
-            }`,
-          }}
-          onTouchStart={(e) => {
-            touchX.current = e.changedTouches[0]?.clientX ?? null;
-          }}
-          onTouchEnd={(e) => {
-            if (touchX.current == null) return;
-            const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current;
-            touchX.current = null;
-            if (dx < -40) go("next");
-            if (dx > 40) go("prev");
-          }}
-          role="img"
-          aria-label={title}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={page.image_url} alt="" className="h-auto w-full select-none" draggable={false} />
-          {(page.hotspots || []).map((hs) => (
-            <button
-              key={hs.id}
-              type="button"
-              className="absolute min-h-[28px] min-w-[28px] border border-brand/70 bg-brand/10 transition-colors hover:bg-brand/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
-              style={{
-                left: `${hs.x_pct}%`,
-                top: `${hs.y_pct}%`,
-                width: `${Math.max(hs.width_pct, 4)}%`,
-                height: `${Math.max(hs.height_pct, 4)}%`,
-              }}
-              aria-label={hs.product_name ? `Open ${hs.product_name}` : "Open product"}
-              onClick={() => openHotspot(hs)}
-            />
-          ))}
-        </div>
+          <div
+            className={cn(
+              "relative max-h-[70vh] w-full max-w-3xl origin-center border border-border bg-background shadow-none transition-transform duration-300 lg:max-h-[80vh]",
+              !reducedMotion && flipping && "opacity-90",
+            )}
+            style={{
+              transform: `scale(${zoom}) ${
+                !reducedMotion && flipping === "next"
+                  ? "perspective(1200px) rotateY(-6deg)"
+                  : !reducedMotion && flipping === "prev"
+                    ? "perspective(1200px) rotateY(6deg)"
+                    : ""
+              }`,
+            }}
+            onTouchStart={(e) => {
+              touchX.current = e.changedTouches[0]?.clientX ?? null;
+            }}
+            onTouchEnd={(e) => {
+              if (touchX.current == null) return;
+              const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX.current;
+              touchX.current = null;
+              if (dx < -40) go("next");
+              if (dx > 40) go("prev");
+            }}
+            role="img"
+            aria-label={title}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={page.image_url} alt="" className="h-auto w-full select-none" draggable={false} />
+            {(page.hotspots || [])
+              .filter((hs) => !hs.list_only)
+              .map((hs) => (
+                <button
+                  key={hs.id}
+                  type="button"
+                  className="absolute min-h-[28px] min-w-[28px] border border-brand/70 bg-brand/10 transition-colors hover:bg-brand/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
+                  style={{
+                    left: `${hs.x_pct}%`,
+                    top: `${hs.y_pct}%`,
+                    width: `${Math.max(hs.width_pct, 4)}%`,
+                    height: `${Math.max(hs.height_pct, 4)}%`,
+                  }}
+                  aria-label={hs.product_name ? `Open ${hs.product_name}` : "Open product"}
+                  onClick={() => hs.product_id && openProduct(hs.product_id)}
+                />
+              ))}
+          </div>
+
+          <div className="mt-3 flex items-center justify-center gap-3 sm:hidden">
+            <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => go("prev")}>
+              Previous
+            </Button>
+            <span className="text-sm text-foreground-secondary">
+              {index + 1} / {pages.length}
+            </span>
+            <Button type="button" variant="outline" size="sm" disabled={index >= pages.length - 1} onClick={() => go("next")}>
+              Next
+            </Button>
+          </div>
+        </section>
+
+        <aside className="flex flex-col border-t border-border bg-background lg:border-t-0">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">Items on this page</h2>
+            <p className="text-xs text-foreground-secondary">
+              Page {index + 1} of {pages.length}
+            </p>
+          </div>
+          <ul className="flex-1 space-y-0 overflow-y-auto p-2" aria-live="polite">
+            {pageItems.length === 0 && (
+              <li className="px-3 py-8 text-center text-sm text-foreground-secondary">
+                Tidak ada item di halaman ini
+              </li>
+            )}
+            {pageItems.map((it) => {
+              const wa = it.contact_for_price
+                ? whatsappLink(
+                    storeWhatsapp,
+                    `Halo, saya tertarik dengan ${it.product_name} di katalog ${storeName}`,
+                  )
+                : null;
+              return (
+                <li key={it.product_id} className="rounded-md border border-transparent p-3 hover:border-border hover:bg-surface-hover">
+                  <div className="flex gap-3">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-surface">
+                      {it.primary_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={urls.api(it.primary_image_url)} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{it.product_name}</p>
+                      <div className="mt-0.5 text-sm">
+                        <PriceBlock
+                          contact={it.contact_for_price}
+                          base={it.base_price_idr}
+                          compareAt={it.compare_at_price_idr}
+                        />
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {it.contact_for_price ? (
+                          wa ? (
+                            <a
+                              href={wa}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-medium text-brand-dark underline-offset-2 hover:underline"
+                            >
+                              Hubungi Penjual
+                            </a>
+                          ) : (
+                            <span className="text-xs text-foreground-muted">Hubungi Penjual</span>
+                          )
+                        ) : (
+                          <button
+                            type="button"
+                            className="text-xs font-medium text-brand-dark underline-offset-2 hover:underline"
+                            onClick={() => openProduct(it.product_id)}
+                          >
+                            Add to cart
+                          </button>
+                        )}
+                        {it.product_slug && (
+                          <a
+                            href={urls.storefrontProduct(storeSlug, it.product_slug)}
+                            className="text-xs text-foreground-secondary underline-offset-2 hover:underline"
+                          >
+                            Details
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </aside>
       </div>
 
       {hotspotLoading && (
@@ -275,18 +448,6 @@ export function FlipbookViewer({
       {hotspotError && !product && (
         <p className="px-4 text-center text-sm text-error">{hotspotError}</p>
       )}
-
-      <div className="flex items-center justify-center gap-3 border-t border-border bg-background px-4 py-3 sm:hidden">
-        <Button type="button" variant="outline" size="sm" disabled={index === 0} onClick={() => go("prev")}>
-          Previous
-        </Button>
-        <span className="text-sm text-foreground-secondary">
-          {index + 1} / {pages.length}
-        </span>
-        <Button type="button" variant="outline" size="sm" disabled={index >= pages.length - 1} onClick={() => go("next")}>
-          Next
-        </Button>
-      </div>
 
       {showThumbs && (
         <div className="border-t border-border bg-background p-3">
@@ -328,10 +489,14 @@ export function FlipbookViewer({
               <div>
                 <h2 className="text-lg font-medium text-foreground">{product.name}</h2>
                 <p className="mt-1 text-sm text-foreground-secondary">
-                  {formatIDR(
-                    product.variants?.find((v) => v.id === variantId)?.effective_price_idr ??
-                      product.base_price_idr,
-                  )}
+                  <PriceBlock
+                    contact={product.contact_for_price}
+                    base={
+                      product.variants?.find((v) => v.id === variantId)?.effective_price_idr ??
+                      product.base_price_idr
+                    }
+                    compareAt={product.compare_at_price_idr}
+                  />
                 </p>
               </div>
               <button type="button" aria-label="Close" onClick={() => setProduct(null)}>
@@ -341,7 +506,7 @@ export function FlipbookViewer({
             {product.description && (
               <p className="mt-3 text-sm text-foreground-secondary">{product.description}</p>
             )}
-            {product.variants && product.variants.length > 0 && (
+            {!product.contact_for_price && product.variants && product.variants.length > 0 && (
               <div className="mt-4 space-y-2">
                 <p className="text-xs font-medium text-foreground">Variant</p>
                 <select
@@ -359,9 +524,23 @@ export function FlipbookViewer({
               </div>
             )}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              <Button type="button" onClick={handleAdd}>
-                Add to cart
-              </Button>
+              {product.contact_for_price ? (
+                contactHref ? (
+                  <Button type="button" asChild>
+                    <a href={contactHref} target="_blank" rel="noreferrer">
+                      Hubungi Penjual
+                    </a>
+                  </Button>
+                ) : (
+                  <Button type="button" disabled>
+                    Hubungi Penjual
+                  </Button>
+                )
+              ) : (
+                <Button type="button" onClick={handleAdd}>
+                  Add to cart
+                </Button>
+              )}
               <Button type="button" variant="outline" asChild>
                 <a href={urls.storefrontCart(storeSlug)}>View cart</a>
               </Button>
@@ -382,7 +561,6 @@ export function FlipbookViewer({
           </div>
         </div>
       )}
-
     </div>
   );
 }

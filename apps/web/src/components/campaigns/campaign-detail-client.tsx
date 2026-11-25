@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { CatalogAttach } from "@/components/catalog/catalog-attach";
 import { urls } from "@/lib/urls";
 
 type CampaignProduct = {
@@ -215,6 +216,8 @@ export function CampaignDetailClient({
           </ul>
         )}
       </section>
+
+      <CatalogAttach storeId={storeId} mode="campaign" targetId={campaign.id} />
 
       <form onSubmit={assign} className="max-w-xl space-y-4 rounded-[10px] border border-border p-5">
         <h2 className="text-base font-medium text-foreground">Assign product</h2>

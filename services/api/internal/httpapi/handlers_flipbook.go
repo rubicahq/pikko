@@ -144,7 +144,7 @@ func (h *FlipbookHandlers) DeleteHotspot(w http.ResponseWriter, r *http.Request)
 
 func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	storeID, storeName, pages, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
+	store, pages, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, flipbook.ErrNotFound) {
 			writeError(w, r, http.StatusNotFound, "not_found", "Catalog not found.")
@@ -155,9 +155,10 @@ func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"store": map[string]any{
-			"id":   storeID,
-			"name": storeName,
-			"slug": slug,
+			"id":       store.ID,
+			"name":     store.Name,
+			"slug":     slug,
+			"whatsapp": store.WhatsApp,
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog",
 		},
 		"pages": pages,
@@ -172,18 +173,22 @@ func (h *FlipbookHandlers) PublicHotspotProduct(w http.ResponseWriter, r *http.R
 		writeError(w, r, http.StatusNotFound, "not_found", "Product not found.")
 		return
 	}
-	storeID, _, _, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
+	store, _, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
 		return
 	}
-	p, err := h.Catalog.GetProduct(r.Context(), storeID, productID, true)
+	p, err := h.Catalog.GetProduct(r.Context(), store.ID, productID, true)
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Product not found.")
 		return
 	}
 	// Strip cost
 	p.CostPriceIDR = nil
+	hook := "add_to_cart"
+	if p.ContactForPrice {
+		hook = "contact_seller"
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"product": p,
 		"link_ref": map[string]any{
@@ -193,6 +198,7 @@ func (h *FlipbookHandlers) PublicHotspotProduct(w http.ResponseWriter, r *http.R
 			"cart_url":     h.URLs.Storefront(slug) + "/cart",
 			"checkout_url": h.URLs.Storefront(slug) + "/checkout",
 		},
-		"checkout_hook": "add_to_cart",
+		"checkout_hook": hook,
+		"store_whatsapp": store.WhatsApp,
 	})
 }
