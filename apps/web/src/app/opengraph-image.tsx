@@ -1,13 +1,24 @@
+/* ImageResponse requires raw <img>; next/image is not supported here. */
+/* eslint-disable @next/next/no-img-element */
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { appBaseDomain } from "@/lib/site";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const alt = "Pikko — Sell your way.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpenGraphImage() {
+export default async function OpenGraphImage() {
   const domain = appBaseDomain() === "localhost" ? "pikko.id" : appBaseDomain();
+  const [iconBuf, logoBuf] = await Promise.all([
+    readFile(join(process.cwd(), "public/brand/pikko-icon.png")),
+    readFile(join(process.cwd(), "public/brand/pikko-logo.png")),
+  ]);
+  const iconSrc = `data:image/png;base64,${iconBuf.toString("base64")}`;
+  const logoSrc = `data:image/png;base64,${logoBuf.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -23,16 +34,9 @@ export default function OpenGraphImage() {
           fontFamily: "Arial, sans-serif",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              background: "#FF3D00",
-              borderRadius: 12,
-            }}
-          />
-          <div style={{ fontSize: 36, fontWeight: 500, letterSpacing: "-0.03em" }}>Pikko</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <img src={iconSrc} width={56} height={56} alt="" />
+          <img src={logoSrc} width={108} height={44} alt="Pikko" />
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div

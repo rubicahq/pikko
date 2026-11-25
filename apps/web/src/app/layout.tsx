@@ -29,6 +29,13 @@ export const metadata: Metadata = {
   },
   description: MARKETING_DEFAULT_DESCRIPTION,
   applicationName: "Pikko",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/brand/pikko-icon.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: [{ url: "/brand/apple-touch-icon.png", sizes: "180x180" }],
+  },
   openGraph: {
     type: "website",
     siteName: "Pikko",
