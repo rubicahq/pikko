@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { urls } from "@/lib/urls";
 
@@ -15,12 +16,19 @@ export function ImportUpload({
   source: "pdf" | "csv";
 }) {
   const router = useRouter();
+  const [catalogName, setCatalogName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const nameReady = catalogName.trim().length > 0;
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (source === "pdf" && !nameReady) {
+      setError("Enter a catalog name before uploading the PDF.");
+      return;
+    }
     if (!file) {
       setError(source === "csv" ? "Choose a CSV file." : "Choose a PDF catalog file.");
       return;
@@ -50,6 +58,9 @@ export function ImportUpload({
       const fd = new FormData();
       fd.append("file", file);
       fd.append("source", source);
+      if (source === "pdf") {
+        fd.append("catalog_name", catalogName.trim());
+      }
       const res = await fetch(urls.api(`/api/v1/stores/${storeId}/catalog-imports`), {
         method: "POST",
         credentials: "include",
@@ -86,7 +97,7 @@ export function ImportUpload({
         </h2>
         <p className="mt-1 text-sm text-foreground-secondary">
           {source === "pdf"
-            ? "AI extracts items per page. Results are drafts — nothing publishes automatically."
+            ? "Name the catalog first, then upload the PDF. AI extracts items per page — drafts only until you confirm."
             : "Use the CSV template. Results are drafts — nothing publishes automatically."}
         </p>
       </div>
@@ -94,12 +105,31 @@ export function ImportUpload({
       {source === "pdf" ? (
         <>
           <div className="space-y-2">
+            <Label htmlFor="catalog-name">Catalog name</Label>
+            <Input
+              id="catalog-name"
+              value={catalogName}
+              onChange={(e) => {
+                setCatalogName(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="e.g. Summer Drop Lookbook"
+              maxLength={200}
+              required
+              autoComplete="off"
+            />
+            <p className="text-xs text-foreground-muted">
+              Required. Upload stays locked until you set a name.
+            </p>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="pdf">PDF file</Label>
             <input
               id="pdf"
               type="file"
               accept="application/pdf,.pdf"
-              className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-2"
+              disabled={!nameReady}
+              className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-surface file:px-3 file:py-2 disabled:cursor-not-allowed disabled:opacity-50"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
             <p className="text-xs text-foreground-muted">
@@ -138,7 +168,7 @@ export function ImportUpload({
           {error}
         </p>
       )}
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" disabled={busy || (source === "pdf" && !nameReady)}>
         {busy ? "Uploading…" : source === "pdf" ? "Start catalog import" : "Start import"}
       </Button>
     </form>

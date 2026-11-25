@@ -62,6 +62,7 @@ type Job struct {
 	ProgressPages  *int       `json:"progress_pages,omitempty"`
 	ErrorMessage   *string    `json:"error_message,omitempty"`
 	AIProvider     *string    `json:"ai_provider,omitempty"`
+	CatalogTitle   string     `json:"catalog_title,omitempty"`
 	CatalogID      *uuid.UUID `json:"catalog_id,omitempty"`
 	IdempotencyKey string     `json:"idempotency_key"`
 	CreatedAt      time.Time  `json:"created_at"`
@@ -73,7 +74,7 @@ const jobSelectCols = `
 	id, store_id, COALESCE(source_type,'pdf'), pdf_file_id, csv_file_id, extract_images, status, page_count,
 	item_count, COALESCE(warning_count,0), progress_pct,
 	COALESCE(progress_stage,'queued'), progress_page, progress_pages,
-	error_message, ai_provider, idempotency_key, created_at, updated_at, completed_at
+	error_message, ai_provider, COALESCE(catalog_title,''), idempotency_key, created_at, updated_at, completed_at
 `
 
 func scanJob(row interface {
@@ -83,7 +84,7 @@ func scanJob(row interface {
 	err := row.Scan(
 		&j.ID, &j.StoreID, &j.SourceType, &j.PDFFileID, &j.CSVFileID, &j.ExtractImages, &j.Status, &j.PageCount,
 		&j.ItemCount, &j.WarningCount, &j.ProgressPct, &j.ProgressStage, &j.ProgressPage, &j.ProgressPages,
-		&j.ErrorMessage, &j.AIProvider, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
+		&j.ErrorMessage, &j.AIProvider, &j.CatalogTitle, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -142,6 +143,7 @@ type Service struct {
 
 type StartInput struct {
 	IdempotencyKey string `json:"idempotency_key"`
+	CatalogTitle   string // required for PDF catalog imports (name before upload)
 	Filename       string
 	DeclaredType   string
 	Reader         io.Reader
@@ -157,6 +159,13 @@ func (s *Service) limits() Limits {
 
 func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in StartInput) (*Job, error) {
 	lim := s.limits()
+	title := strings.TrimSpace(in.CatalogTitle)
+	if title == "" {
+		return nil, fmt.Errorf("%w: catalog name is required before uploading a PDF", ErrInvalidInput)
+	}
+	if len(title) > 200 {
+		return nil, fmt.Errorf("%w: catalog name must be 200 characters or fewer", ErrInvalidInput)
+	}
 	if in.Size <= 0 {
 		return nil, fmt.Errorf("%w: choose a PDF file to upload", ErrInvalidInput)
 	}
@@ -208,12 +217,28 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	var jobID uuid.UUID
 	err = s.DB.QueryRow(ctx, `
 		INSERT INTO catalog_import_jobs (
-			store_id, created_by, source_type, pdf_file_id, extract_images, status, page_count, idempotency_key
-		) VALUES ($1,$2,'pdf',$3,false,'pending',$4,$5)
+			store_id, created_by, source_type, pdf_file_id, extract_images, status, page_count, catalog_title, idempotency_key
+		) VALUES ($1,$2,'pdf',$3,false,'pending',$4,$5,$6)
 		RETURNING id
-	`, storeID, userID, f.ID, pages, idem).Scan(&jobID)
+	`, storeID, userID, f.ID, pages, title, idem).Scan(&jobID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Name-first: draft catalog exists as soon as the named import starts.
+	var catalogID uuid.UUID
+	cerr := s.DB.QueryRow(ctx, `
+		SELECT id FROM catalogs WHERE store_id=$1 AND source_import_job_id=$2
+	`, storeID, jobID).Scan(&catalogID)
+	if errors.Is(cerr, pgx.ErrNoRows) {
+		_ = s.DB.QueryRow(ctx, `
+			INSERT INTO catalogs (store_id, title, status, source_import_job_id)
+			VALUES ($1,$2,'draft',$3) RETURNING id
+		`, storeID, title, jobID).Scan(&catalogID)
+	} else if cerr == nil {
+		_, _ = s.DB.Exec(ctx, `
+			UPDATE catalogs SET title=$3, updated_at=now() WHERE id=$1 AND store_id=$2
+		`, catalogID, storeID, title)
 	}
 
 	payload := map[string]any{"import_job_id": jobID.String(), "store_id": storeID.String()}
@@ -700,7 +725,10 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 	}
 
 	// Ensure a reusable catalog document from this import (standalone until linked).
-	title := "Catalog " + job.CreatedAt.Format("2006-01-02")
+	title := strings.TrimSpace(job.CatalogTitle)
+	if title == "" {
+		title = "Catalog " + job.CreatedAt.Format("2006-01-02")
+	}
 	var catalogID uuid.UUID
 	cerr := s.DB.QueryRow(ctx, `
 		SELECT id FROM catalogs WHERE store_id=$1 AND source_import_job_id=$2
@@ -710,6 +738,10 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 			INSERT INTO catalogs (store_id, title, status, source_import_job_id)
 			VALUES ($1,$2,'draft',$3) RETURNING id
 		`, storeID, title, jobID).Scan(&catalogID)
+	} else if cerr == nil {
+		_, _ = s.DB.Exec(ctx, `
+			UPDATE catalogs SET title=$3, updated_at=now() WHERE id=$1 AND store_id=$2
+		`, catalogID, storeID, title)
 	}
 	if catalogID != uuid.Nil {
 		_, _ = s.DB.Exec(ctx, `
