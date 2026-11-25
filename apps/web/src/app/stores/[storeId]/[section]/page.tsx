@@ -7,6 +7,7 @@ const PHASE_REDIRECT: Record<string, (storeId: string) => string> = {
   catalog: urls.storeProducts,
   products: urls.storeProducts,
   catalogs: urls.storeCatalogs,
+  attributes: urls.storeAttributes,
   settings: urls.storeSettings,
   orders: urls.storeOrders,
   preorders: (storeId) => `/stores/${storeId}/preorders`,

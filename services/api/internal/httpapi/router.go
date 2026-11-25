@@ -205,8 +205,10 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("GET /api/v1/stores/{storeID}/attributes", storePerm(rbac.PermCatalogRead, p2.ListAttributeDefinitions))
 	mux.Handle("POST /api/v1/stores/{storeID}/attributes", storePerm(rbac.PermCatalogWrite, p2.CreateAttributeDefinition))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/attributes/{attributeID}", storePerm(rbac.PermCatalogWrite, p2.UpdateAttributeDefinition))
+	mux.Handle("DELETE /api/v1/stores/{storeID}/attributes/{attributeID}", storePerm(rbac.PermCatalogWrite, p2.DeleteAttributeDefinition))
 	mux.Handle("GET /api/v1/stores/{storeID}/products/{productID}/attributes", storePerm(rbac.PermCatalogRead, p2.ListProductAttributes))
 	mux.Handle("PUT /api/v1/stores/{storeID}/products/{productID}/attributes", storePerm(rbac.PermCatalogWrite, p2.SetProductAttribute))
+	mux.Handle("PUT /api/v1/stores/{storeID}/products/{productID}/attributes/bulk", storePerm(rbac.PermCatalogWrite, p2.SetProductAttributesBulk))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/products/{productID}/attributes/{attributeID}", storePerm(rbac.PermCatalogWrite, p2.DeleteProductAttribute))
 
 	// Campaigns (Agent 04 — CAMP-05 unification)

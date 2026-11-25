@@ -3,7 +3,8 @@ import {
   getSession,
   getStore,
   getProduct,
-  getStoreCategories,
+  getStoreAttributes,
+  getProductAttributeValues,
 } from "@/lib/server-api";
 import { ProductForm } from "@/components/catalog/product-form";
 import { ProductRelations } from "@/components/catalog/product-relations";
@@ -25,14 +26,20 @@ export default async function EditProductPage({
   if (!PRODUCT_ID_UUID.test(productId)) {
     redirect(urls.storeProducts(storeId));
   }
-  const [product, categories] = await Promise.all([
+  const [product, attributes, attributeValues] = await Promise.all([
     getProduct(storeId, productId),
-    getStoreCategories(storeId),
+    getStoreAttributes(storeId),
+    getProductAttributeValues(storeId, productId),
   ]);
   if (!product) redirect(urls.storeProducts(storeId));
   return (
     <div className="space-y-8">
-      <ProductForm storeId={storeId} categories={categories} product={product} />
+      <ProductForm
+        storeId={storeId}
+        attributes={attributes}
+        attributeValues={attributeValues}
+        product={product}
+      />
       <ProductRelations storeId={storeId} productId={productId} />
     </div>
   );

@@ -38,6 +38,10 @@ export const urls = {
   productsImport: (storeId: string) => `/stores/${storeId}/products/import`,
   productsImportJob: (storeId: string, jobId: string) =>
     `/stores/${storeId}/products/import/${jobId}`,
+  storeAttributes: (storeId: string) => `/stores/${storeId}/attributes`,
+  storeAttributeNew: (storeId: string) => `/stores/${storeId}/attributes/new`,
+  storeAttribute: (storeId: string, attributeId: string) =>
+    `/stores/${storeId}/attributes/${attributeId}`,
   // Catalogs — PDF flipbook documents
   storeCatalogs: (storeId: string) => `/stores/${storeId}/catalogs`,
   storeCatalogsNew: (storeId: string) => `/stores/${storeId}/catalogs/new`,

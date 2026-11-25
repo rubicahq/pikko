@@ -205,7 +205,7 @@ export const PRIMARY_WORKSPACES: WorkspaceDef[] = [
         label: "Attributes",
         href: "attributes",
         matchPrefixes: ["attributes"],
-        implemented: false,
+        implemented: true,
         permission: "catalog.read",
       },
     ],

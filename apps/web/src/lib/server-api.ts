@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
 import type {
   Account,
+  AttributeDefinition,
   Category,
   OnboardingDraft,
   Product,
+  ProductAttributeValue,
   Session,
   Store,
   StorefrontConfig,
@@ -108,6 +110,23 @@ export async function getStoreCategories(storeId: string): Promise<Category[]> {
     `/api/v1/stores/${storeId}/categories`,
   );
   return data?.categories || [];
+}
+
+export async function getStoreAttributes(storeId: string): Promise<AttributeDefinition[]> {
+  const data = await serverFetch<{ attributes: AttributeDefinition[] }>(
+    `/api/v1/stores/${storeId}/attributes`,
+  );
+  return data?.attributes || [];
+}
+
+export async function getProductAttributeValues(
+  storeId: string,
+  productId: string,
+): Promise<ProductAttributeValue[]> {
+  const data = await serverFetch<{ values: ProductAttributeValue[] }>(
+    `/api/v1/stores/${storeId}/products/${productId}/attributes`,
+  );
+  return data?.values || [];
 }
 
 export async function getSetupChecklist(

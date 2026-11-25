@@ -4,10 +4,8 @@ import {
   getSession,
   getStore,
   getProducts,
-  getStoreCategories,
 } from "@/lib/server-api";
 import { Button } from "@/components/ui/button";
-import { CategoryManager } from "@/components/catalog/category-manager";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { PageHeader } from "@/components/ui/page-header";
@@ -32,10 +30,7 @@ export default async function ProductsPage({
   if (!session) redirect(urls.auth());
   const store = await getStore(storeId);
   if (!store) redirect(urls.stores());
-  const [productPage, categories] = await Promise.all([
-    getProducts(storeId),
-    getStoreCategories(storeId),
-  ]);
+  const productPage = await getProducts(storeId);
   const products = productPage.products ?? [];
 
   return (
@@ -54,8 +49,6 @@ export default async function ProductsPage({
           </>
         }
       />
-
-      <CategoryManager storeId={storeId} categories={categories} />
 
       {products.length === 0 ? (
         <EmptyState
