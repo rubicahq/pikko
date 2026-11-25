@@ -21,29 +21,30 @@ var (
 )
 
 type Config struct {
-	ID               uuid.UUID       `json:"id"`
-	StoreID          uuid.UUID       `json:"store_id"`
-	Channel          string          `json:"channel"`
-	ThemeID          string          `json:"theme_id"`
-	BackgroundColor  string          `json:"background_color"`
-	TextColor        string          `json:"text_color"`
-	PrimaryColor     string          `json:"primary_color"`
-	ButtonForeground string          `json:"button_foreground"`
-	SurfaceColor     string          `json:"surface_color"`
-	BorderColor      string          `json:"border_color"`
-	LogoFileID       *uuid.UUID      `json:"logo_file_id,omitempty"`
-	FaviconFileID    *uuid.UUID      `json:"favicon_file_id,omitempty"`
-	StoreIconFileID  *uuid.UUID      `json:"store_icon_file_id,omitempty"`
-	LogoURL          string          `json:"logo_url,omitempty"`
-	FaviconURL       string          `json:"favicon_url,omitempty"`
-	StoreIconURL     string          `json:"store_icon_url,omitempty"`
-	Description      *string         `json:"description,omitempty"`
-	ContactEmail     *string         `json:"contact_email,omitempty"`
-	WhatsApp         *string         `json:"whatsapp,omitempty"`
-	SocialLinks      json.RawMessage `json:"social_links"`
-	UpdatedAt        time.Time       `json:"updated_at"`
-	PublishedAt      *time.Time      `json:"published_at,omitempty"`
-	ThemeName        string          `json:"theme_name,omitempty"`
+	ID                 uuid.UUID       `json:"id"`
+	StoreID            uuid.UUID       `json:"store_id"`
+	Channel            string          `json:"channel"`
+	ThemeID            string          `json:"theme_id"`
+	BackgroundColor    string          `json:"background_color"`
+	TextColor          string          `json:"text_color"`
+	PrimaryColor       string          `json:"primary_color"`
+	ButtonForeground   string          `json:"button_foreground"`
+	SurfaceColor       string          `json:"surface_color"`
+	BorderColor        string          `json:"border_color"`
+	LogoFileID         *uuid.UUID      `json:"logo_file_id,omitempty"`
+	FaviconFileID      *uuid.UUID      `json:"favicon_file_id,omitempty"`
+	StoreIconFileID    *uuid.UUID      `json:"store_icon_file_id,omitempty"`
+	LogoURL            string          `json:"logo_url,omitempty"`
+	FaviconURL         string          `json:"favicon_url,omitempty"`
+	StoreIconURL       string          `json:"store_icon_url,omitempty"`
+	Description        *string         `json:"description,omitempty"`
+	ContactEmail       *string         `json:"contact_email,omitempty"`
+	WhatsApp           *string         `json:"whatsapp,omitempty"`
+	SocialLinks        json.RawMessage `json:"social_links"`
+	UpdatedAt          time.Time       `json:"updated_at"`
+	PublishedAt        *time.Time      `json:"published_at,omitempty"`
+	ThemeName          string          `json:"theme_name,omitempty"`
+	ShowCatalogsOnHome bool            `json:"show_catalogs_on_home"`
 }
 
 type Banner struct {
@@ -85,12 +86,12 @@ func (s *Service) Get(ctx context.Context, storeID uuid.UUID, channel string) (*
 	err := s.DB.QueryRow(ctx, `
 		SELECT id, store_id, channel, theme_id, background_color, text_color, primary_color,
 		       logo_file_id, favicon_file_id, store_icon_file_id, description, contact_email, whatsapp,
-		       social_links, updated_at, published_at
+		       social_links, show_catalogs_on_home, updated_at, published_at
 		FROM storefront_configs WHERE store_id=$1 AND channel=$2
 	`, storeID, channel).Scan(
 		&c.ID, &c.StoreID, &c.Channel, &c.ThemeID, &c.BackgroundColor, &c.TextColor, &c.PrimaryColor,
 		&c.LogoFileID, &c.FaviconFileID, &c.StoreIconFileID, &c.Description, &c.ContactEmail, &c.WhatsApp,
-		&social, &c.UpdatedAt, &c.PublishedAt,
+		&social, &c.ShowCatalogsOnHome, &c.UpdatedAt, &c.PublishedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if channel == "draft" {
@@ -139,20 +140,21 @@ func publicFileAPIPath(storeID, fileID uuid.UUID) string {
 }
 
 type PatchInput struct {
-	ThemeID         *string          `json:"theme_id"`
-	BackgroundColor *string          `json:"background_color"`
-	TextColor       *string          `json:"text_color"`
-	PrimaryColor    *string          `json:"primary_color"`
-	LogoFileID      *uuid.UUID       `json:"logo_file_id"`
-	ClearLogo       bool             `json:"clear_logo"`
-	FaviconFileID   *uuid.UUID       `json:"favicon_file_id"`
-	ClearFavicon    bool             `json:"clear_favicon"`
-	StoreIconFileID *uuid.UUID       `json:"store_icon_file_id"`
-	ClearStoreIcon  bool             `json:"clear_store_icon"`
-	Description     *string          `json:"description"`
-	ContactEmail    *string          `json:"contact_email"`
-	WhatsApp        *string          `json:"whatsapp"`
-	SocialLinks     *json.RawMessage `json:"social_links"`
+	ThemeID            *string          `json:"theme_id"`
+	BackgroundColor    *string          `json:"background_color"`
+	TextColor          *string          `json:"text_color"`
+	PrimaryColor       *string          `json:"primary_color"`
+	LogoFileID         *uuid.UUID       `json:"logo_file_id"`
+	ClearLogo          bool             `json:"clear_logo"`
+	FaviconFileID      *uuid.UUID       `json:"favicon_file_id"`
+	ClearFavicon       bool             `json:"clear_favicon"`
+	StoreIconFileID    *uuid.UUID       `json:"store_icon_file_id"`
+	ClearStoreIcon     bool             `json:"clear_store_icon"`
+	Description        *string          `json:"description"`
+	ContactEmail       *string          `json:"contact_email"`
+	WhatsApp           *string          `json:"whatsapp"`
+	SocialLinks        *json.RawMessage `json:"social_links"`
+	ShowCatalogsOnHome *bool            `json:"show_catalogs_on_home"`
 }
 
 func (s *Service) PatchDraft(ctx context.Context, storeID uuid.UUID, in PatchInput) (*Config, error) {
@@ -250,15 +252,19 @@ func (s *Service) PatchDraft(ctx context.Context, storeID uuid.UUID, in PatchInp
 		}
 		social = *in.SocialLinks
 	}
+	showCatalogs := cur.ShowCatalogsOnHome
+	if in.ShowCatalogsOnHome != nil {
+		showCatalogs = *in.ShowCatalogsOnHome
+	}
 
 	_, err = s.DB.Exec(ctx, `
 		UPDATE storefront_configs SET
 			theme_id=$3, background_color=$4, text_color=$5, primary_color=$6,
 			logo_file_id=$7, favicon_file_id=$8, store_icon_file_id=$9,
-			description=$10, contact_email=$11, whatsapp=$12, social_links=$13,
+			description=$10, contact_email=$11, whatsapp=$12, social_links=$13, show_catalogs_on_home=$14,
 			updated_at=now()
 		WHERE store_id=$1 AND channel=$2
-	`, storeID, "draft", themeID, bg, text, primary, logo, favicon, icon, desc, email, wa, social)
+	`, storeID, "draft", themeID, bg, text, primary, logo, favicon, icon, desc, email, wa, social, showCatalogs)
 	if err != nil {
 		return nil, err
 	}
@@ -296,9 +302,9 @@ func (s *Service) Publish(ctx context.Context, storeID, actor uuid.UUID) (*Confi
 		INSERT INTO storefront_configs (
 			store_id, channel, theme_id, background_color, text_color, primary_color,
 			logo_file_id, favicon_file_id, store_icon_file_id, description, contact_email, whatsapp,
-			social_links, updated_at, published_at
+			social_links, show_catalogs_on_home, updated_at, published_at
 		) VALUES (
-			$1,'published',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now()
+			$1,'published',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),now()
 		)
 		ON CONFLICT (store_id, channel) DO UPDATE SET
 			theme_id=EXCLUDED.theme_id,
@@ -312,11 +318,12 @@ func (s *Service) Publish(ctx context.Context, storeID, actor uuid.UUID) (*Confi
 			contact_email=EXCLUDED.contact_email,
 			whatsapp=EXCLUDED.whatsapp,
 			social_links=EXCLUDED.social_links,
+ show_catalogs_on_home=EXCLUDED.show_catalogs_on_home,
 			updated_at=now(),
 			published_at=now()
 	`, storeID, draft.ThemeID, draft.BackgroundColor, draft.TextColor, draft.PrimaryColor,
 		draft.LogoFileID, draft.FaviconFileID, draft.StoreIconFileID, draft.Description,
-		draft.ContactEmail, draft.WhatsApp, draft.SocialLinks)
+		draft.ContactEmail, draft.WhatsApp, draft.SocialLinks, draft.ShowCatalogsOnHome)
 	if err != nil {
 		return nil, err
 	}

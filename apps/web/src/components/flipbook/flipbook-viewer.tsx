@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CartBadge } from "@/components/storefront/cart-badge";
+import { WishlistBadge } from "@/components/storefront/wishlist-badge";
+import { WishlistButton } from "@/components/storefront/wishlist-button";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { addToCart } from "@/lib/cart";
@@ -98,11 +100,13 @@ export function FlipbookViewer({
   storeName,
   pages,
   storeWhatsapp,
+  liveSlug,
 }: {
   storeSlug: string;
   storeName: string;
   pages: FlipPage[];
   storeWhatsapp?: string | null;
+  liveSlug?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -257,7 +261,7 @@ export function FlipbookViewer({
       <header className="flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
         <div className="min-w-0">
           <a
-            href={urls.storefrontPath(storeSlug)}
+            href={liveSlug ? urls.storefrontLive(storeSlug, liveSlug) : urls.storefrontPath(storeSlug)}
             className="truncate text-sm font-semibold text-foreground hover:text-brand-dark"
           >
             {storeName}
@@ -265,6 +269,7 @@ export function FlipbookViewer({
           <p className="text-xs text-foreground-secondary">{title}</p>
         </div>
         <div className="flex items-center gap-1">
+          {liveSlug ? <WishlistBadge storeSlug={storeSlug} liveSlug={liveSlug} color="#15191E" /> : null}
           <CartBadge storeSlug={storeSlug} color="#15191E" />
           <Button type="button" variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
             <Minus className="h-4 w-4" strokeWidth={1.75} />
@@ -350,7 +355,7 @@ export function FlipbookViewer({
                 >
                   {hs.product_name && (
                     <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-max max-w-[min(16rem,80vw)] -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md group-hover:block group-focus-visible:block">
-                      {hs.product_name} · Add to cart
+                      {hs.product_name} · {liveSlug ? "Wishlist" : "Add to cart"}
                     </span>
                   )}
                 </button>
@@ -409,7 +414,11 @@ export function FlipbookViewer({
                         />
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {it.contact_for_price ? (
+                        {liveSlug ? (
+                          <WishlistButton storeSlug={storeSlug} liveSlug={liveSlug}
+                            productId={it.product_id} productName={it.product_name}
+                            primaryColor="#C83200" buttonFg="#FFFFFF" enabled />
+                        ) : it.contact_for_price ? (
                           wa ? (
                             <a
                               href={wa}
@@ -431,7 +440,7 @@ export function FlipbookViewer({
                             Add to cart
                           </button>
                         )}
-                        {it.product_slug && (
+                        {!liveSlug && it.product_slug && (
                           <a
                             href={urls.storefrontProduct(storeSlug, it.product_slug)}
                             className="text-xs text-foreground-secondary underline-offset-2 hover:underline"
@@ -531,7 +540,11 @@ export function FlipbookViewer({
               </div>
             )}
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              {product.contact_for_price ? (
+              {liveSlug ? (
+                <WishlistButton storeSlug={storeSlug} liveSlug={liveSlug}
+                  productId={product.id} productName={product.name}
+                  primaryColor="#C83200" buttonFg="#FFFFFF" enabled />
+              ) : product.contact_for_price ? (
                 contactHref ? (
                   <Button type="button" asChild>
                     <a href={contactHref} target="_blank" rel="noreferrer">
@@ -548,10 +561,10 @@ export function FlipbookViewer({
                   Add to cart
                 </Button>
               )}
-              <Button type="button" variant="outline" asChild>
+              {!liveSlug ? <Button type="button" variant="outline" asChild>
                 <a href={urls.storefrontCart(storeSlug)}>View cart</a>
-              </Button>
-              {productURL && (
+              </Button> : null}
+              {!liveSlug && productURL && (
                 <Button type="button" variant="ghost" asChild>
                   <a href={productURL}>Product page</a>
                 </Button>

@@ -85,12 +85,12 @@ export default async function PublicStorePage({ params }: Props) {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <Link
+          {sf.show_catalogs_on_home !== false ? <Link
             href={catalogs.length > 0 ? urls.storefrontCatalogs(storeSlug) : `/${storeSlug}/catalog`}
             className="text-sm opacity-80 hover:opacity-100"
           >
             Catalogs
-          </Link>
+          </Link> : null}
           <CartBadge storeSlug={storeSlug} color={text} />
           {sf.whatsapp ? (
             <a
@@ -109,21 +109,6 @@ export default async function PublicStorePage({ params }: Props) {
         {sf.description && (
           <p className="max-w-reading text-base opacity-80">{sf.description}</p>
         )}
-
-        {catalogs.length > 0 ? (
-          <section className="mt-10">
-            <h2 className="text-xl font-medium">Catalogs</h2>
-            <CatalogBannerCards
-              storeSlug={storeSlug}
-              catalogs={catalogs}
-              limit={CATALOG_HOMEPAGE_LIMIT}
-              showExploreMore
-              borderColor={border}
-              surfaceColor={surface}
-              textColor={text}
-            />
-          </section>
-        ) : null}
 
         {openLives.length > 0 ? (
           <section className="mt-10">
@@ -152,6 +137,21 @@ export default async function PublicStorePage({ params }: Props) {
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+
+        {sf.show_catalogs_on_home !== false && catalogs.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-xl font-medium">Catalogs</h2>
+            <CatalogBannerCards
+              storeSlug={storeSlug}
+              catalogs={catalogs}
+              limit={CATALOG_HOMEPAGE_LIMIT}
+              showExploreMore
+              borderColor={border}
+              surfaceColor={surface}
+              textColor={text}
+            />
           </section>
         ) : null}
 
