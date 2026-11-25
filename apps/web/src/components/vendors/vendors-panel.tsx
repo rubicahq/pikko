@@ -103,8 +103,20 @@ export function VendorsPanel({ storeId }: { storeId: string }) {
     <div className="mx-auto max-w-dashboard space-y-8">
       <PageHeader
         title="Vendors"
-        description="Preferred suppliers for purchasing splits and receiving handoff."
+        description="Deprecated — use product attributes and Fulfillment grouping instead. This page stays available for existing data only."
+        actions={
+          <Button asChild variant="outline">
+            <Link href={`/stores/${storeId}/attributes`}>Go to Attributes</Link>
+          </Button>
+        }
       />
+      <p className="rounded-lg border border-border bg-background-subtle px-4 py-3 text-sm text-foreground-secondary">
+        Vendor is soft-deprecated. Sourcing and demand splits should use{" "}
+        <Link href={`/stores/${storeId}/attributes`} className="font-medium text-foreground underline">
+          Attributes
+        </Link>{" "}
+        and Fulfillment group options. Existing vendor records are kept.
+      </p>
 
       {error ? (
         <p className="rounded-lg border border-error-border bg-error-bg px-4 py-3 text-sm text-error">

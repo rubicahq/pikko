@@ -209,6 +209,21 @@ func (h *CommerceHandlers) PatchOrder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"order": o})
 }
 
+func (h *CommerceHandlers) MarkPaidByAdmin(w http.ResponseWriter, r *http.Request) {
+	orderID, err := uuid.Parse(r.PathValue("orderID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
+		return
+	}
+	pay, err := h.Commerce.MarkPaidByAdmin(r.Context(), StoreID(r), orderID, UserID(r))
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	o, _ := h.Commerce.GetOrder(r.Context(), StoreID(r), orderID)
+	writeJSON(w, http.StatusOK, map[string]any{"payment": pay, "order": o})
+}
+
 func (h *CommerceHandlers) VerifyPayment(w http.ResponseWriter, r *http.Request) {
 	orderID, err := uuid.Parse(r.PathValue("orderID"))
 	if err != nil {

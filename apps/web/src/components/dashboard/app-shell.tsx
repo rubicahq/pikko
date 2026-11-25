@@ -4,6 +4,7 @@ import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { ContextualTabs } from "@/components/dashboard/contextual-tabs";
 import { HeaderUtilities } from "@/components/dashboard/header-utilities";
+import { DocumentTitle } from "@/components/dashboard/document-title";
 
 export function AppShell({
   user,
@@ -19,6 +20,9 @@ export function AppShell({
   const permissions = currentStore.permissions;
   return (
     <div className="flex min-h-screen bg-workspace">
+      <Suspense fallback={null}>
+        <DocumentTitle storeId={currentStore.id} permissions={permissions} />
+      </Suspense>
       {/* Tablet: collapsed icon rail */}
       <div className="sticky top-0 hidden h-screen md:block lg:hidden">
         <DashboardSidebar

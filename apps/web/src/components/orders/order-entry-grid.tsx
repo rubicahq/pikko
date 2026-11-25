@@ -51,6 +51,7 @@ type DraftPayload = {
   customer_email: string;
   customer_phone: string;
   fulfillment_method: string;
+  payment_option?: string;
   internal_notes: string;
   campaign_id: string;
   preorder_batch_id: string;
@@ -89,6 +90,9 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const router = useRouter();
   const [customer, setCustomer] = useState<OrderCustomer | null>(null);
   const [fulfillment, setFulfillment] = useState("pickup");
+  const [paymentOption, setPaymentOption] = useState<"paid_by_admin" | "bank_transfer">(
+    "paid_by_admin",
+  );
   const [notes, setNotes] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [batchId, setBatchId] = useState("");
@@ -138,6 +142,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
       customer_email: customer?.email || "",
       customer_phone: customer?.phone || "",
       fulfillment_method: fulfillment,
+      payment_option: paymentOption,
       internal_notes: notes,
       campaign_id: campaignId,
       preorder_batch_id: batchId,
@@ -151,7 +156,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           unit_price_idr: l.unit_price_idr,
         })),
     };
-  }, [customer, fulfillment, notes, campaignId, batchId, lines]);
+  }, [customer, fulfillment, paymentOption, notes, campaignId, batchId, lines]);
 
   function onCampaignChange(next: string) {
     setCampaignId(next);
@@ -418,6 +423,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           customer_email: customer.email || undefined,
           customer_phone: customer.phone || undefined,
           fulfillment_method: fulfillment,
+          payment_option: paymentOption,
           internal_notes: notes || undefined,
           campaign_id: campaignId || undefined,
           preorder_batch_id: batchId || undefined,
@@ -489,6 +495,23 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
             <option value="shipping">Shipping</option>
             <option value="free_shipping">Free shipping</option>
           </select>
+        </div>
+        <div>
+          <Label htmlFor="payment-option">Payment</Label>
+          <select
+            id="payment-option"
+            className="mt-1.5 flex h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
+            value={paymentOption}
+            onChange={(e) =>
+              setPaymentOption(e.target.value === "bank_transfer" ? "bank_transfer" : "paid_by_admin")
+            }
+          >
+            <option value="paid_by_admin">Paid by admin</option>
+            <option value="bank_transfer">Bank transfer (awaiting proof)</option>
+          </select>
+          <p className="mt-1.5 text-caption text-foreground-muted">
+            Paid by admin marks the order paid so it shows in Fulfillment immediately.
+          </p>
         </div>
       </div>
 

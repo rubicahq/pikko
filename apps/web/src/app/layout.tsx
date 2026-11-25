@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(marketingURL("/")),
   title: {
     default: "Pikko",
-    template: "%s · Pikko",
+    template: "%s | Pikko",
   },
   description: MARKETING_DEFAULT_DESCRIPTION,
   applicationName: "Pikko",

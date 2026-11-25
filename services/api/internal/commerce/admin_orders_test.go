@@ -464,3 +464,104 @@ func TestAdminOrderCampaignAndPreorderRelations(t *testing.T) {
 		t.Fatalf("expected cleared relations %#v", co)
 	}
 }
+
+func TestAdminPaidByAdminPayment(t *testing.T) {
+	pool := testPool(t)
+	defer pool.Close()
+	reset(t, pool)
+
+	dir := t.TempDir()
+	store, err := storage.NewLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg()
+	router, _ := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: store})
+	storeSvc := &stores.Service{DB: pool, Cfg: c}
+
+	userA, tokenA := signIn(t, pool, "paid-admin@example.com")
+	stA, err := storeSvc.CreateStore(context.Background(), userA, stores.CreateDirectInput{
+		Name: "Paid Admin Mart", Slug: "paid-admin-mart", Category: "other", SellingModel: "ready_stock",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid := stA.ID.String()
+
+	code, _ := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/payment-methods", tokenA, map[string]any{
+		"bank_name": "BCA", "account_holder": "Admin", "account_number": "112233",
+	})
+	if code != 201 {
+		t.Fatalf("payment method %d", code)
+	}
+	code, _ = doJSON(t, router, "PATCH", "/api/v1/stores/"+sid+"/fulfillment", tokenA, map[string]any{
+		"pickup_enabled": true,
+	})
+	if code != 200 {
+		t.Fatalf("fulfillment %d", code)
+	}
+	code, prodBody := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products", tokenA, map[string]any{
+		"name": "Paid Tee", "slug": "paid-tee", "price_idr": 50000, "inventory_mode": "unlimited",
+	})
+	if code != 201 {
+		t.Fatalf("product %d %v", code, prodBody)
+	}
+	productID := prodBody["product"].(map[string]any)["id"].(string)
+	code, _ = doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products/"+productID+"/status", tokenA, map[string]any{
+		"status": "active",
+	})
+	if code != 200 {
+		t.Fatalf("publish %d", code)
+	}
+
+	// Create with paid_by_admin — order is paid immediately for Fulfilment.
+	code, created := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Ayu", "customer_email": "ayu@example.com",
+		"fulfillment_method": "pickup",
+		"payment_option":     "paid_by_admin",
+		"idempotency_key":    uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("create paid_by_admin %d %v", code, created)
+	}
+	order := created["order"].(map[string]any)
+	if order["payment_status"] != "paid" {
+		t.Fatalf("want paid got %v", order["payment_status"])
+	}
+	orderID := order["id"].(string)
+	code, detail := doJSON(t, router, "GET", "/api/v1/stores/"+sid+"/orders/"+orderID, tokenA, nil)
+	if code != 200 {
+		t.Fatalf("get order %d %v", code, detail)
+	}
+	pay := detail["payment"].(map[string]any)
+	if pay["method_type"] != "paid_by_admin" || pay["status"] != "verified" {
+		t.Fatalf("payment %#v", pay)
+	}
+
+	// Bank-transfer create then Mark paid by admin.
+	code, unpaid := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Budi", "customer_email": "budi@example.com",
+		"fulfillment_method": "pickup",
+		"payment_option":     "bank_transfer",
+		"idempotency_key":    uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("create unpaid %d %v", code, unpaid)
+	}
+	unpaidID := unpaid["order"].(map[string]any)["id"].(string)
+	if unpaid["order"].(map[string]any)["payment_status"] != "unpaid" {
+		t.Fatalf("expected unpaid %#v", unpaid["order"])
+	}
+	code, marked := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders/"+unpaidID+"/payments/paid-by-admin", tokenA, map[string]any{})
+	if code != 200 {
+		t.Fatalf("mark paid_by_admin %d %v", code, marked)
+	}
+	if marked["order"].(map[string]any)["payment_status"] != "paid" {
+		t.Fatalf("mark result %#v", marked)
+	}
+	if marked["payment"].(map[string]any)["method_type"] != "paid_by_admin" {
+		t.Fatalf("marked payment %#v", marked["payment"])
+	}
+}

@@ -23,7 +23,7 @@ export function marketingMetadata({
   noIndex?: boolean;
 }): Metadata {
   const url = marketingURL(path);
-  const fullTitle = title === siteName ? siteName : `${title} · ${siteName}`;
+  const fullTitle = title === siteName ? siteName : `${title} | ${siteName}`;
   return {
     title,
     description,

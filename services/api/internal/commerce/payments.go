@@ -277,6 +277,96 @@ func (s *Service) RejectPayment(ctx context.Context, storeID, orderID, paymentID
 	return s.GetLatestPayment(ctx, storeID, orderID)
 }
 
+// MarkPaidByAdmin marks an unpaid order as paid without bank evidence so it
+// appears in Fulfilment (purchasing/packing). Soft-creates or converts a payment
+// row with method_type=paid_by_admin.
+func (s *Service) MarkPaidByAdmin(ctx context.Context, storeID, orderID, actorID uuid.UUID) (*Payment, error) {
+	o, err := s.GetOrder(ctx, storeID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if o.OrderStatus == OrderCancelled {
+		return nil, ErrInvalidTransition
+	}
+	if o.PaymentStatus == PaymentPaid {
+		return nil, ErrAlreadyVerified
+	}
+
+	tx, err := s.DB.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	note := "Paid by admin"
+	amount := o.TotalIDR
+
+	var payID uuid.UUID
+	existing, err := s.GetLatestPayment(ctx, storeID, orderID)
+	switch {
+	case err == nil && (existing.Status == PaymentRecordPending || existing.Status == PaymentRecordAwaitingVerification || existing.Status == PaymentRecordRejected):
+		ct, err := tx.Exec(ctx, `
+			UPDATE payments SET
+				method_type=$3, status='verified', verified_at=now(), verified_by=$4,
+				payment_method_id=NULL, bank_name_snapshot=NULL, account_holder_snapshot=NULL,
+				account_number_snapshot=NULL, instructions_snapshot=$5, note=$5,
+				rejected_at=NULL, rejected_by=NULL, reject_reason=NULL,
+				payment_kind=$6, amount_idr=$7, updated_at=now(), version=version+1
+			WHERE id=$1 AND store_id=$2 AND status IN ('pending','awaiting_verification','rejected')
+		`, existing.ID, storeID, MethodTypePaidByAdmin, actorID, note, PaymentKindFull, amount)
+		if err != nil {
+			return nil, err
+		}
+		if ct.RowsAffected() == 0 {
+			return nil, ErrAlreadyVerified
+		}
+		payID = existing.ID
+	case errors.Is(err, ErrNotFound):
+		err = tx.QueryRow(ctx, `
+			INSERT INTO payments (
+				store_id, order_id, payment_method_id, method_type, amount_idr, status,
+				instructions_snapshot, verified_at, verified_by, payment_kind, note
+			) VALUES ($1,$2,NULL,$3,$4,'verified',$5,now(),$6,$7,$5)
+			RETURNING id
+		`, storeID, orderID, MethodTypePaidByAdmin, amount, note, actorID, PaymentKindFull).Scan(&payID)
+		if err != nil {
+			return nil, err
+		}
+	case err != nil:
+		return nil, err
+	default:
+		return nil, ErrInvalidTransition
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE orders SET payment_status='paid', updated_at=now() WHERE id=$1 AND store_id=$2
+	`, orderID, storeID)
+	if err != nil {
+		return nil, err
+	}
+	_, _ = tx.Exec(ctx, `
+		INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, actor_user_id, reason)
+		VALUES ($1,$2,'payment',$3,'paid',$4,'paid_by_admin')
+	`, storeID, orderID, o.PaymentStatus, actorID)
+
+	if _, err := s.recomputeSettlementTx(ctx, tx, storeID, orderID); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	if s.Outbox != nil {
+		_ = s.Outbox.Write(ctx, &storeID, "payment.payment_verified", map[string]any{
+			"order_id": orderID.String(), "payment_id": payID.String(), "method": MethodTypePaidByAdmin,
+		}, "paid_by_admin:"+payID.String())
+	}
+	analytics.Emit(ctx, s.DB, storeID, "payment.paid_by_admin", &actorID, map[string]any{
+		"order_id": orderID.String(), "payment_id": payID.String(),
+	})
+	return s.GetLatestPayment(ctx, storeID, orderID)
+}
+
 func (s *Service) notifyPaymentVerified(ctx context.Context, storeID uuid.UUID, o *Order) {
 	if s.Email == nil || s.Cfg == nil {
 		return
