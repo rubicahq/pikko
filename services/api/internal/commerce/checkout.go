@@ -738,15 +738,18 @@ func (s *Service) enqueueOrderEmails(ctx context.Context, st *publicStoreMeta, o
 		fromName = s.Cfg.EmailFromName
 	}
 
-	custSubject, custHTML, custText := email.OrderConfirmationContent(
-		st.Name, order.OrderNumber, money.FormatIDR(order.TotalIDR), trackURL,
-	)
-	_ = s.Email.Enqueue(ctx, email.Message{
-		TemplateKey: "order_confirmation_customer", To: order.CustomerEmail,
-		From: from, FromName: fromName, ReplyTo: s.Cfg.EmailReplyTo,
-		Subject: custSubject, HTML: custHTML, Text: custText,
-		IdempotencyKey: "email:order_confirm:" + order.ID.String(),
-	})
+	// Skip customer confirmation for synthetic phone-only CRM snapshots.
+	if order.CustomerEmail != "" && !strings.HasSuffix(order.CustomerEmail, "@customers.local") {
+		custSubject, custHTML, custText := email.OrderConfirmationContent(
+			st.Name, order.OrderNumber, money.FormatIDR(order.TotalIDR), trackURL,
+		)
+		_ = s.Email.Enqueue(ctx, email.Message{
+			TemplateKey: "order_confirmation_customer", To: order.CustomerEmail,
+			From: from, FromName: fromName, ReplyTo: s.Cfg.EmailReplyTo,
+			Subject: custSubject, HTML: custHTML, Text: custText,
+			IdempotencyKey: "email:order_confirm:" + order.ID.String(),
+		})
+	}
 
 	if st.OwnerEmail != "" {
 		dashURL := ""

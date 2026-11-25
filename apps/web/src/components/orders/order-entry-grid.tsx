@@ -2,10 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiFetch, formatIDR } from "@/lib/api";
+import {
+  ApiError,
+  apiFetch,
+  formatIDR,
+  type AttributeDefinition,
+  type Product,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  OrderCustomerPicker,
+  type OrderCustomer,
+} from "@/components/orders/order-customer-picker";
+import {
+  OrderProductOptionChips,
+  type ProductVariantOption,
+} from "@/components/orders/order-product-option-chips";
+import { OrderQuickAddProduct } from "@/components/orders/order-quick-add-product";
 
 type Suggest = {
   product_id: string;
@@ -21,12 +36,16 @@ type Line = {
   product_id: string;
   variant_id?: string;
   product_label: string;
+  product_name?: string;
   quantity: number;
   unit_price_idr: number;
+  variants?: ProductVariantOption[];
+  needs_option?: boolean;
   error?: string;
 };
 
 type DraftPayload = {
+  customer_id: string;
   customer_name: string;
   customer_email: string;
   customer_phone: string;
@@ -61,20 +80,20 @@ function newKey() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function emptyLine(): Line {
+  return { key: newKey(), product_id: "", product_label: "", quantity: 1, unit_price_idr: 0 };
+}
+
 export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const router = useRouter();
-  const [customerName, setCustomerName] = useState("");
-  const [customerEmail, setCustomerEmail] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [customer, setCustomer] = useState<OrderCustomer | null>(null);
   const [fulfillment, setFulfillment] = useState("pickup");
   const [notes, setNotes] = useState("");
   const [campaignId, setCampaignId] = useState("");
   const [batchId, setBatchId] = useState("");
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [batches, setBatches] = useState<BatchOption[]>([]);
-  const [lines, setLines] = useState<Line[]>([
-    { key: newKey(), product_id: "", product_label: "", quantity: 1, unit_price_idr: 0 },
-  ]);
+  const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [suggestQ, setSuggestQ] = useState<{ key: string; q: string } | null>(null);
   const [suggestions, setSuggestions] = useState<Suggest[]>([]);
@@ -82,6 +101,8 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
+  const [addProductFor, setAddProductFor] = useState<{ key: string; name: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const syncingRelation = useRef(false);
@@ -90,10 +111,12 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
     void Promise.all([
       apiFetch<{ campaigns: CampaignOption[] }>(`/api/v1/stores/${storeId}/campaigns`),
       apiFetch<{ batches: BatchOption[] }>(`/api/v1/stores/${storeId}/preorders`),
+      apiFetch<{ attributes: AttributeDefinition[] }>(`/api/v1/stores/${storeId}/attributes`),
     ])
-      .then(([campRes, batchRes]) => {
+      .then(([campRes, batchRes, attrRes]) => {
         setCampaigns(campRes.campaigns || []);
         setBatches(batchRes.batches || []);
+        setAttributes(attrRes.attributes || []);
       })
       .catch(() => {
         /* selectors stay empty; create still works without relations */
@@ -102,9 +125,10 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
 
   const payload = useCallback((): DraftPayload => {
     return {
-      customer_name: customerName,
-      customer_email: customerEmail,
-      customer_phone: customerPhone,
+      customer_id: customer?.id || "",
+      customer_name: customer?.name || "",
+      customer_email: customer?.email || "",
+      customer_phone: customer?.phone || "",
       fulfillment_method: fulfillment,
       internal_notes: notes,
       campaign_id: campaignId,
@@ -119,7 +143,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           unit_price_idr: l.unit_price_idr,
         })),
     };
-  }, [customerName, customerEmail, customerPhone, fulfillment, notes, campaignId, batchId, lines]);
+  }, [customer, fulfillment, notes, campaignId, batchId, lines]);
 
   function onCampaignChange(next: string) {
     setCampaignId(next);
@@ -151,7 +175,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
 
   const autosave = useCallback(async () => {
     try {
-      const body = { title: customerName || "Order draft", payload: payload() };
+      const body = { title: customer?.name || "Order draft", payload: payload() };
       if (draftId) {
         await apiFetch(`/api/v1/stores/${storeId}/order-entry/drafts/${draftId}`, {
           method: "PUT",
@@ -168,7 +192,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
     } catch {
       /* keep typing */
     }
-  }, [draftId, payload, storeId, customerName]);
+  }, [draftId, payload, storeId, customer?.name]);
 
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -188,7 +212,8 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
     const t = setTimeout(() => {
       void apiFetch<{ suggestions: Suggest[] }>(
         `/api/v1/stores/${storeId}/order-entry/catalog-suggest?q=${encodeURIComponent(suggestQ.q)}`,
-      ).then((res) => setSuggestions(res.suggestions || []))
+      )
+        .then((res) => setSuggestions(res.suggestions || []))
         .catch(() => setSuggestions([]));
     }, 200);
     return () => clearTimeout(t);
@@ -199,25 +224,126 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   }
 
   function addLine() {
-    setLines((prev) => [
-      ...prev,
-      { key: newKey(), product_id: "", product_label: "", quantity: 1, unit_price_idr: 0 },
-    ]);
+    setLines((prev) => [...prev, emptyLine()]);
+  }
+
+  async function loadVariantsForLine(
+    lineKey: string,
+    productId: string,
+    productName: string,
+    preferredVariantId?: string | null,
+    fallbackPrice?: number,
+  ) {
+    try {
+      const res = await apiFetch<{
+        product: Product & { variants?: ProductVariantOption[] };
+      }>(`/api/v1/stores/${storeId}/products/${productId}`);
+      const variants = res.product.variants || [];
+      const basePrice = res.product.base_price_idr ?? fallbackPrice ?? 0;
+      if (variants.length === 0) {
+        updateLine(lineKey, {
+          product_id: productId,
+          variant_id: undefined,
+          product_name: productName,
+          product_label: productName,
+          unit_price_idr: basePrice,
+          variants: [],
+          needs_option: false,
+          error: undefined,
+        });
+        return;
+      }
+      const preferred =
+        preferredVariantId && variants.find((v) => v.id === preferredVariantId);
+      if (preferred) {
+        updateLine(lineKey, {
+          product_id: productId,
+          variant_id: preferred.id,
+          product_name: productName,
+          product_label: `${productName} · ${preferred.option_key}`,
+          unit_price_idr: preferred.effective_price_idr,
+          variants,
+          needs_option: false,
+          error: undefined,
+        });
+        return;
+      }
+      updateLine(lineKey, {
+        product_id: productId,
+        variant_id: undefined,
+        product_name: productName,
+        product_label: productName,
+        unit_price_idr: basePrice,
+        variants,
+        needs_option: true,
+        error: "Select an option",
+      });
+    } catch {
+      updateLine(lineKey, {
+        product_id: productId,
+        variant_id: preferredVariantId || undefined,
+        product_name: productName,
+        product_label: productName,
+        unit_price_idr: fallbackPrice ?? 0,
+        variants: [],
+        needs_option: false,
+      });
+    }
   }
 
   function pickSuggest(lineKey: string, s: Suggest) {
-    updateLine(lineKey, {
-      product_id: s.product_id,
-      variant_id: s.variant_id || undefined,
-      product_label: s.variant_label ? `${s.name} · ${s.variant_label}` : s.name,
-      unit_price_idr: s.unit_price_idr,
-    });
     setSuggestQ(null);
     setSuggestions([]);
+    updateLine(lineKey, {
+      product_id: s.product_id,
+      product_label: s.name,
+      product_name: s.name,
+      unit_price_idr: s.unit_price_idr,
+      variant_id: undefined,
+      needs_option: false,
+      error: undefined,
+    });
+    void loadVariantsForLine(lineKey, s.product_id, s.name, s.variant_id, s.unit_price_idr);
+  }
+
+  function pickVariant(lineKey: string, variant: ProductVariantOption) {
+    setLines((prev) =>
+      prev.map((l) => {
+        if (l.key !== lineKey) return l;
+        const name = l.product_name || l.product_label;
+        return {
+          ...l,
+          variant_id: variant.id,
+          product_label: `${name} · ${variant.option_key}`,
+          unit_price_idr: variant.effective_price_idr,
+          needs_option: false,
+          error: undefined,
+        };
+      }),
+    );
+  }
+
+  function applyCreatedProduct(lineKey: string, product: Product) {
+    void loadVariantsForLine(lineKey, product.id, product.name, null, product.base_price_idr);
+  }
+
+  function linesReady(): string | null {
+    if (!customer?.id) return "Select or add a customer.";
+    const filled = lines.filter((l) => l.product_id);
+    if (filled.length === 0) return "Add at least one product.";
+    if (filled.some((l) => l.needs_option || (l.variants && l.variants.length > 0 && !l.variant_id))) {
+      return "Select required product options on each line.";
+    }
+    return null;
   }
 
   async function validateBulk() {
     setError(null);
+    const local = linesReady();
+    if (local) {
+      setError(local);
+      return false;
+    }
     setBusy(true);
     try {
       const items = lines
@@ -263,6 +389,10 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
     setError(null);
     const ok = await validateBulk();
     if (!ok) return;
+    if (!customer?.id) {
+      setError("Select or add a customer.");
+      return;
+    }
     setBusy(true);
     try {
       const items = lines
@@ -276,9 +406,10 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
         method: "POST",
         body: {
           items,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone || undefined,
+          customer_id: customer.id,
+          customer_name: customer.name,
+          customer_email: customer.email || undefined,
+          customer_phone: customer.phone || undefined,
           fulfillment_method: fulfillment,
           internal_notes: notes || undefined,
           campaign_id: campaignId || undefined,
@@ -331,41 +462,14 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   }
 
   const subtotal = lines.reduce(
-    (sum, l) => sum + (l.product_id ? l.unit_price_idr * l.quantity : 0),
+    (sum, l) => sum + (l.product_id && !l.needs_option ? l.unit_price_idr * l.quantity : 0),
     0,
   );
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <Label htmlFor="cust-name">Customer name</Label>
-          <Input
-            id="cust-name"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="cust-email">Email</Label>
-          <Input
-            id="cust-email"
-            type="email"
-            value={customerEmail}
-            onChange={(e) => setCustomerEmail(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
-        <div>
-          <Label htmlFor="cust-phone">Phone</Label>
-          <Input
-            id="cust-phone"
-            value={customerPhone}
-            onChange={(e) => setCustomerPhone(e.target.value)}
-            className="mt-1.5"
-          />
-        </div>
+        <OrderCustomerPicker storeId={storeId} customer={customer} onSelect={setCustomer} />
         <div>
           <Label htmlFor="fulfill">Fulfillment</Label>
           <select
@@ -435,7 +539,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           <thead className="bg-background-subtle text-left text-foreground-secondary">
             <tr>
               <th className="px-3 py-2 font-medium">#</th>
-              <th className="px-3 py-2 font-medium">Product / variant</th>
+              <th className="px-3 py-2 font-medium">Product / option</th>
               <th className="w-28 px-3 py-2 font-medium">Qty</th>
               <th className="w-36 px-3 py-2 text-right font-medium">Unit</th>
               <th className="w-36 px-3 py-2 text-right font-medium">Line</th>
@@ -443,7 +547,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           </thead>
           <tbody>
             {lines.map((line, row) => (
-              <tr key={line.key} className="border-t border-border">
+              <tr key={line.key} className="border-t border-border align-top">
                 <td className="px-3 py-1.5 text-foreground-muted tabular-nums">{row + 1}</td>
                 <td className="relative px-2 py-1">
                   <Input
@@ -457,37 +561,77 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
                         product_label: e.target.value,
                         product_id: "",
                         variant_id: undefined,
+                        variants: undefined,
+                        needs_option: false,
+                        error: undefined,
                       });
                       setSuggestQ({ key: line.key, q: e.target.value });
                     }}
                     onKeyDown={(e) => onGridKeyDown(e, row, 0)}
-                    placeholder="Type name or SKU…"
+                    placeholder="Search product or SKU…"
                     className="h-9 border-transparent bg-transparent px-1 focus-visible:border-border"
                     aria-label={`Product row ${row + 1}`}
                   />
-                  {suggestQ?.key === line.key && suggestions.length > 0 ? (
-                    <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background shadow-sm">
-                      {suggestions.map((s) => (
-                        <li key={`${s.product_id}-${s.variant_id || ""}`}>
+                  {suggestQ?.key === line.key && suggestQ.q.trim().length > 0 ? (
+                    <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-background shadow-sm">
+                      {suggestions.length === 0 ? (
+                        <li className="px-3 py-2 text-sm text-foreground-muted">
+                          No matches.{" "}
                           <button
                             type="button"
-                            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-background-subtle"
-                            onClick={() => pickSuggest(line.key, s)}
+                            className="font-medium text-foreground underline underline-offset-2"
+                            onClick={() =>
+                              setAddProductFor({ key: line.key, name: suggestQ.q.trim() })
+                            }
                           >
-                            <span>
-                              {s.name}
-                              {s.variant_label ? ` · ${s.variant_label}` : ""}
-                              {s.sku ? (
-                                <span className="text-foreground-muted"> · {s.sku}</span>
-                              ) : null}
-                            </span>
-                            <span className="tabular-nums text-foreground-secondary">
-                              {formatIDR(s.unit_price_idr)}
-                            </span>
+                            Add product
                           </button>
                         </li>
-                      ))}
+                      ) : (
+                        <>
+                          {suggestions.map((s) => (
+                            <li key={`${s.product_id}-${s.variant_id || ""}`}>
+                              <button
+                                type="button"
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-background-subtle"
+                                onClick={() => pickSuggest(line.key, s)}
+                              >
+                                <span>
+                                  {s.name}
+                                  {s.variant_label ? ` · ${s.variant_label}` : ""}
+                                  {s.sku ? (
+                                    <span className="text-foreground-muted"> · {s.sku}</span>
+                                  ) : null}
+                                </span>
+                                <span className="tabular-nums text-foreground-secondary">
+                                  {formatIDR(s.unit_price_idr)}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                          <li className="border-t border-border">
+                            <button
+                              type="button"
+                              className="w-full px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-background-subtle"
+                              onClick={() =>
+                                setAddProductFor({ key: line.key, name: suggestQ.q.trim() })
+                              }
+                            >
+                              + Add new product
+                            </button>
+                          </li>
+                        </>
+                      )}
                     </ul>
+                  ) : null}
+                  {line.variants && line.variants.length > 0 ? (
+                    <OrderProductOptionChips
+                      variants={line.variants}
+                      selectedId={line.variant_id}
+                      attributes={attributes}
+                      onSelect={(v) => pickVariant(line.key, v)}
+                      error={line.needs_option ? line.error : undefined}
+                    />
                   ) : null}
                 </td>
                 <td className="px-2 py-1">
@@ -508,10 +652,12 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
                   />
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums text-foreground-secondary">
-                  {line.product_id ? formatIDR(line.unit_price_idr) : "—"}
+                  {line.product_id && !line.needs_option ? formatIDR(line.unit_price_idr) : "—"}
                 </td>
                 <td className="px-3 py-1.5 text-right tabular-nums">
-                  {line.product_id ? formatIDR(line.unit_price_idr * line.quantity) : "—"}
+                  {line.product_id && !line.needs_option
+                    ? formatIDR(line.unit_price_idr * line.quantity)
+                    : "—"}
                 </td>
               </tr>
             ))}
@@ -544,6 +690,18 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
         </div>
       </div>
       {error ? <p className="text-sm text-error">{error}</p> : null}
+
+      <OrderQuickAddProduct
+        storeId={storeId}
+        open={!!addProductFor}
+        initialName={addProductFor?.name || ""}
+        onOpenChange={(open) => {
+          if (!open) setAddProductFor(null);
+        }}
+        onCreated={(product) => {
+          if (addProductFor) applyCreatedProduct(addProductFor.key, product);
+        }}
+      />
     </div>
   );
 }

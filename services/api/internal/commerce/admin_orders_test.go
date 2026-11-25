@@ -141,6 +141,60 @@ func TestAdminOrderCreateRevisionAndCSV(t *testing.T) {
 		t.Fatalf("original_quantity=%v", item["original_quantity"])
 	}
 
+	// Create order from existing phone-only CRM customer via customer_id
+	code, crm := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/customers", tokenA, map[string]any{
+		"name": "Budi WA", "phone": "081234567890",
+	})
+	if code != 201 {
+		t.Fatalf("create crm customer %d %v", code, crm)
+	}
+	crmID := crm["customer"].(map[string]any)["id"].(string)
+	code, linked := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_id": crmID,
+		"fulfillment_method": "pickup",
+		"idempotency_key": uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("admin create with customer_id %d %v", code, linked)
+	}
+	linkedOrder := linked["order"].(map[string]any)
+	if linkedOrder["customer_id"] != crmID {
+		t.Fatalf("expected customer_id %s got %v", crmID, linkedOrder["customer_id"])
+	}
+	if linkedOrder["customer_name"] != "Budi WA" {
+		t.Fatalf("customer_name=%v", linkedOrder["customer_name"])
+	}
+
+	// Product with variants requires variant_id on validate
+	code, withOpts := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products", tokenA, map[string]any{
+		"product": map[string]any{
+			"name": "Sized Tee", "slug": "sized-tee", "sku": "SZ-TEE", "base_price_idr": 60000,
+			"ready_stock_eligible": true, "inventory_mode": "unlimited", "status": "published",
+		},
+		"options": []map[string]any{{"name": "Size", "values": []string{"S", "M"}}},
+		"variants": []map[string]any{
+			{"availability": "available", "options": map[string]string{"Size": "S"}},
+			{"availability": "available", "options": map[string]string{"Size": "M"}},
+		},
+	})
+	if code != 201 {
+		t.Fatalf("product with variants %d %v", code, withOpts)
+	}
+	sizedID := withOpts["product"].(map[string]any)["id"].(string)
+	code, _ = doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products/"+sizedID+"/status", tokenA, map[string]any{
+		"status": "published",
+	})
+	if code != 200 {
+		t.Fatalf("publish sized %d", code)
+	}
+	code, needVar := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/order-entry/validate", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": sizedID, "quantity": 1}},
+	})
+	if code != 200 || needVar["valid"] != false {
+		t.Fatalf("expected invalid without variant %d %v", code, needVar)
+	}
+
 	// Revisions after create
 	code, revs := doJSON(t, router, "GET", "/api/v1/stores/"+sid+"/orders/"+orderID+"/revisions", tokenA, nil)
 	if code != 200 {

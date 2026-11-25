@@ -221,6 +221,21 @@ func (s *Service) BulkValidateLines(ctx context.Context, storeID uuid.UUID, item
 			res.Valid = false
 			res.Errors = append(res.Errors, OrderLineValidateError{Index: i, Field: "quantity", Message: "Quantity must be > 0."})
 		}
+		if it.ProductID != uuid.Nil && it.VariantID == nil {
+			var variantCount int
+			err := s.DB.QueryRow(ctx, `
+				SELECT COUNT(*) FROM product_variants WHERE product_id=$1 AND store_id=$2
+			`, it.ProductID, storeID).Scan(&variantCount)
+			if err != nil {
+				return nil, err
+			}
+			if variantCount > 0 {
+				res.Valid = false
+				res.Errors = append(res.Errors, OrderLineValidateError{
+					Index: i, Field: "variant_id", Message: "Select a product option before continuing.",
+				})
+			}
+		}
 	}
 	if !res.Valid {
 		return res, nil
@@ -277,10 +292,53 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	}
 
 	name := strings.TrimSpace(in.CustomerName)
-	_, emailAddr, emailOK := validate.NormalizeEmail(in.CustomerEmail)
-	if len(name) < 2 || !emailOK {
-		return nil, ErrInvalidInput
+	phone := in.CustomerPhone
+	var emailAddr string
+	var linkedCustomerID *uuid.UUID
+
+	if in.CustomerID != nil {
+		var cName string
+		var cEmail, cPhone *string
+		err = s.DB.QueryRow(ctx, `
+			SELECT name, email, phone FROM customers WHERE id=$1 AND store_id=$2
+		`, *in.CustomerID, storeID).Scan(&cName, &cEmail, &cPhone)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: customer not found in this store", ErrInvalidInput)
+		}
+		if err != nil {
+			return nil, err
+		}
+		linkedCustomerID = in.CustomerID
+		if name == "" {
+			name = cName
+		}
+		if len(strings.TrimSpace(name)) < 2 {
+			return nil, ErrInvalidInput
+		}
+		if phone == nil || strings.TrimSpace(*phone) == "" {
+			phone = cPhone
+		}
+		if cEmail != nil && strings.TrimSpace(*cEmail) != "" {
+			_, emailAddr, _ = validate.NormalizeEmail(*cEmail)
+		}
+		if emailAddr == "" {
+			if _, normalized, ok := validate.NormalizeEmail(in.CustomerEmail); ok {
+				emailAddr = normalized
+			}
+		}
+		if emailAddr == "" {
+			// orders.customer_email is NOT NULL; phone-only CRM customers use a stable snapshot.
+			emailAddr = fmt.Sprintf("customer+%s@customers.local", in.CustomerID.String())
+		}
+	} else {
+		_, normalized, emailOK := validate.NormalizeEmail(in.CustomerEmail)
+		if len(name) < 2 || !emailOK {
+			return nil, ErrInvalidInput
+		}
+		emailAddr = normalized
 	}
+	in.CustomerPhone = phone
+
 	if in.FulfillmentMethod == "" {
 		in.FulfillmentMethod = FulfillmentPickup
 	}
@@ -369,13 +427,27 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	}
 	defer tx.Rollback(ctx)
 
-	customerID, err := upsertCustomerTx(ctx, tx, storeID, name, emailAddr, in.CustomerPhone)
-	if err != nil {
-		return nil, err
-	}
-	if in.CustomerID != nil && *in.CustomerID != customerID {
-		// Prefer explicit customer match when email resolves to same person; ignore mismatch by email upsert.
-		_ = in.CustomerID
+	var customerID uuid.UUID
+	if linkedCustomerID != nil {
+		customerID = *linkedCustomerID
+		_, err = tx.Exec(ctx, `
+			UPDATE customers SET
+				name=$3,
+				phone=COALESCE($4, phone),
+				first_order_at=COALESCE(first_order_at, now()),
+				last_order_at=now(),
+				total_orders=total_orders+1,
+				updated_at=now()
+			WHERE id=$1 AND store_id=$2
+		`, customerID, storeID, name, in.CustomerPhone)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		customerID, err = upsertCustomerTx(ctx, tx, storeID, name, emailAddr, in.CustomerPhone)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	orderNumber, err := nextOrderNumberTx(ctx, tx, storeID)
