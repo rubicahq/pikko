@@ -12,6 +12,10 @@ func TestTwentyFourThemes(t *testing.T) {
 		if !ValidHex(th.BackgroundColor) || !ValidHex(th.TextColor) || !ValidHex(th.PrimaryColor) {
 			t.Fatalf("invalid hex on %s", th.ID)
 		}
+		if !ValidHex(th.SurfaceColor) || !ValidHex(th.BorderColor) || !ValidHex(th.ButtonForeground) {
+			t.Fatalf("invalid derived hex on %s: surface=%q border=%q button=%q",
+				th.ID, th.SurfaceColor, th.BorderColor, th.ButtonForeground)
+		}
 		if _, ok := seen[th.ID]; ok {
 			t.Fatalf("duplicate theme id %s", th.ID)
 		}
@@ -19,6 +23,16 @@ func TestTwentyFourThemes(t *testing.T) {
 		if AccessibleOn(th.PrimaryColor) == "" {
 			t.Fatalf("missing button foreground for %s", th.ID)
 		}
+	}
+}
+
+func TestDeriveBorderPikkoSignature(t *testing.T) {
+	got := DeriveBorder("#FFFFFF", "#15191E")
+	if !ValidHex(got) {
+		t.Fatalf("DeriveBorder returned invalid hex %q", got)
+	}
+	if got != "#DBDCDD" {
+		t.Fatalf("DeriveBorder = %q want #DBDCDD", got)
 	}
 }
 

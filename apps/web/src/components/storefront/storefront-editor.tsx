@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeCssColor } from "@/lib/safe-css-color";
 import { urls } from "@/lib/urls";
 
 export function StorefrontEditor({
@@ -76,7 +77,7 @@ export function StorefrontEditor({
     setMessage(null);
     try {
       await apiFetch(`/api/v1/stores/${store.id}/storefront/publish`, { method: "POST" });
-      setMessage("Storefront published.");
+      setMessage(`Storefront published. Live at ${urls.storefront(store.slug)}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publish failed.");
@@ -198,11 +199,19 @@ export function StorefrontEditor({
           <Button type="button" loading={saving} onClick={() => publish()}>
             Publish storefront
           </Button>
-          <Button type="button" variant="outline" asChild>
-            <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
-              Open live storefront
-            </a>
-          </Button>
+          {store.publication_status === "published" ? (
+            <Button type="button" variant="outline" asChild>
+              <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
+                Open live storefront
+              </a>
+            </Button>
+          ) : (
+            <p className="self-center text-sm text-foreground-secondary">
+              Live URL opens after you publish — until then{" "}
+              <span className="font-medium text-foreground">{urls.storefront(store.slug)}</span>{" "}
+              returns 404.
+            </p>
+          )}
         </div>
         {message && <p className="text-sm text-success">{message}</p>}
         {error && <p className="text-sm text-error">{error}</p>}
@@ -211,9 +220,12 @@ export function StorefrontEditor({
       <div
         className="rounded-lg border border-border p-6"
         style={{
-          background: cfg.background_color,
-          color: cfg.text_color,
-          borderColor: cfg.border_color || theme?.border_color,
+          background: safeCssColor(cfg.background_color, "#FFFFFF"),
+          color: safeCssColor(cfg.text_color, "#15191E"),
+          borderColor: safeCssColor(
+            cfg.border_color || theme?.border_color,
+            "#E1E3E8",
+          ),
         }}
       >
         <p className="text-xs uppercase tracking-wide opacity-70">Draft preview</p>

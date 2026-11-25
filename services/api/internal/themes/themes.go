@@ -174,7 +174,8 @@ func DeriveBorder(bg, text string) string {
 	nr := r*0.85 + tr*0.15
 	ng := g*0.85 + tg*0.15
 	nb := b*0.85 + tb*0.15
-	return fmt.Sprintf("#%02X%02X%02X", nr, ng, nb)
+	// %02X requires integers; floats print as Go hex-float (e.g. 0X1.B7P+07) and break CSS.
+	return fmt.Sprintf("#%02X%02X%02X", min255(nr), min255(ng), min255(nb))
 }
 
 func min255(v float64) int {
