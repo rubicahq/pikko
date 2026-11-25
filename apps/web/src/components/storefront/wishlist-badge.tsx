@@ -24,11 +24,13 @@ export function WishlistBadge({
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [hasIdentity, setHasIdentity] = useState(false);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const identity = getWishlistIdentity(storeSlug);
     setHasIdentity(Boolean(identity?.phone));
+    setPortalUrl(identity?.portalUrl || null);
     if (!identity?.phone) {
       setItems([]);
       return;
@@ -66,6 +68,7 @@ export function WishlistBadge({
           {!hasIdentity ? <p className="text-sm text-foreground-secondary">Pilih Wishlist pada produk, lalu masukkan nama dan nomor WhatsApp untuk melihat daftar di sini.</p> : null}
           {error ? <p role="alert" className="text-sm text-error">{error}</p> : null}
           {hasIdentity && !error && items.length === 0 ? <p className="text-sm text-foreground-secondary">Belum ada produk di wishlist.</p> : null}
+          {portalUrl ? <a href={portalUrl} className="mb-5 inline-flex h-10 items-center rounded-md border border-border px-4 text-sm font-medium hover:bg-surface-hover">Buka customer portal</a> : null}
           <ul className="space-y-3">{items.map((item) => (
             <li key={item.id} className="rounded-lg border border-border p-3">
               <p className="font-medium">{item.product_name}</p>

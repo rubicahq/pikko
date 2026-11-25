@@ -238,6 +238,15 @@ func (h *PortalHandlers) Dashboard(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"dashboard": dash})
 }
 
+func (h *PortalHandlers) ListWishlist(w http.ResponseWriter, r *http.Request) {
+	items, err := h.Portal.Commerce.ListCustomerWishlist(r.Context(), PortalStoreID(r), PortalCustomerID(r))
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 func (h *PortalHandlers) ListOrders(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))

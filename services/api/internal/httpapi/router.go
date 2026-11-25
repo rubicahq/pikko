@@ -489,6 +489,7 @@ func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
 	mux.HandleFunc("GET /api/v1/portal/{storeSlug}/auth/session", portalH.Session)
 	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/logout", portalH.Logout)
 	mux.Handle("GET /api/v1/portal/{storeSlug}/dashboard", portalH.Require(portalH.Dashboard))
+	mux.Handle("GET /api/v1/portal/{storeSlug}/wishlist", portalH.Require(portalH.ListWishlist))
 	mux.Handle("GET /api/v1/portal/{storeSlug}/orders", portalH.Require(portalH.ListOrders))
 	mux.Handle("GET /api/v1/portal/{storeSlug}/orders/{orderID}", portalH.Require(portalH.GetOrder))
 	mux.Handle("POST /api/v1/portal/{storeSlug}/orders/{orderID}/address-change", portalH.Require(portalH.RequestAddressChange))
