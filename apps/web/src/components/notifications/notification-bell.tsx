@@ -32,7 +32,7 @@ export function NotificationBell({ storeId }: { storeId: string }) {
   return (
     <Link
       href={urls.storeNotifications(storeId)}
-      className="relative inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground-secondary hover:bg-surface hover:text-foreground"
+      className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground-secondary hover:bg-surface hover:text-foreground"
       aria-label={count > 0 ? `${count} unread notifications` : "Notifications"}
     >
       <Bell className="h-5 w-5" strokeWidth={1.75} />

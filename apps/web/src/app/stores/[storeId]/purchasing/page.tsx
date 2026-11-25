@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/server-api";
 import { urls } from "@/lib/urls";
@@ -11,5 +12,9 @@ export default async function PurchasingPage({
   const { storeId } = await params;
   const session = await getSession();
   if (!session) redirect(urls.auth());
-  return <PurchasingWorkspace storeId={storeId} />;
+  return (
+    <Suspense fallback={null}>
+      <PurchasingWorkspace storeId={storeId} />
+    </Suspense>
+  );
 }

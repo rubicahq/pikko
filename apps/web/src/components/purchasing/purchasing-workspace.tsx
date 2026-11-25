@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,10 @@ type Vendor = { id: string; name: string; status: string };
 type Tab = "requirements" | "eligibility" | "receiving";
 
 export function PurchasingWorkspace({ storeId }: { storeId: string }) {
-  const [tab, setTab] = useState<Tab>("requirements");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const receivingRequested = searchParams.get("tab") === "receiving";
+  const [tab, setTab] = useState<Tab>(receivingRequested ? "receiving" : "requirements");
   const [eligibility, setEligibility] = useState<Eligibility[]>([]);
   const [lines, setLines] = useState<PurchasingLine[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -68,6 +72,20 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   const [groupBy, setGroupBy] = useState("variant");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [unavailDrafts, setUnavailDrafts] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (receivingRequested) setTab("receiving");
+  }, [receivingRequested]);
+
+  function selectTab(next: Tab) {
+    setTab(next);
+    const base = urls.storePurchasing(storeId);
+    if (next === "receiving") {
+      router.replace(`${base}?tab=receiving`, { scroll: false });
+    } else if (receivingRequested) {
+      router.replace(base, { scroll: false });
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [receiving, setReceiving] = useState<
@@ -171,7 +189,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
           lines: bodyLines,
         },
       });
-      setTab("receiving");
+      selectTab("receiving");
       await load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Receiving create failed.");
@@ -216,7 +234,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
           <button
             key={t}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => selectTab(t)}
             className={
               tab === t
                 ? "rounded-md bg-ink px-4 py-2 text-sm font-semibold text-foreground-inverse"
@@ -414,7 +432,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                       variant="outline"
                       onClick={() => {
                         setBatchId(e.batch_id);
-                        setTab("requirements");
+                        selectTab("requirements");
                       }}
                     >
                       Open

@@ -166,31 +166,48 @@ Compact dashboard actions **may** be pill; not everything is pill.
 
 | Surface | Spec |
 | --- | --- |
-| Sidebar | **232px**, solid white, fixed, padding 16, subtle right border — **no glass** |
+| Sidebar | **224px** (collapsed **64px** on tablet), solid white, fixed, horizontal pad 12, subtle right border `#E5E7EB` — **no glass** |
 | Workspace | Cloud White `#F5F6FA`, padding 32 |
 | Overview content | max width **1120px** (`max-w-overview`) |
 | Ops pages | full dashboard width; tables stay dense |
-| Top bar | Minimal; solid white; notifications — no heavy translucent blur |
+| Top bar | **60px**, solid white, sticky; contextual tabs left + Messages/Notifications right — single row, no second header |
 
 Validate: **375, 390, 768, 1024, 1440** — no horizontal overflow.
 
 ---
 
-## 12. Sidebar Navigation
+## 12. Hybrid Navigation
 
-BMC-like composition: logo → store switcher → View store → grouped nav → Connie entry → Settings → account.
+**Sidebar for primary activities. Horizontal tabs for contextual features.**
 
-| Group | Items (live when implemented) |
-| --- | --- |
-| **Workspace** | Overview, Notifications, Analytics |
-| **Operations** | Orders, Purchasing, Packing*, Shipments*, Payments |
-| **Relationships** | Customers, Vendors, Team |
-| **Manage** | Catalog, Campaigns, Preorders, Storefront, Business Rules, Settings |
+SSOT: `apps/web/src/components/dashboard/nav-config.ts` (`PRIMARY_WORKSPACES`, `SETTINGS_WORKSPACE`, match helpers).
 
-\*Hidden until built (`implemented: false` in `nav-config.ts`).
+### Sidebar (top → bottom)
 
-Nav items: height 40px, 12px horizontal pad, 20px icons stroke ~1.75, radius 10.  
-**Active:** `#F0F1F3` background, ink text, selective orange icon — **not** a solid orange row.
+Logo → store switcher → View store → divider → **7 primary items** → flex space → Connie (compact) → Settings → My Account dropdown.
+
+No Workspace / Operations / Relationships / Manage group labels. No accordion / expandable submenus.
+
+| Primary | Default route | Contextual tabs (implemented only) |
+| --- | --- | --- |
+| Overview | `/overview` | Summary, Analytics |
+| Orders | `/orders` | All Orders, Preorders, Live Shopping, Payments |
+| Fulfillment | `/purchasing` | Purchasing, Receiving (`?tab=receiving`), Packing, Shipments, Vendors |
+| Products | `/products` | All Products, Catalogs · Attributes\* |
+| Campaigns | `/campaigns` | All / Active (`?status=active`) / Completed (`?status=completed`) |
+| Customers | `/customers` | All Customers · Store Credit\* |
+| Storefront | `/storefront` | Appearance, Content (`?tab=content`), Preview (`?tab=preview`) |
+
+\*Hidden until built (`implemented: false`).
+
+**Settings** (utility): General, Team, Business Rules, Payment Settings, WhatsApp Templates (`/messages`).  
+**Header utilities:** Messages, Notifications (Search omitted until implemented). Connie: 44px peach gradient, Coming Soon — no AI backend.
+
+Nav items: height 40px, gap 4, radius 10, icons 20px stroke ~1.75, label 14/500.  
+**Active:** `#F0F1F3` bg, `#15191E` text (600), icon `#FF3D00` — **not** a solid orange row.  
+**Tabs:** 14px, active 600 + 2px `#FF3D00` bottom indicator; inactive `#626975`.
+
+**Responsive:** desktop full sidebar; tablet collapsed icon rail + tooltips; mobile drawer; tabs scroll horizontally, single row.
 
 ---
 
@@ -280,7 +297,7 @@ Skeletons (`Skeleton` / `TableSkeleton`) matching final layout density. Respect 
 
 ## 23. Responsive
 
-Mobile: drawer nav (`MobileNav` + `Sheet`), stacked headers, full-width tables that scroll horizontally when needed. Desktop: 232px sidebar + cloud workspace.
+Mobile: drawer nav (`MobileNav` + `Sheet`), contextual tabs in sticky header (horizontal scroll), Messages/Notifications in header. Tablet: 64px collapsed sidebar. Desktop: 224px sidebar + cloud workspace.
 
 ---
 
@@ -325,10 +342,11 @@ Prefer typecheck, lint, build, and targeted unit/API tests. No full Playwright s
 ## 29. Acceptance
 
 - [x] Visibly BMC-simple with Pikko orange — not a mere recolor of soft-gradient shell
-- [x] White 232px sidebar; Cloud White workspace; no glass foundation
+- [x] White 224px sidebar (64px collapsed); Cloud White workspace; no glass foundation
+- [x] Hybrid nav: 7 primary workspaces + contextual header tabs
 - [x] Primary buttons Ink Black; brand orange selective
 - [x] Overview is vertical hierarchy (not four KPI cards)
-- [x] Connie is visual entry only
+- [x] Connie is compact visual entry only
 - [x] Unimplemented nav remains hidden
 - [x] No API/DB/auth/RBAC/workflow regressions
 - [x] `docs/DESIGN_SYSTEM.md` matches this authority

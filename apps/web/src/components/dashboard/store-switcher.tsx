@@ -15,9 +15,11 @@ function initial(name: string) {
 export function StoreSwitcher({
   stores,
   current,
+  compact = false,
 }: {
   stores: Store[];
   current?: Store | null;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const active = current || stores[0];
@@ -27,20 +29,30 @@ export function StoreSwitcher({
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-3 rounded-md border border-border bg-background px-3 py-2 text-left hover:bg-background-subtle"
+          title={compact ? active?.name || "Select store" : undefined}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-md border border-border bg-background text-left hover:bg-background-subtle",
+            compact ? "justify-center px-0 py-2" : "px-3 py-2",
+          )}
         >
           <span className="flex h-8 w-8 items-center justify-center rounded-md bg-surface text-sm font-medium text-foreground">
             {active ? initial(active.name) : "?"}
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-foreground">
-              {active?.name || "Select store"}
-            </span>
-            {active ? (
-              <span className="block truncate text-xs text-foreground-muted">{active.slug}</span>
-            ) : null}
-          </span>
-          <ChevronsUpDown className="h-4 w-4 text-foreground-muted" strokeWidth={1.75} />
+          {!compact ? (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {active?.name || "Select store"}
+                </span>
+                {active ? (
+                  <span className="block truncate text-xs text-foreground-muted">{active.slug}</span>
+                ) : null}
+              </span>
+              <ChevronsUpDown className="h-4 w-4 text-foreground-muted" strokeWidth={1.75} />
+            </>
+          ) : (
+            <span className="sr-only">{active?.name || "Select store"}</span>
+          )}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

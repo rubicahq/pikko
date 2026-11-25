@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   apiFetch,
   apiUpload,
@@ -14,6 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { urls } from "@/lib/urls";
 
+type Section = "appearance" | "content" | "preview";
+
+/** Survive soft remounts when contextual tabs only change ?tab= */
+const draftCache = new Map<string, StorefrontConfig>();
+
+function sectionFromSearch(raw: string | null): Section {
+  if (raw === "content" || raw === "preview") return raw;
+  return "appearance";
+}
+
 export function StorefrontEditor({
   store,
   draft,
@@ -24,7 +34,9 @@ export function StorefrontEditor({
   themes: Theme[];
 }) {
   const router = useRouter();
-  const [cfg, setCfg] = useState(draft);
+  const searchParams = useSearchParams();
+  const section = sectionFromSearch(searchParams.get("tab"));
+  const [cfg, setCfg] = useState(() => draftCache.get(store.id) || draft);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,6 +54,7 @@ export function StorefrontEditor({
         `/api/v1/stores/${store.id}/storefront`,
         { method: "PATCH", body },
       );
+      draftCache.set(store.id, res.storefront);
       setCfg(res.storefront);
       setMessage("Draft saved.");
       router.refresh();
@@ -50,6 +63,14 @@ export function StorefrontEditor({
     } finally {
       setSaving(false);
     }
+  }
+
+  function updateCfg(next: StorefrontConfig | ((prev: StorefrontConfig) => StorefrontConfig)) {
+    setCfg((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      draftCache.set(store.id, value);
+      return value;
+    });
   }
 
   async function uploadAsset(purpose: "logo" | "favicon" | "store_icon", file: File) {
@@ -85,160 +106,206 @@ export function StorefrontEditor({
     }
   }
 
-  return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-[30px] font-medium text-foreground">Storefront</h1>
-          <p className="mt-2 text-sm text-foreground-secondary">
-            Edit the draft. Publish when you are ready — live customers only see published config.
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="theme">Theme</Label>
-          <select
-            id="theme"
-            className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
-            value={cfg.theme_id}
-            onChange={(e) => patch({ theme_id: e.target.value })}
-          >
-            {themes.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-3 gap-3">
-          {(
-            [
-              ["background_color", "Background"],
-              ["text_color", "Text"],
-              ["primary_color", "Primary"],
-            ] as const
-          ).map(([key, label]) => (
-            <div key={key} className="space-y-2">
-              <Label htmlFor={key}>{label}</Label>
-              <Input
-                id={key}
-                type="color"
-                value={cfg[key]}
-                onChange={(e) => setCfg((c) => ({ ...c, [key]: e.target.value.toUpperCase() }))}
-                onBlur={(e) => patch({ [key]: e.target.value.toUpperCase() })}
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">Store description</Label>
-          <textarea
-            id="description"
-            className="min-h-24 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-            value={cfg.description || ""}
-            onChange={(e) => setCfg((c) => ({ ...c, description: e.target.value }))}
-            onBlur={(e) => patch({ description: e.target.value })}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="contact_email">Contact email</Label>
-          <Input
-            id="contact_email"
-            type="email"
-            value={cfg.contact_email || ""}
-            onChange={(e) => setCfg((c) => ({ ...c, contact_email: e.target.value }))}
-            onBlur={(e) => patch({ contact_email: e.target.value })}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="whatsapp">WhatsApp</Label>
-          <Input
-            id="whatsapp"
-            value={cfg.whatsapp || ""}
-            onChange={(e) => setCfg((c) => ({ ...c, whatsapp: e.target.value }))}
-            onBlur={(e) => patch({ whatsapp: e.target.value })}
-          />
-        </div>
-
-        {(
-          [
-            ["logo", "Logo"],
-            ["favicon", "Favicon"],
-            ["store_icon", "Store icon"],
-          ] as const
-        ).map(([purpose, label]) => (
-          <div key={purpose} className="space-y-2">
-            <Label htmlFor={purpose}>{label}</Label>
-            <Input
-              id={purpose}
-              type="file"
-              accept={
-                purpose === "favicon"
-                  ? "image/png,image/x-icon,image/svg+xml,image/webp"
-                  : "image/png,image/jpeg,image/webp,image/svg+xml"
-              }
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                  await uploadAsset(purpose, file);
-                } catch (err) {
-                  setError(err instanceof Error ? err.message : "Upload failed.");
-                }
-              }}
-            />
-          </div>
-        ))}
-
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" loading={saving} onClick={() => publish()}>
-            Publish storefront
-          </Button>
-          <Button type="button" variant="outline" asChild>
-            <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
-              Open live storefront
-            </a>
-          </Button>
-        </div>
-        {message && <p className="text-sm text-success">{message}</p>}
-        {error && <p className="text-sm text-error">{error}</p>}
+  const previewPane = (
+    <div
+      className="rounded-lg border border-border p-6"
+      style={{
+        background: cfg.background_color,
+        color: cfg.text_color,
+        borderColor: cfg.border_color || theme?.border_color,
+      }}
+    >
+      <p className="text-xs uppercase tracking-wide opacity-70">Draft preview</p>
+      <div className="mt-4 flex items-center gap-3">
+        {cfg.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={cfg.logo_url} alt="" className="h-10 w-auto" />
+        ) : (
+          <span className="text-2xl font-medium">{store.name}</span>
+        )}
       </div>
-
-      <div
-        className="rounded-lg border border-border p-6"
+      <p className="mt-4 max-w-md text-sm opacity-80">
+        {cfg.description || "Your store description appears here."}
+      </p>
+      <button
+        type="button"
+        className="mt-6 rounded-md px-4 py-2 text-sm font-medium"
         style={{
-          background: cfg.background_color,
-          color: cfg.text_color,
-          borderColor: cfg.border_color || theme?.border_color,
+          background: cfg.primary_color,
+          color: cfg.button_foreground || "#15191E",
         }}
       >
-        <p className="text-xs uppercase tracking-wide opacity-70">Draft preview</p>
-        <div className="mt-4 flex items-center gap-3">
-          {cfg.logo_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={cfg.logo_url} alt="" className="h-10 w-auto" />
-          ) : (
-            <span className="text-2xl font-medium">{store.name}</span>
-          )}
+        Shop now
+      </button>
+    </div>
+  );
+
+  return (
+    <div
+      className={
+        section === "preview"
+          ? "space-y-6"
+          : "grid gap-8 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]"
+      }
+    >
+      {section !== "preview" ? (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-[30px] font-medium text-foreground">
+              {section === "content" ? "Storefront content" : "Storefront appearance"}
+            </h1>
+            <p className="mt-2 text-sm text-foreground-secondary">
+              Edit the draft. Publish when you are ready — live customers only see published config.
+            </p>
+          </div>
+
+          {section === "appearance" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="theme">Theme</Label>
+                <select
+                  id="theme"
+                  className="h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
+                  value={cfg.theme_id}
+                  onChange={(e) => patch({ theme_id: e.target.value })}
+                >
+                  {themes.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {(
+                  [
+                    ["background_color", "Background"],
+                    ["text_color", "Text"],
+                    ["primary_color", "Primary"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="space-y-2">
+                    <Label htmlFor={key}>{label}</Label>
+                    <Input
+                      id={key}
+                      type="color"
+                      value={cfg[key]}
+                      onChange={(e) =>
+                        updateCfg((c) => ({ ...c, [key]: e.target.value.toUpperCase() }))
+                      }
+                      onBlur={(e) => patch({ [key]: e.target.value.toUpperCase() })}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {(
+                [
+                  ["logo", "Logo"],
+                  ["favicon", "Favicon"],
+                  ["store_icon", "Store icon"],
+                ] as const
+              ).map(([purpose, label]) => (
+                <div key={purpose} className="space-y-2">
+                  <Label htmlFor={purpose}>{label}</Label>
+                  <Input
+                    id={purpose}
+                    type="file"
+                    accept={
+                      purpose === "favicon"
+                        ? "image/png,image/x-icon,image/svg+xml,image/webp"
+                        : "image/png,image/jpeg,image/webp,image/svg+xml"
+                    }
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        await uploadAsset(purpose, file);
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : "Upload failed.");
+                      }
+                    }}
+                  />
+                </div>
+              ))}
+            </>
+          ) : null}
+
+          {section === "content" ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="description">Store description</Label>
+                <textarea
+                  id="description"
+                  className="min-h-24 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  value={cfg.description || ""}
+                  onChange={(e) => updateCfg((c) => ({ ...c, description: e.target.value }))}
+                  onBlur={(e) => patch({ description: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="contact_email">Contact email</Label>
+                <Input
+                  id="contact_email"
+                  type="email"
+                  value={cfg.contact_email || ""}
+                  onChange={(e) => updateCfg((c) => ({ ...c, contact_email: e.target.value }))}
+                  onBlur={(e) => patch({ contact_email: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp</Label>
+                <Input
+                  id="whatsapp"
+                  value={cfg.whatsapp || ""}
+                  onChange={(e) => updateCfg((c) => ({ ...c, whatsapp: e.target.value }))}
+                  onBlur={(e) => patch({ whatsapp: e.target.value })}
+                />
+              </div>
+            </>
+          ) : null}
+
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" loading={saving} onClick={() => publish()}>
+              Publish storefront
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
+                Open live storefront
+              </a>
+            </Button>
+          </div>
+          {message && <p className="text-sm text-success">{message}</p>}
+          {error && <p className="text-sm text-error">{error}</p>}
         </div>
-        <p className="mt-4 max-w-md text-sm opacity-80">
-          {cfg.description || "Your store description appears here."}
-        </p>
-        <button
-          type="button"
-          className="mt-6 rounded-md px-4 py-2 text-sm font-medium"
-          style={{
-            background: cfg.primary_color,
-            color: cfg.button_foreground || "#15191E",
-          }}
-        >
-          Shop now
-        </button>
-      </div>
+      ) : (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-[30px] font-medium text-foreground">Storefront preview</h1>
+            <p className="mt-2 text-sm text-foreground-secondary">
+              Draft preview below. Publishing is explicit — switching tabs never publishes.
+            </p>
+          </div>
+          {previewPane}
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" loading={saving} onClick={() => publish()}>
+              Publish storefront
+            </Button>
+            <Button type="button" variant="outline" asChild>
+              <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
+                Open live storefront
+              </a>
+            </Button>
+          </div>
+          {message && <p className="text-sm text-success">{message}</p>}
+          {error && <p className="text-sm text-error">{error}</p>}
+        </div>
+      )}
+
+      {section !== "preview" ? previewPane : null}
     </div>
   );
 }

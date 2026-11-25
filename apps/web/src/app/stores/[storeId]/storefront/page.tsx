@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSession, getStore, getStorefront, getThemes } from "@/lib/server-api";
 import { StorefrontEditor } from "@/components/storefront/storefront-editor";
@@ -18,5 +19,9 @@ export default async function StorefrontPage({
   ]);
   if (!store || !draft) redirect(urls.stores());
 
-  return <StorefrontEditor store={store} draft={draft} themes={themes} />;
+  return (
+    <Suspense fallback={null}>
+      <StorefrontEditor store={store} draft={draft} themes={themes} />
+    </Suspense>
+  );
 }

@@ -221,14 +221,14 @@ function PreviewBody() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-section">Nav IA (live groups)</h2>
+        <h2 className="text-section">Hybrid nav (live workspaces)</h2>
         <Card>
-          <CardTitle>PRD §6 grouping</CardTitle>
+          <CardTitle>Primary + utility</CardTitle>
           <CardDescription>
-            Unimplemented modules are omitted from the merchant shell.
+            Seven workspaces + Settings. Unimplemented tabs stay hidden.
           </CardDescription>
           <Separator className="my-4" />
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             {nav.map((group) => (
               <div key={group.id}>
                 <p className="text-label uppercase tracking-wide text-foreground-muted">{group.label}</p>
