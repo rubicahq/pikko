@@ -63,6 +63,27 @@ export function storefrontOrigin(): string {
   return `https://shop.${domain}`;
 }
 
+/** Tim Pikko HQ BO origin (hq.pikko.site) — not the merchant dashboard. */
+export function hqOrigin(): string {
+  const fromEnv = process.env.NEXT_PUBLIC_HQ_URL || process.env.HQ_URL;
+  if (fromEnv) return trimSlash(fromEnv);
+  const domain = appBaseDomain();
+  if (domain === "localhost") return "http://localhost:3000";
+  return `https://hq.${domain}`;
+}
+
+export function isHQHost(host: string): boolean {
+  const h = host.split(":")[0].toLowerCase();
+  try {
+    const hq = new URL(hqOrigin()).hostname.toLowerCase();
+    if (h === hq) return true;
+  } catch {
+    /* fall through */
+  }
+  const domain = appBaseDomain();
+  return domain !== "localhost" && h === `hq.${domain}`;
+}
+
 /** Host label shown in onboarding slug preview (no scheme). */
 export function storefrontHost(): string {
   return hostFromURL(

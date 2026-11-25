@@ -9,10 +9,11 @@ import (
 // Generator centralizes all absolute URL construction (PRD §7).
 // Business logic stores relative paths / identifiers only.
 type Generator struct {
-	Marketing     string
-	Dashboard     string
+	Marketing      string
+	Dashboard      string
 	StorefrontBase string
-	API           string
+	HQ             string
+	API            string
 }
 
 func New(marketing, dashboard, storefront, api string) *Generator {
@@ -22,6 +23,12 @@ func New(marketing, dashboard, storefront, api string) *Generator {
 		StorefrontBase: strings.TrimRight(storefront, "/"),
 		API:            strings.TrimRight(api, "/"),
 	}
+}
+
+// WithHQ sets the Tim Pikko HQ origin (hq.pikko.site).
+func (g *Generator) WithHQ(hq string) *Generator {
+	g.HQ = strings.TrimRight(hq, "/")
+	return g
 }
 
 func (g *Generator) MarketingHome() string { return g.Marketing + "/" }
@@ -91,6 +98,23 @@ func (g *Generator) PortalDashboard(storeSlug string) string {
 
 func (g *Generator) MagicLink(token string) string {
 	return g.AuthConfirm(token)
+}
+
+func (g *Generator) HQAuthEnter() string { return g.hqBase() + "/auth" }
+func (g *Generator) HQAuthConfirm(token string) string {
+	return g.hqBase() + "/auth/confirm?token=" + url.QueryEscape(token)
+}
+func (g *Generator) HQHome() string { return g.hqBase() + "/" }
+
+func (g *Generator) MagicLinkHQ(token string) string {
+	return g.HQAuthConfirm(token)
+}
+
+func (g *Generator) hqBase() string {
+	if g.HQ != "" {
+		return g.HQ
+	}
+	return g.Dashboard
 }
 
 func (g *Generator) TeamInvite(token string) string {

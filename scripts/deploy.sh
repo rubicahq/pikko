@@ -307,6 +307,9 @@ if (( DO_PULL )); then
 fi
 NEW_SHA="$(git rev-parse HEAD)"
 log "sha ${OLD_SHA:0:7} → ${NEW_SHA:0:7}"
+# Surface measured deploy version in HQ System Health (never invent when unset).
+export DEPLOY_VERSION="${DEPLOY_VERSION:-$NEW_SHA}"
+log "DEPLOY_VERSION=${DEPLOY_VERSION:0:12}"
 
 DIFF="$(paths_changed "$OLD_SHA" "$NEW_SHA")"
 plan_services "$DIFF"
@@ -409,7 +412,7 @@ load_surface_urls_from_env() {
     key="${line%%=*}"
     val="${line#*=}"
     case "$key" in
-      MARKETING_URL|DASHBOARD_URL|STOREFRONT_URL|API_BASE_URL|APP_BASE_DOMAIN)
+      MARKETING_URL|DASHBOARD_URL|STOREFRONT_URL|HQ_URL|API_BASE_URL|APP_BASE_DOMAIN)
         val="${val%$'\r'}"
         if [[ "$val" == \"*\" ]]; then val="${val:1:${#val}-2}"; fi
         if [[ "$val" == \'*\' ]]; then val="${val:1:${#val}-2}"; fi

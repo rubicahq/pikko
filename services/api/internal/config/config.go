@@ -15,7 +15,9 @@ type Config struct {
 	MarketingURL  string
 	DashboardURL  string
 	StorefrontURL string
+	HQURL         string
 	APIBaseURL    string
+	DeployVersion string
 	DefaultLocale string
 	DefaultTZ     string
 	DefaultCurr   string
@@ -94,7 +96,9 @@ func Load() (*Config, error) {
 		MarketingURL:  marketing,
 		DashboardURL:  getenv("DASHBOARD_URL", "http://localhost:3000"),
 		StorefrontURL: getenv("STOREFRONT_URL", "http://localhost:3000"),
+		HQURL:         getenv("HQ_URL", "http://localhost:3000"),
 		APIBaseURL:    getenv("API_BASE_URL", "http://localhost:8080"),
+		DeployVersion: firstNonEmpty(os.Getenv("DEPLOY_VERSION"), os.Getenv("GIT_SHA"), os.Getenv("SOURCE_VERSION")),
 		DefaultLocale: getenv("APP_DEFAULT_LOCALE", "id-ID"),
 		DefaultTZ:     getenv("APP_DEFAULT_TIMEZONE", "Asia/Jakarta"),
 		DefaultCurr:   getenv("APP_DEFAULT_CURRENCY", "IDR"),
@@ -169,6 +173,7 @@ func Load() (*Config, error) {
 			c.DashboardURL,
 			c.MarketingURL,
 			c.StorefrontURL,
+			c.HQURL,
 		}, ",")
 	}
 	c.CORSOrigins = splitCSV(getenv("API_CORS_ORIGINS", corsDefault))

@@ -62,6 +62,19 @@ type RequestResult struct {
 }
 
 func (s *Service) RequestMagicLink(ctx context.Context, rawEmail, ip, ua string) (*RequestResult, error) {
+	return s.requestMagicLink(ctx, rawEmail, ip, ua, func(raw string) string {
+		return s.URLs.MagicLink(raw)
+	})
+}
+
+// RequestMagicLinkHQ sends a magic link that confirms on the HQ host.
+func (s *Service) RequestMagicLinkHQ(ctx context.Context, rawEmail, ip, ua string) (*RequestResult, error) {
+	return s.requestMagicLink(ctx, rawEmail, ip, ua, func(raw string) string {
+		return s.URLs.MagicLinkHQ(raw)
+	})
+}
+
+func (s *Service) requestMagicLink(ctx context.Context, rawEmail, ip, ua string, confirm func(raw string) string) (*RequestResult, error) {
 	display, normalized, ok := validate.NormalizeEmail(rawEmail)
 	if !ok {
 		return nil, ErrInvalidEmail
@@ -111,7 +124,7 @@ func (s *Service) RequestMagicLink(ctx context.Context, rawEmail, ip, ua string)
 		return nil, err
 	}
 
-	confirmURL := s.URLs.MagicLink(raw)
+	confirmURL := confirm(raw)
 	subject, html, text := email.MagicLinkContent(s.Cfg.EmailFromName, confirmURL, int(s.Cfg.MagicLinkTTL.Minutes()))
 	msg := email.Message{
 		TemplateKey:     "magic_link",

@@ -31,6 +31,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/storefront"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
+	"github.com/rubicahq/pikko/services/api/internal/syshealth"
 	"github.com/rubicahq/pikko/services/api/internal/team"
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 	"github.com/rubicahq/pikko/services/api/internal/whatsapp"
@@ -46,12 +47,34 @@ type Deps struct {
 	Renderer pdfutil.Renderer
 }
 
+// RouterExtras exposes background helpers started by cmd/api (not by tests).
+type RouterExtras struct {
+	Health  *syshealth.Service
+	Checker *syshealth.Checker
+	Alerter *syshealth.Alerter
+}
+
 // NewRouter builds the HTTP handler and an optional background job worker.
 func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
-	urlGen := urls.New(d.Cfg.MarketingURL, d.Cfg.DashboardURL, d.Cfg.StorefrontURL, d.Cfg.APIBaseURL)
+	h, w, _ := NewRouterWithExtras(d)
+	return h, w
+}
+
+func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
+	urlGen := urls.New(d.Cfg.MarketingURL, d.Cfg.DashboardURL, d.Cfg.StorefrontURL, d.Cfg.APIBaseURL).WithHQ(d.Cfg.HQURL)
 	mailSender := email.NewSender(d.Cfg.EmailMode, d.Cfg.BrevoAPIKey, d.Logger)
 	mailSvc := &email.Service{DB: d.DB, Sender: mailSender, Logger: d.Logger, DefaultFromName: d.Cfg.EmailFromName}
 	authSvc := &auth.Service{DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger}
+	healthSvc := &syshealth.Service{
+		DB: d.DB, Logger: d.Logger, DeployVersion: d.Cfg.DeployVersion, Environment: d.Cfg.AppEnv,
+	}
+	healthChecker := &syshealth.Checker{DB: d.DB, Cfg: d.Cfg, Storage: d.Storage, Health: healthSvc}
+	healthAlerter := &syshealth.Alerter{
+		Health: healthSvc, Email: mailSvc,
+		From: d.Cfg.EmailNotificationFrom, FromName: d.Cfg.EmailFromName,
+	}
+	hqH := &HQHandlers{Auth: authSvc, Health: healthSvc, Checker: healthChecker, Alerter: healthAlerter, Cfg: d.Cfg}
+	hqMW := &HQAuthMiddleware{Auth: authSvc, Health: healthSvc, Cfg: d.Cfg}
 	storeSvc := &stores.Service{DB: d.DB, Cfg: d.Cfg}
 	accountSvc := &account.Service{DB: d.DB}
 	storefrontSvc := &storefront.Service{DB: d.DB}
@@ -135,6 +158,28 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("POST /api/v1/auth/magic-link/verify", authH.VerifyMagicLink)
 	mux.HandleFunc("GET /api/v1/auth/session", authH.Session)
 	mux.HandleFunc("POST /api/v1/auth/logout", authH.Logout)
+
+	// HQ BO (Tim Pikko) — separate from merchant dashboard
+	mux.HandleFunc("POST /api/v1/hq/auth/magic-link/request", hqH.RequestMagicLink)
+	mux.HandleFunc("GET /api/v1/hq/auth/magic-link/peek", hqH.PeekMagicLink)
+	mux.HandleFunc("POST /api/v1/hq/auth/magic-link/verify", hqH.VerifyMagicLink)
+	mux.HandleFunc("GET /api/v1/hq/auth/session", hqH.Session)
+	mux.HandleFunc("POST /api/v1/hq/auth/logout", hqH.Logout)
+	hqAuthed := func(fn http.HandlerFunc) http.Handler { return hqMW.Require(fn) }
+	mux.Handle("GET /api/v1/hq/system-health/overview", hqAuthed(hqH.Overview))
+	mux.Handle("GET /api/v1/hq/system-health/issues", hqAuthed(hqH.ListIssues))
+	mux.Handle("GET /api/v1/hq/system-health/issues/{issueID}", hqAuthed(hqH.GetIssue))
+	mux.Handle("PATCH /api/v1/hq/system-health/issues/{issueID}", hqAuthed(hqH.PatchIssue))
+	mux.Handle("GET /api/v1/hq/system-health/jobs/stats", hqAuthed(hqH.JobStats))
+	mux.Handle("GET /api/v1/hq/system-health/jobs", hqAuthed(hqH.ListJobs))
+	mux.Handle("GET /api/v1/hq/system-health/jobs/{jobID}", hqAuthed(hqH.GetJob))
+	mux.Handle("POST /api/v1/hq/system-health/jobs/{jobID}/retry", hqAuthed(hqH.RetryJob))
+	mux.Handle("GET /api/v1/hq/system-health/services", hqAuthed(hqH.ListServices))
+	mux.Handle("GET /api/v1/hq/system-health/usage", hqAuthed(hqH.Usage))
+	mux.Handle("GET /api/v1/hq/system-health/alerts/rules", hqAuthed(hqH.ListAlertRules))
+	mux.Handle("PATCH /api/v1/hq/system-health/alerts/rules/{ruleID}", hqAuthed(hqH.PatchAlertRule))
+	mux.Handle("GET /api/v1/hq/system-health/alerts/events", hqAuthed(hqH.ListAlertEvents))
+	mux.Handle("POST /api/v1/hq/system-health/alerts/evaluate", hqAuthed(hqH.EvaluateAlerts))
 
 	// Authenticated
 	mux.Handle("POST /api/v1/auth/logout-all", authMW.Require(http.HandlerFunc(authH.LogoutAll)))
@@ -468,15 +513,27 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 			},
 		},
 		Interval: 400 * time.Millisecond,
+		OnFailure: func(ctx context.Context, job *jobs.Job, failErr error) {
+			sev := syshealth.SeverityError
+			msg := "job failed"
+			if failErr != nil {
+				msg = failErr.Error()
+			}
+			healthSvc.Record(ctx, syshealth.Event{
+				Source: "worker", Severity: sev, Module: job.JobType, ErrorCode: "job_failed",
+				Message: msg, StoreID: job.StoreID,
+				Context: map[string]any{"job_id": job.ID.String(), "attempts": job.Attempts},
+			})
+		},
 	}
 
 	var handler http.Handler = mux
 	handler = IPRateLimitMiddleware(d.DB, d.Cfg)(handler)
 	handler = SecurityHeaders(d.Cfg)(handler)
 	handler = CORSMiddleware(d.Cfg)(handler)
-	handler = AccessLogMiddleware(d.Logger)(handler)
+	handler = AccessLogMiddlewareWithHealth(d.Logger, healthSvc)(handler)
 	handler = RequestIDMiddleware(handler)
-	return handler, worker
+	return handler, worker, RouterExtras{Health: healthSvc, Checker: healthChecker, Alerter: healthAlerter}
 }
 
 func uuidLike() string {

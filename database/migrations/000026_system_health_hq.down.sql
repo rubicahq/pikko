@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS hq_admin_audit;
+DROP TABLE IF EXISTS ai_usage_events;
+DROP TABLE IF EXISTS hq_alert_events;
+DROP TABLE IF EXISTS hq_alert_rules;
+DROP TABLE IF EXISTS system_service_checks;
+DROP TABLE IF EXISTS api_latency_samples;
+DROP TABLE IF EXISTS api_metric_minutes;
+DROP TABLE IF EXISTS system_error_occurrences;
+DROP TABLE IF EXISTS system_error_issues;
+DROP TABLE IF EXISTS hq_admins;

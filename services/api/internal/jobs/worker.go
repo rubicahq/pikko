@@ -26,6 +26,7 @@ type Worker struct {
 	Types      []string
 	Handlers   map[string]Handler
 	Interval   time.Duration
+	OnFailure  func(ctx context.Context, job *Job, err error)
 	syncEvery  int
 	tickCount  int
 }
@@ -84,6 +85,9 @@ func (w *Worker) tick(ctx context.Context) {
 			w.Logger.Error("job_failed", "job_id", job.ID, "type", job.JobType, "error", err)
 		}
 		_ = w.Queue.Fail(ctx, job.ID, err.Error(), 10*time.Second)
+		if w.OnFailure != nil {
+			w.OnFailure(ctx, job, err)
+		}
 		return
 	}
 	_ = w.Queue.Complete(ctx, job.ID)

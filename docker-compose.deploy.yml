@@ -27,7 +27,9 @@ services:
       MARKETING_URL: ${MARKETING_URL:-https://pikko.site}
       DASHBOARD_URL: ${DASHBOARD_URL:-https://app.pikko.site}
       STOREFRONT_URL: ${STOREFRONT_URL:-https://shop.pikko.site}
+      HQ_URL: ${HQ_URL:-https://hq.pikko.site}
       API_BASE_URL: ${API_BASE_URL:-https://api.pikko.site}
+      DEPLOY_VERSION: ${DEPLOY_VERSION:-}
       DATABASE_URL: postgres://${POSTGRES_USER:-pikko}:${POSTGRES_PASSWORD}@pikko-postgres:5432/${POSTGRES_DB:-pikko}?sslmode=disable
       EMAIL_MODE: ${EMAIL_MODE:-log}
       BREVO_API_KEY: ${BREVO_API_KEY:-}
@@ -44,7 +46,7 @@ services:
       AUTH_RATE_LIMIT_IP_PER_HOUR: ${AUTH_RATE_LIMIT_IP_PER_HOUR:-20}
       API_RATE_LIMIT_IP_PER_HOUR: ${API_RATE_LIMIT_IP_PER_HOUR:-1200}
       API_ADDR: ":8080"
-      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-https://app.pikko.site,https://pikko.site,https://shop.pikko.site}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-https://app.pikko.site,https://pikko.site,https://shop.pikko.site,https://hq.pikko.site}
       STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
       STORAGE_LOCAL_PATH: /data/storage
       AI_API_KEY: ${AI_API_KEY:-}
@@ -70,6 +72,7 @@ services:
         NEXT_PUBLIC_MARKETING_URL: ${NEXT_PUBLIC_MARKETING_URL:-https://pikko.site}
         NEXT_PUBLIC_DASHBOARD_URL: ${NEXT_PUBLIC_DASHBOARD_URL:-https://app.pikko.site}
         NEXT_PUBLIC_STOREFRONT_URL: ${NEXT_PUBLIC_STOREFRONT_URL:-https://shop.pikko.site}
+        NEXT_PUBLIC_HQ_URL: ${NEXT_PUBLIC_HQ_URL:-https://hq.pikko.site}
         NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-}
         NEXT_PUBLIC_API_BASE_URL: ""
     environment:
@@ -79,6 +82,8 @@ services:
       AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-pikko_session}
       LEGACY_BASE_DOMAIN: ${LEGACY_BASE_DOMAIN:-}
       APP_BASE_DOMAIN: ${APP_BASE_DOMAIN:-pikko.site}
+      HQ_URL: ${HQ_URL:-https://hq.pikko.site}
+      NEXT_PUBLIC_HQ_URL: ${NEXT_PUBLIC_HQ_URL:-https://hq.pikko.site}
     ports:
       - "127.0.0.1:3100:3000"
     mem_limit: 512m

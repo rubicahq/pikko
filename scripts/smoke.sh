@@ -19,6 +19,7 @@ PUBLIC_API_URL="${SMOKE_PUBLIC_API_URL:-${API_BASE_URL:-https://api.pikko.site}}
 PUBLIC_MARKETING_URL="${SMOKE_PUBLIC_MARKETING_URL:-${MARKETING_URL:-https://pikko.site}}"
 PUBLIC_APP_URL="${SMOKE_PUBLIC_APP_URL:-${DASHBOARD_URL:-https://app.pikko.site}}"
 PUBLIC_SHOP_URL="${SMOKE_PUBLIC_SHOP_URL:-${STOREFRONT_URL:-https://shop.pikko.site}}"
+PUBLIC_HQ_URL="${SMOKE_PUBLIC_HQ_URL:-${HQ_URL:-https://hq.pikko.site}}"
 
 need() {
   local url="$1" expect="${2:-200}"
@@ -64,6 +65,15 @@ if [[ "$PUBLIC" == "1" ]]; then
     200|301|302|308) echo "[smoke] ok  ${PUBLIC_SHOP_URL%/}/ → $shop_code" ;;
     *)
       echo "[smoke] FAIL ${PUBLIC_SHOP_URL%/}/ → HTTP $shop_code" >&2
+      exit 1
+      ;;
+  esac
+  # HQ BO — auth gate may redirect to /auth; accept 200/301/302/308.
+  hq_code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${PUBLIC_HQ_URL%/}/" || echo 000)"
+  case "$hq_code" in
+    200|301|302|308) echo "[smoke] ok  ${PUBLIC_HQ_URL%/}/ → $hq_code" ;;
+    *)
+      echo "[smoke] FAIL ${PUBLIC_HQ_URL%/}/ → HTTP $hq_code" >&2
       exit 1
       ;;
   esac
