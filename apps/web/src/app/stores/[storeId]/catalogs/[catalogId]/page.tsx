@@ -67,13 +67,6 @@ export default async function CatalogDetailPage({
             <Button asChild variant="outline">
               <Link href={urls.catalogsFlipbook(storeId)}>Open flipbook</Link>
             </Button>
-            {catalog.source_import_job_id ? (
-              <Button asChild variant="outline">
-                <Link href={urls.catalogsImportJob(storeId, catalog.source_import_job_id)}>
-                  Review import
-                </Link>
-              </Button>
-            ) : null}
           </div>
         </div>
       </div>

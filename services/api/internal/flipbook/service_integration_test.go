@@ -224,8 +224,8 @@ func TestFlipbookPublishAndPublicHotspots(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
-	if rr.Code != 201 {
-		t.Fatalf("create hotspot %d %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusGone {
+		t.Fatalf("create hotspot want 410 got %d %s", rr.Code, rr.Body.String())
 	}
 
 	pubBody, _ := json.Marshal(map[string]any{"status": "published"})
@@ -254,20 +254,23 @@ func TestFlipbookPublishAndPublicHotspots(t *testing.T) {
 	}
 	var pub struct {
 		Pages []struct {
-			Hotspots []struct {
-				ProductID string `json:"product_id"`
-			} `json:"hotspots"`
+			ID       string `json:"id"`
+			ImageURL string `json:"image_url"`
+			Hotspots []any  `json:"hotspots"`
 		} `json:"pages"`
 	}
 	_ = json.Unmarshal(rr.Body.Bytes(), &pub)
-	if len(pub.Pages) < 1 || len(pub.Pages[0].Hotspots) < 1 {
-		t.Fatalf("expected public hotspot, got %+v", pub)
+	if len(pub.Pages) < 1 || pub.Pages[0].ImageURL == "" {
+		t.Fatalf("expected public page image, got %+v", pub)
+	}
+	if len(pub.Pages[0].Hotspots) > 0 {
+		t.Fatalf("etalase must omit hotspots, got %+v", pub)
 	}
 
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/flip-a/catalog/products/"+created.Product.ID, nil)
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
-	if rr.Code != 200 {
-		t.Fatalf("public hotspot product %d", rr.Code)
+	if rr.Code != http.StatusGone {
+		t.Fatalf("public hotspot product want 410 got %d", rr.Code)
 	}
 }

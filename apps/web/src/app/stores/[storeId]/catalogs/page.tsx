@@ -63,7 +63,7 @@ export default async function CatalogsPage({
         <EmptyState
           className="items-center py-16 text-center"
           title="No catalogs yet"
-          description="Upload a PDF to create a flipbook catalog with AI-extracted items."
+          description="Upload a PDF to create a display flipbook catalog."
           action={
             <Button asChild size="large">
               <Link href={urls.storeCatalogsNew(storeId)}>Add Catalog</Link>

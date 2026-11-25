@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
@@ -239,31 +238,61 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	}
 	var getResp struct {
 		Job struct {
-			Status    string `json:"status"`
-			ItemCount int    `json:"item_count"`
+			Status        string `json:"status"`
+			ItemCount     int    `json:"item_count"`
+			PageCount     *int   `json:"page_count"`
+			CatalogID     string `json:"catalog_id"`
+			ProgressStage string `json:"progress_stage"`
 		} `json:"job"`
 	}
 	_ = json.Unmarshal(rrG.Body.Bytes(), &getResp)
-	if getResp.Job.Status != "review_required" {
-		t.Fatalf("status=%s want review_required body=%s", getResp.Job.Status, rrG.Body.String())
+	if getResp.Job.Status != "completed" {
+		t.Fatalf("status=%s want completed body=%s", getResp.Job.Status, rrG.Body.String())
 	}
-	if getResp.Job.ItemCount < 1 {
-		t.Fatal("expected items")
+	if getResp.Job.ItemCount != 0 {
+		t.Fatalf("pages-only job should have 0 AI items, got %d", getResp.Job.ItemCount)
+	}
+	if getResp.Job.PageCount == nil || *getResp.Job.PageCount < 1 {
+		t.Fatal("expected page_count from PDF render")
+	}
+	if getResp.Job.CatalogID == "" {
+		t.Fatal("expected catalog_id after pages-only complete")
 	}
 
+	// AI item APIs soft-deprecated for PDF jobs
 	reqItems := httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeA.String()+"/catalog-imports/"+jobID+"/items", nil)
 	reqItems.Header.Set("Authorization", "Bearer "+tokA)
 	rrItems := httptest.NewRecorder()
 	router.ServeHTTP(rrItems, reqItems)
-	var itemsResp struct {
-		Items []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"items"`
+	if rrItems.Code != http.StatusGone {
+		t.Fatalf("items want 410 got %d %s", rrItems.Code, rrItems.Body.String())
 	}
-	_ = json.Unmarshal(rrItems.Body.Bytes(), &itemsResp)
-	if len(itemsResp.Items) < 1 {
-		t.Fatal("no items")
+
+	reqC := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeA.String()+"/catalog-imports/"+jobID+"/confirm", bytes.NewReader([]byte(`{}`)))
+	reqC.Header.Set("Authorization", "Bearer "+tokA)
+	reqC.Header.Set("Content-Type", "application/json")
+	rrC := httptest.NewRecorder()
+	router.ServeHTTP(rrC, reqC)
+	if rrC.Code != http.StatusGone {
+		t.Fatalf("confirm want 410 got %d %s", rrC.Code, rrC.Body.String())
+	}
+
+	// Pages linked for flipbook
+	reqPages := httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeA.String()+"/catalog-pages", nil)
+	reqPages.Header.Set("Authorization", "Bearer "+tokA)
+	rrPages := httptest.NewRecorder()
+	router.ServeHTTP(rrPages, reqPages)
+	if rrPages.Code != 200 {
+		t.Fatalf("pages %d %s", rrPages.Code, rrPages.Body.String())
+	}
+	var pagesResp struct {
+		Pages []struct {
+			ID string `json:"id"`
+		} `json:"pages"`
+	}
+	_ = json.Unmarshal(rrPages.Body.Bytes(), &pagesResp)
+	if len(pagesResp.Pages) < 1 {
+		t.Fatal("expected catalog pages from PDF render")
 	}
 
 	// Cross-store: B cannot read A's job
@@ -283,42 +312,10 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 		t.Fatalf("store B job lookup got %d", rrXB.Code)
 	}
 
-	// Confirm selected → draft products
-	body, _ := json.Marshal(map[string]any{"item_ids": []string{itemsResp.Items[0].ID}})
-	reqC := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeA.String()+"/catalog-imports/"+jobID+"/confirm", bytes.NewReader(body))
-	reqC.Header.Set("Authorization", "Bearer "+tokA)
-	reqC.Header.Set("Content-Type", "application/json")
-	rrC := httptest.NewRecorder()
-	router.ServeHTTP(rrC, reqC)
-	if rrC.Code != 200 {
-		t.Fatalf("confirm %d %s", rrC.Code, rrC.Body.String())
-	}
-	var conf struct {
-		CreatedCount int `json:"created_count"`
-		Job          struct {
-			Status string `json:"status"`
-		} `json:"job"`
-	}
-	_ = json.Unmarshal(rrC.Body.Bytes(), &conf)
-	if conf.CreatedCount < 1 || conf.Job.Status != "completed" {
-		t.Fatalf("confirm result %+v", conf)
-	}
-
-	// Products are draft
-	reqP := httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeA.String()+"/products?status=draft", nil)
-	reqP.Header.Set("Authorization", "Bearer "+tokA)
-	rrP := httptest.NewRecorder()
-	router.ServeHTTP(rrP, reqP)
-	bodyP, _ := io.ReadAll(rrP.Body)
-	if !bytes.Contains(bodyP, []byte("draft")) {
-		t.Fatalf("expected draft products: %s", bodyP)
-	}
-
 	_ = jobs.TypeCatalogPDFImport
 }
 
-// TestE2EB_PDFImportToPublicFlipbook covers E2E-B: PDF → extract → review/bulk →
-// confirm drafts → publish products/pages/storefront → public hotspot product.
+// TestE2EB_PDFImportToPublicFlipbook covers E2E-B: PDF → page render → publish → public etalase (no AI/hotspots).
 func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
 	pool := testPool(t)
 	defer pool.Close()
@@ -374,71 +371,26 @@ func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
 		time.Sleep(40 * time.Millisecond)
 	}
 
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID, nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	rr = httptest.NewRecorder()
+	router.ServeHTTP(rr, req)
+	var jobResp struct {
+		Job struct {
+			Status string `json:"status"`
+		} `json:"job"`
+	}
+	_ = json.Unmarshal(rr.Body.Bytes(), &jobResp)
+	if jobResp.Job.Status != "completed" {
+		t.Fatalf("job status=%s want completed", jobResp.Job.Status)
+	}
+
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/items", nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
-	var itemsResp struct {
-		Items []struct {
-			ID            string   `json:"id"`
-			Name          string   `json:"name"`
-			ConfidencePct *float64 `json:"confidence_pct"`
-			ReviewStatus  string   `json:"review_status"`
-		} `json:"items"`
-	}
-	_ = json.Unmarshal(rr.Body.Bytes(), &itemsResp)
-	if len(itemsResp.Items) < 1 {
-		t.Fatal("expected extracted items")
-	}
-	if itemsResp.Items[0].ConfidencePct == nil {
-		t.Fatal("expected confidence_pct on items")
-	}
-
-	bulkBody, _ := json.Marshal(map[string]any{"action": "accept_high_confidence"})
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/items/bulk", bytes.NewReader(bulkBody))
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	if rr.Code != 200 {
-		t.Fatalf("bulk %d %s", rr.Code, rr.Body.String())
-	}
-
-	ids := make([]string, 0, len(itemsResp.Items))
-	for _, it := range itemsResp.Items {
-		if it.Name != "" {
-			ids = append(ids, it.ID)
-		}
-	}
-	confBody, _ := json.Marshal(map[string]any{"item_ids": ids})
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/catalog-imports/"+jobID+"/confirm", bytes.NewReader(confBody))
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	rr = httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-	if rr.Code != 200 {
-		t.Fatalf("confirm %d %s", rr.Code, rr.Body.String())
-	}
-	var conf struct {
-		CreatedCount int `json:"created_count"`
-		HotspotCount int `json:"hotspot_count"`
-		ProductIDs   []string `json:"product_ids"`
-	}
-	_ = json.Unmarshal(rr.Body.Bytes(), &conf)
-	if conf.CreatedCount < 1 || len(conf.ProductIDs) < 1 {
-		t.Fatalf("confirm %+v", conf)
-	}
-
-	for _, pid := range conf.ProductIDs {
-		stBody, _ := json.Marshal(map[string]string{"status": "published"})
-		req = httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeID.String()+"/products/"+pid+"/status", bytes.NewReader(stBody))
-		req.Header.Set("Authorization", "Bearer "+tok)
-		req.Header.Set("Content-Type", "application/json")
-		rr = httptest.NewRecorder()
-		router.ServeHTTP(rr, req)
-		if rr.Code != 200 {
-			t.Fatalf("publish product %d %s", rr.Code, rr.Body.String())
-		}
+	if rr.Code != http.StatusGone {
+		t.Fatalf("items want 410 got %d", rr.Code)
 	}
 
 	pubPages, _ := json.Marshal(map[string]any{"status": "published"})
@@ -467,25 +419,28 @@ func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
 	}
 	var pub struct {
 		Pages []struct {
-			Hotspots []struct {
-				ProductID string `json:"product_id"`
-			} `json:"hotspots"`
+			ID       string `json:"id"`
+			ImageURL string `json:"image_url"`
+			Hotspots []any  `json:"hotspots"`
+			Items    []any  `json:"items"`
 		} `json:"pages"`
 	}
 	_ = json.Unmarshal(rr.Body.Bytes(), &pub)
 	if len(pub.Pages) < 1 {
 		t.Fatal("expected published pages")
 	}
-	// Hotspots appear when confirm created bbox candidates; mock AI provides bboxes.
-	if conf.HotspotCount > 0 && (len(pub.Pages[0].Hotspots) < 1) {
-		t.Fatalf("expected public hotspots after confirm, got %+v", pub)
+	if pub.Pages[0].ImageURL == "" {
+		t.Fatal("expected page image_url")
+	}
+	if len(pub.Pages[0].Hotspots) > 0 || len(pub.Pages[0].Items) > 0 {
+		t.Fatalf("etalase must omit hotspots/items, got %+v", pub.Pages[0])
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/e2eb-store/catalog/products/"+conf.ProductIDs[0], nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/public/stores/e2eb-store/catalog/products/"+uuid.NewString(), nil)
 	rr = httptest.NewRecorder()
 	router.ServeHTTP(rr, req)
-	if rr.Code != 200 {
-		t.Fatalf("public product %d %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusGone {
+		t.Fatalf("public hotspot product want 410 got %d", rr.Code)
 	}
 }
 

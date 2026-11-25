@@ -61,8 +61,9 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 			Size:           hdr.Size,
 		})
 	} else {
+		// PDF catalogs are display flipbooks only (pages render, no AI product import).
 		if h.Ent != nil {
-			if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureAIPDFImport); err != nil {
+			if err := h.Ent.RequireFeature(r.Context(), StoreID(r), entitlements.FeatureCatalogFlipbook); err != nil {
 				writeEntitlementErr(w, r, err)
 				return
 			}
@@ -74,7 +75,7 @@ func (h *ImportHandlers) Start(w http.ResponseWriter, r *http.Request) {
 		job, err = h.Imports.Start(r.Context(), StoreID(r), UserID(r), imports.StartInput{
 			IdempotencyKey: r.Header.Get("Idempotency-Key"),
 			CatalogTitle:   catalogName,
-			ImageMode:      r.FormValue("image_mode"),
+			ImageMode:      "none",
 			Filename:       hdr.Filename,
 			DeclaredType:   hdr.Header.Get("Content-Type"),
 			Reader:         file,
@@ -141,6 +142,9 @@ func (h *ImportHandlers) ListItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
 		return
 	}
+	if h.rejectPDFAI(w, r, jobID) {
+		return
+	}
 	items, err := h.Imports.ListItems(r.Context(), StoreID(r), jobID)
 	if err != nil {
 		if errors.Is(err, imports.ErrNotFound) {
@@ -157,6 +161,9 @@ func (h *ImportHandlers) PatchItem(w http.ResponseWriter, r *http.Request) {
 	jobID, err := uuid.Parse(r.PathValue("jobID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
+		return
+	}
+	if h.rejectPDFAI(w, r, jobID) {
 		return
 	}
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
@@ -191,6 +198,9 @@ func (h *ImportHandlers) BulkItems(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
 		return
 	}
+	if h.rejectPDFAI(w, r, jobID) {
+		return
+	}
 	var in imports.BulkItemsInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
@@ -218,6 +228,9 @@ func (h *ImportHandlers) DeleteItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
 		return
 	}
+	if h.rejectPDFAI(w, r, jobID) {
+		return
+	}
 	itemID, err := uuid.Parse(r.PathValue("itemID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import item not found.")
@@ -238,6 +251,9 @@ func (h *ImportHandlers) Confirm(w http.ResponseWriter, r *http.Request) {
 	jobID, err := uuid.Parse(r.PathValue("jobID"))
 	if err != nil {
 		writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
+		return
+	}
+	if h.rejectPDFAI(w, r, jobID) {
 		return
 	}
 	var in imports.ConfirmInput
@@ -294,4 +310,24 @@ func publicImportErr(err error) string {
 		r[0] = r[0] - ('a' - 'A')
 	}
 	return string(r)
+}
+
+// rejectPDFAI returns 410 for soft-deprecated AI PDF item/confirm APIs.
+// CSV product import review remains available. Returns true when the response was written.
+func (h *ImportHandlers) rejectPDFAI(w http.ResponseWriter, r *http.Request, jobID uuid.UUID) bool {
+	job, err := h.Imports.GetJob(r.Context(), StoreID(r), jobID)
+	if err != nil {
+		if errors.Is(err, imports.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Import job not found.")
+			return true
+		}
+		writeError(w, r, http.StatusInternalServerError, "get_failed", "Unable to load import job.")
+		return true
+	}
+	if job.SourceType == "pdf" || job.SourceType == "" {
+		writeError(w, r, http.StatusGone, "ai_pdf_import_disabled",
+			"AI PDF product import is disabled. Catalogs are display flipbooks only.")
+		return true
+	}
+	return false
 }
