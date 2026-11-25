@@ -679,10 +679,26 @@ func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSu
 }
 
 func upsertCustomerTx(ctx context.Context, tx pgx.Tx, storeID uuid.UUID, name, emailAddr string, phone *string) (uuid.UUID, error) {
+	secret, err := validate.NewPortalAccessSecret()
+	if err != nil {
+		return uuid.Nil, err
+	}
+	var normalizedPhone *string
+	if phone != nil {
+		if p, ok := validate.NormalizeIndonesianPhone(*phone); ok {
+			normalizedPhone = &p
+		} else {
+			// Keep raw digits-ish phone when not a valid ID mobile (legacy guests).
+			trimmed := strings.TrimSpace(*phone)
+			if trimmed != "" {
+				normalizedPhone = &trimmed
+			}
+		}
+	}
 	var id uuid.UUID
-	err := tx.QueryRow(ctx, `
-		INSERT INTO customers (store_id, name, email, phone, first_order_at, last_order_at, total_orders)
-		VALUES ($1,$2,$3,$4,now(),now(),1)
+	err = tx.QueryRow(ctx, `
+		INSERT INTO customers (store_id, name, email, phone, first_order_at, last_order_at, total_orders, portal_access_secret)
+		VALUES ($1,$2,$3,$4,now(),now(),1,$5)
 		ON CONFLICT (store_id, email) DO UPDATE SET
 			name=EXCLUDED.name,
 			phone=COALESCE(EXCLUDED.phone, customers.phone),
@@ -690,7 +706,7 @@ func upsertCustomerTx(ctx context.Context, tx pgx.Tx, storeID uuid.UUID, name, e
 			total_orders=customers.total_orders+1,
 			updated_at=now()
 		RETURNING id
-	`, storeID, name, emailAddr, phone).Scan(&id)
+	`, storeID, name, emailAddr, normalizedPhone, secret).Scan(&id)
 	return id, err
 }
 

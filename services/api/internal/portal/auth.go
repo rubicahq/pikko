@@ -4,105 +4,92 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/rubicahq/pikko/services/api/internal/auth"
-	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/validate"
 )
 
-// RequestMagicLink sends a store-scoped customer portal magic link.
-// Always returns a generic success shape when the email is valid — does not reveal
-// whether a customer record exists (enumeration-safe).
+// ErrAccessLinkRequired indicates email magic-link portal login is retired;
+// customers must use their personal /{slug}/customer/{secret}-{phone} URL.
+var ErrAccessLinkRequired = errors.New("portal access link required")
+
+// RequestMagicLink is retired — portal access is via durable secret+phone URL only.
 func (s *Service) RequestMagicLink(ctx context.Context, storeSlug, rawEmail, ip, ua string) (*RequestMagicLinkResult, error) {
-	display, normalized, ok := validate.NormalizeEmail(rawEmail)
+	_, _, ok := validate.NormalizeEmail(rawEmail)
 	if !ok {
 		return nil, ErrInvalidEmail
 	}
-	st, err := s.resolveStoreBySlug(ctx, storeSlug)
-	if err != nil {
+	if _, err := s.resolveStoreBySlug(ctx, storeSlug); err != nil {
 		return nil, err
 	}
+	_ = ip
+	_ = ua
+	return nil, ErrAccessLinkRequired
+}
 
-	if err := s.checkRateLimit(ctx, "portal:email:"+st.ID.String()+":"+normalized, s.Cfg.RateLimitEmailHour); err != nil {
+// AuthenticateAccessKey opens a portal session from the durable URL key
+// `{4_alnum_secret}-{phone}` for the given store slug. Both secret and phone must match.
+func (s *Service) AuthenticateAccessKey(ctx context.Context, storeSlug, accessKey, ip, ua string) (*VerifyResult, error) {
+	secret, rawPhone, ok := validate.ParsePortalAccessKey(accessKey)
+	if !ok {
+		return nil, ErrInvalidToken
+	}
+	phone, ok := validate.NormalizeIndonesianPhone(rawPhone)
+	if !ok {
+		return nil, ErrInvalidToken
+	}
+	st, err := s.resolveStoreBySlug(ctx, storeSlug)
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+	if err := s.checkRateLimit(ctx, "portal:access:"+st.ID.String()+":"+phone, s.Cfg.RateLimitEmailHour); err != nil {
 		return nil, err
 	}
 	if ip != "" {
-		if err := s.checkRateLimit(ctx, "portal:ip:"+ip, s.Cfg.RateLimitIPHour); err != nil {
+		if err := s.checkRateLimit(ctx, "portal:access-ip:"+ip, s.Cfg.RateLimitIPHour); err != nil {
 			return nil, err
 		}
 	}
 
-	var lastCreated time.Time
+	var customer Customer
 	err = s.DB.QueryRow(ctx, `
-		SELECT created_at FROM customer_portal_tokens
-		WHERE store_id=$1 AND email_normalized=$2
-		ORDER BY created_at DESC LIMIT 1
-	`, st.ID, normalized).Scan(&lastCreated)
-	if err == nil && time.Since(lastCreated) < s.Cfg.ResendCooldown {
-		return nil, ErrCooldown
+		SELECT id, store_id, name, email, phone, total_orders, created_at
+		FROM customers
+		WHERE store_id=$1 AND phone=$2 AND portal_access_secret=$3
+	`, st.ID, phone, secret).Scan(
+		&customer.ID, &customer.StoreID, &customer.Name, &customer.Email, &customer.Phone,
+		&customer.TotalOrders, &customer.CreatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrInvalidToken
 	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
-	}
-
-	raw, hash, err := auth.NewToken()
 	if err != nil {
 		return nil, err
 	}
-	expires := s.now().Add(s.Cfg.MagicLinkTTL)
 
-	var ipPtr *net.IP
-	if ip != "" {
-		parsed := net.ParseIP(ip)
-		if parsed != nil {
-			ipPtr = &parsed
-		}
+	sessionRaw, sessionHash, err := auth.NewToken()
+	if err != nil {
+		return nil, err
 	}
-
+	sessionExpires := s.now().Add(s.Cfg.SessionTTL)
 	_, err = s.DB.Exec(ctx, `
-		INSERT INTO customer_portal_tokens (store_id, email_normalized, token_hash, expires_at, request_ip, user_agent)
-		VALUES ($1,$2,$3,$4,$5,$6)
-	`, st.ID, normalized, hash, expires, ipPtr, nullStr(ua))
+		INSERT INTO customer_portal_sessions (store_id, customer_id, token_hash, expires_at, user_agent)
+		VALUES ($1,$2,$3,$4,$5)
+	`, st.ID, customer.ID, sessionHash, sessionExpires, nullStr(ua))
 	if err != nil {
 		return nil, err
 	}
 
-	// Only email when a customer exists for this store (still return ok either way).
-	if _, findErr := s.findCustomerByEmail(ctx, st.ID, normalized); findErr == nil {
-		confirmURL := s.URLs.PortalConfirm(st.Slug, raw)
-		subject, html, text := email.PortalMagicLinkContent(s.Cfg.EmailFromName, st.Name, confirmURL, int(s.Cfg.MagicLinkTTL.Minutes()))
-		msg := email.Message{
-			TemplateKey:     "portal_magic_link",
-			To:              display,
-			From:            s.Cfg.EmailAccountFrom,
-			FromName:        s.Cfg.EmailFromName,
-			ReplyTo:         s.Cfg.EmailReplyTo,
-			Subject:         subject,
-			HTML:            html,
-			Text:            text,
-			IdempotencyKey:  fmt.Sprintf("portal-magic:%s:%s:%d", st.ID, normalized, expires.Unix()),
-			DisableTracking: true,
-		}
-		if err := s.Email.SendNow(ctx, msg); err != nil {
-			s.Logger.Error("portal_magic_link_email_failed", "error", err)
-			return nil, fmt.Errorf("failed to send email")
-		}
-	}
-
-	res := &RequestMagicLinkResult{
-		Email:           display,
-		CooldownSeconds: int(s.Cfg.ResendCooldown.Seconds()),
-	}
-	if (s.Cfg.AppEnv == "development" || s.Cfg.AppEnv == "test") && s.Cfg.EmailMode == "log" {
-		// Expose token in test/dev even when no customer — verify will still fail without customer.
-		res.DevToken = raw
-	}
-	return res, nil
+	return &VerifyResult{
+		Customer:     customer,
+		Store:        *st,
+		SessionToken: sessionRaw,
+		RedirectPath: fmt.Sprintf("/portal/%s/dashboard", st.Slug),
+	}, nil
 }
 
 func (s *Service) PeekToken(ctx context.Context, storeSlug, raw string) (ok bool) {

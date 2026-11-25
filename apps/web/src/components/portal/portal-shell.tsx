@@ -36,7 +36,7 @@ export function PortalShell({
     } catch {
       /* ignore */
     }
-    router.replace(base);
+    router.replace(`/${storeSlug}`);
   }
 
   return (

@@ -233,6 +233,7 @@ func (s *Service) buildVars(ctx context.Context, storeID uuid.UUID, t Template, 
 	}
 	vars["store_name"] = storeName
 	if s.URLs != nil {
+		// Generic store portal landing (session check only). Prefer customer-specific URL below.
 		vars["portal_url"] = s.URLs.PortalHome(storeSlug)
 	}
 
@@ -262,11 +263,13 @@ func (s *Service) buildVars(ctx context.Context, storeID uuid.UUID, t Template, 
 
 	if in.CustomerID != nil && in.OrderID == nil {
 		customerID = in.CustomerID
-		var name, email string
+		var name string
+		var email *string
 		var custPhone *string
+		var portalSecret string
 		err := s.DB.QueryRow(ctx, `
-			SELECT name, email, phone FROM customers WHERE id=$1 AND store_id=$2
-		`, *in.CustomerID, storeID).Scan(&name, &email, &custPhone)
+			SELECT name, email, phone, portal_access_secret FROM customers WHERE id=$1 AND store_id=$2
+		`, *in.CustomerID, storeID).Scan(&name, &email, &custPhone, &portalSecret)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return nil, "", nil, nil, nil, fmt.Errorf("%w: customer", ErrNotFound)
@@ -274,9 +277,14 @@ func (s *Service) buildVars(ctx context.Context, storeID uuid.UUID, t Template, 
 			return nil, "", nil, nil, nil, err
 		}
 		vars["customer_name"] = name
-		vars["customer_email"] = email
+		if email != nil {
+			vars["customer_email"] = *email
+		}
 		if custPhone != nil {
 			phone = *custPhone
+		}
+		if s.URLs != nil && custPhone != nil && *custPhone != "" && portalSecret != "" {
+			vars["portal_url"] = s.URLs.PortalCustomer(storeSlug, portalSecret, *custPhone)
 		}
 	}
 
@@ -319,6 +327,22 @@ func (s *Service) buildVars(ctx context.Context, storeID uuid.UUID, t Template, 
 			phone = *custPhone
 		} else if shippingPhone != nil {
 			phone = *shippingPhone
+		}
+		if s.URLs != nil && custID != nil {
+			var portalSecret string
+			var portalPhone *string
+			_ = s.DB.QueryRow(ctx, `
+				SELECT portal_access_secret, phone FROM customers WHERE id=$1 AND store_id=$2
+			`, *custID, storeID).Scan(&portalSecret, &portalPhone)
+			p := ""
+			if portalPhone != nil && *portalPhone != "" {
+				p = *portalPhone
+			} else if phone != "" {
+				p = phone
+			}
+			if portalSecret != "" && p != "" {
+				vars["portal_url"] = s.URLs.PortalCustomer(storeSlug, portalSecret, p)
+			}
 		}
 		// Guest tracking tokens are hashed-at-rest; portal is the recoverable customer link.
 		if vars["portal_url"] != "" {

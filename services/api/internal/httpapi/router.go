@@ -311,6 +311,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("POST /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersWrite, p5.CreateCustomer))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersRead, p5.GetCustomer))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersWrite, p5.PatchCustomer))
+	mux.Handle("POST /api/v1/stores/{storeID}/customers/{customerID}/portal-access/rotate", storePerm(rbac.PermCustomersWrite, p5.RotateCustomerPortalAccess))
 	mux.Handle("GET /api/v1/stores/{storeID}/address-change-requests", storePerm(rbac.PermCustomersRead, portalH.MerchantListAddressChanges))
 	mux.Handle("POST /api/v1/stores/{storeID}/address-change-requests/{requestID}/review", storePerm(rbac.PermCustomersWrite, portalH.MerchantReviewAddressChange))
 
@@ -396,6 +397,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}/evidence/{evidenceID}/file", commerceH.TrackingEvidenceFile)
 
 	// Agent 08: customer portal (separate auth from merchant; preserve guest tracking)
+	// Access is via durable /{slug}/customer/{secret}-{phone}; email magic-link request is retired.
+	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/access", portalH.AuthenticateAccessKey)
 	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/magic-link/request", portalH.RequestMagicLink)
 	mux.HandleFunc("GET /api/v1/portal/{storeSlug}/auth/magic-link/peek", portalH.PeekMagicLink)
 	mux.HandleFunc("POST /api/v1/portal/{storeSlug}/auth/magic-link/verify", portalH.VerifyMagicLink)

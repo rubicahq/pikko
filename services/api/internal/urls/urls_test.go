@@ -14,6 +14,11 @@ func TestGenerator(t *testing.T) {
 	if link != "https://app.pikko.site/auth/confirm?token=tok" {
 		t.Fatalf("magic: %s", link)
 	}
+	got := g.PortalCustomer("rick-store", "a7k2", "6281234567890")
+	want := "https://shop.pikko.site/rick-store/customer/a7k2-6281234567890"
+	if got != want {
+		t.Fatalf("portal customer: got %s want %s", got, want)
+	}
 }
 
 func TestGeneratorPikkoID(t *testing.T) {

@@ -3,7 +3,6 @@ package portal_test
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/httpapi"
 	"github.com/rubicahq/pikko/services/api/internal/storage"
 	"github.com/rubicahq/pikko/services/api/internal/stores"
+	"github.com/rubicahq/pikko/services/api/internal/validate"
 )
 
 func TestCreateCustomerWithoutOrderPortalAccess(t *testing.T) {
@@ -68,12 +68,23 @@ func TestCreateCustomerWithoutOrderPortalAccess(t *testing.T) {
 		t.Fatalf("total_orders=%v", cust["total_orders"])
 	}
 	portalURL, _ := created["portal_url"].(string)
-	accessURL, _ := created["portal_access_url"].(string)
-	if !strings.Contains(portalURL, "/portal/wa-shop") {
-		t.Fatalf("portal_url=%q", portalURL)
+	if !strings.Contains(portalURL, "/wa-shop/customer/") {
+		t.Fatalf("portal_url=%q want /wa-shop/customer/{secret}-{phone}", portalURL)
 	}
-	if !strings.Contains(accessURL, "/portal/wa-shop/confirm?token=") {
-		t.Fatalf("portal_access_url=%q", accessURL)
+	u, err := url.Parse(portalURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.Split(strings.TrimPrefix(u.Path, "/"), "/")
+	if len(parts) != 3 || parts[0] != "wa-shop" || parts[1] != "customer" {
+		t.Fatalf("path parts=%v", parts)
+	}
+	secret, phone, ok := validate.ParsePortalAccessKey(parts[2])
+	if !ok || phone != "6281234567890" || !validate.ValidPortalAccessSecret(secret) {
+		t.Fatalf("access key=%q secret=%q phone=%q", parts[2], secret, phone)
+	}
+	if _, hasAccess := created["portal_access_url"]; hasAccess {
+		t.Fatalf("portal_access_url should be omitted, got %v", created["portal_access_url"])
 	}
 
 	// Duplicate phone → conflict
@@ -84,20 +95,20 @@ func TestCreateCustomerWithoutOrderPortalAccess(t *testing.T) {
 		t.Fatalf("duplicate phone want 409 got %d %v", code, dup)
 	}
 
-	// One-time access link opens portal session without email
-	u, err := url.Parse(accessURL)
-	if err != nil {
-		t.Fatal(err)
+	// Email magic-link request is retired
+	code, retired := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/magic-link/request", "", map[string]any{
+		"email": "anyone@example.com",
+	})
+	if code != 410 {
+		t.Fatalf("magic-link request want 410 got %d %v", code, retired)
 	}
-	rawToken := u.Query().Get("token")
-	if rawToken == "" {
-		t.Fatal("missing token in access url")
-	}
-	code, ver := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/magic-link/verify", "", map[string]any{
-		"token": rawToken,
+
+	// Durable access key opens portal session
+	code, ver := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/access", "", map[string]any{
+		"access_key": parts[2],
 	})
 	if code != 200 {
-		t.Fatalf("verify access link %d %v", code, ver)
+		t.Fatalf("access auth %d %v", code, ver)
 	}
 	sessionTok, _ := ver["session_token"].(string)
 	if sessionTok == "" {
@@ -112,12 +123,36 @@ func TestCreateCustomerWithoutOrderPortalAccess(t *testing.T) {
 		t.Fatalf("session customer %v want %v", pcust["id"], cust["id"])
 	}
 
-	// Token is single-use
-	code, reuse := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/magic-link/verify", "", map[string]any{
-		"token": rawToken,
+	// Wrong secret → gone
+	code, bad := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/access", "", map[string]any{
+		"access_key": "zzzz-" + phone,
 	})
-	if code != http.StatusGone {
-		t.Fatalf("reuse want 410 got %d %v", code, reuse)
+	if code != 410 {
+		t.Fatalf("wrong secret want 410 got %d %v", code, bad)
+	}
+
+	// Rotate invalidates prior URL
+	code, rotated := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/customers/"+cust["id"].(string)+"/portal-access/rotate", token, nil)
+	if code != 200 {
+		t.Fatalf("rotate %d %v", code, rotated)
+	}
+	newURL, _ := rotated["portal_url"].(string)
+	if newURL == "" || newURL == portalURL {
+		t.Fatalf("expected new portal_url, got %q (old %q)", newURL, portalURL)
+	}
+	code, stale := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/access", "", map[string]any{
+		"access_key": parts[2],
+	})
+	if code != 410 {
+		t.Fatalf("stale key after rotate want 410 got %d %v", code, stale)
+	}
+	nu, _ := url.Parse(newURL)
+	nparts := strings.Split(strings.TrimPrefix(nu.Path, "/"), "/")
+	code, ver2 := doJSON(t, router, "POST", "/api/v1/portal/wa-shop/auth/access", "", map[string]any{
+		"access_key": nparts[2],
+	})
+	if code != 200 {
+		t.Fatalf("new key auth %d %v", code, ver2)
 	}
 
 	// List includes phone-only customer
