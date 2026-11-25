@@ -94,11 +94,11 @@ export function ConniePanel({
             "text-sm font-medium text-foreground hover:brightness-[0.98]",
             triggerClassName,
           )}
-          aria-label="Ask Connie"
-          title="Ask Connie"
+          aria-label="Ask Connie AI"
+          title="Ask Connie AI"
         >
           <Sparkles className="h-4 w-4 shrink-0 text-brand" strokeWidth={1.75} />
-          <span className="truncate">Ask Connie</span>
+          <span className="truncate">Ask Connie AI</span>
         </button>
       </SheetTrigger>
       <SheetContent
