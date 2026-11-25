@@ -28,7 +28,7 @@ export function CustomerPortalLink({ url }: Props) {
           Customer portal link
         </p>
         <p className="mt-0.5 text-sm text-foreground-secondary">
-          Share this link with the customer — they can reuse it anytime.
+          Share this personal link — opens their portal with secret + phone in the URL (no email login).
         </p>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">

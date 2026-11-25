@@ -74,6 +74,13 @@ func (g *Generator) PortalHome(storeSlug string) string {
 	return fmt.Sprintf("%s/portal/%s", g.StorefrontBase, url.PathEscape(storeSlug))
 }
 
+// PortalCustomer is the durable shareable customer portal URL:
+// /{store_slug}/customer/{4_alnum_secret}-{phone}
+func (g *Generator) PortalCustomer(storeSlug, secret, phone string) string {
+	key := secret + "-" + phone
+	return fmt.Sprintf("%s/%s/customer/%s", g.StorefrontBase, url.PathEscape(storeSlug), url.PathEscape(key))
+}
+
 func (g *Generator) PortalConfirm(storeSlug, token string) string {
 	return fmt.Sprintf("%s/portal/%s/confirm?token=%s", g.StorefrontBase, url.PathEscape(storeSlug), url.QueryEscape(token))
 }

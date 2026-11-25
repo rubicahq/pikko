@@ -169,14 +169,14 @@ func TestPortalSecurityIDOR(t *testing.T) {
 	enableShipping(t, router, sidA, tokenA)
 	enableShipping(t, router, sidB, tokenB)
 
-	orderA1 := createAdminOrder(t, router, sidA, tokenA, productA, "Alice", "alice@example.com")
-	orderA2 := createAdminOrder(t, router, sidA, tokenA, productA, "Bob", "bob@example.com")
-	orderB1 := createAdminOrder(t, router, sidB, tokenB, productB, "Alice", "alice@example.com")
+	orderA1 := createAdminOrder(t, router, sidA, tokenA, productA, "Alice", "alice@example.com", "081211111111")
+	orderA2 := createAdminOrder(t, router, sidA, tokenA, productA, "Bob", "bob@example.com", "081222222222")
+	orderB1 := createAdminOrder(t, router, sidB, tokenB, productB, "Alice", "alice@example.com", "081211111111")
 
-	// Portal login Alice @ alpha-shop
-	aliceTokenA := portalSignIn(t, router, "alpha-shop", "alice@example.com")
-	bobTokenA := portalSignIn(t, router, "alpha-shop", "bob@example.com")
-	aliceTokenB := portalSignIn(t, router, "beta-shop", "alice@example.com")
+	// Portal login Alice @ alpha-shop via durable secret+phone URL
+	aliceTokenA := portalSignIn(t, pool, router, stA.ID, "alpha-shop", "alice@example.com")
+	bobTokenA := portalSignIn(t, pool, router, stA.ID, "alpha-shop", "bob@example.com")
+	aliceTokenB := portalSignIn(t, pool, router, stB.ID, "beta-shop", "alice@example.com")
 
 	// Alice sees only her alpha order
 	code, dash := doJSON(t, router, "GET", "/api/v1/portal/alpha-shop/dashboard", aliceTokenA, nil)
@@ -314,12 +314,13 @@ func enableShipping(t *testing.T, router http.Handler, sid, token string) {
 	}
 }
 
-func createAdminOrder(t *testing.T, router http.Handler, sid, token, productID, name, emailAddr string) string {
+func createAdminOrder(t *testing.T, router http.Handler, sid, token, productID, name, emailAddr, phone string) string {
 	t.Helper()
 	code, created := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", token, map[string]any{
 		"items":              []map[string]any{{"product_id": productID, "quantity": 1}},
 		"customer_name":      name,
 		"customer_email":     emailAddr,
+		"customer_phone":     phone,
 		"fulfillment_method": "shipping",
 		"shipping_address": map[string]any{
 			"recipient_name": name, "line1": "Jl Test 1", "city": "Jakarta", "country": "ID",
@@ -332,33 +333,26 @@ func createAdminOrder(t *testing.T, router http.Handler, sid, token, productID, 
 	return created["order"].(map[string]any)["id"].(string)
 }
 
-func portalSignIn(t *testing.T, router http.Handler, slug, emailAddr string) string {
+func portalSignIn(t *testing.T, pool *pgxpool.Pool, router http.Handler, storeID uuid.UUID, slug, emailAddr string) string {
 	t.Helper()
-	code, reqBody := doJSON(t, router, "POST", "/api/v1/portal/"+slug+"/auth/magic-link/request", "", map[string]any{
-		"email": emailAddr,
+	var secret, phone string
+	err := pool.QueryRow(context.Background(), `
+		SELECT portal_access_secret, phone FROM customers
+		WHERE store_id=$1 AND email IS NOT NULL AND lower(email)=lower($2)
+	`, storeID, emailAddr).Scan(&secret, &phone)
+	if err != nil {
+		t.Fatalf("lookup portal access for %s: %v", emailAddr, err)
+	}
+	accessKey := secret + "-" + phone
+	code, ver := doJSON(t, router, "POST", "/api/v1/portal/"+slug+"/auth/access", "", map[string]any{
+		"access_key": accessKey,
 	})
 	if code != 200 {
-		t.Fatalf("portal request %d %v", code, reqBody)
-	}
-	dev := reqBody["dev_token"].(string)
-	if !httptestPeekOK(t, router, slug, dev) {
-		t.Fatal("peek failed")
-	}
-	code, ver := doJSON(t, router, "POST", "/api/v1/portal/"+slug+"/auth/magic-link/verify", "", map[string]any{
-		"token": dev,
-	})
-	if code != 200 {
-		t.Fatalf("portal verify %d %v", code, ver)
+		t.Fatalf("portal access %d %v", code, ver)
 	}
 	tok, _ := ver["session_token"].(string)
 	if tok == "" {
 		t.Fatal("missing session_token")
 	}
 	return tok
-}
-
-func httptestPeekOK(t *testing.T, router http.Handler, slug, token string) bool {
-	t.Helper()
-	code, _ := doJSON(t, router, "GET", "/api/v1/portal/"+slug+"/auth/magic-link/peek?token="+token, "", nil)
-	return code == 200
 }

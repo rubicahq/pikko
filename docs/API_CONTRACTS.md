@@ -218,8 +218,9 @@ Source `live_quick_add`; campaign quota + finite stock enforced under row locks.
 | POST | `/stores/{storeID}/order-entry/csv-preview` |
 | POST | `/stores/{storeID}/order-entry/csv-import` |
 | GET | `/stores/{storeID}/customers` |
-| POST | `/stores/{storeID}/customers` | name + phone/WA only; returns stable `portal_url` + one-time `portal_access_url` |
-| GET/PATCH | `/stores/{storeID}/customers/{customerID}` | GET also returns stable `portal_url` + `store_slug` for sharing |
+| POST | `/stores/{storeID}/customers` | name + phone/WA only; returns durable `portal_url` (`/{slug}/customer/{secret}-{phone}`) |
+| GET/PATCH | `/stores/{storeID}/customers/{customerID}` | GET also returns durable `portal_url` + `store_slug` for sharing |
+| POST | `/stores/{storeID}/customers/{customerID}/portal-access/rotate` | Invalidate prior portal URL; mint new secret; revoke portal sessions |
 
 ### 2.8 Notifications + analytics
 
@@ -312,9 +313,10 @@ Cookie: `PORTAL_COOKIE_NAME` (default `pikko_portal_session`). Separate from mer
 
 | Method | Path | Auth |
 | --- | --- | --- |
-| POST | `/portal/{storeSlug}/auth/magic-link/request` | public |
-| GET | `/portal/{storeSlug}/auth/magic-link/peek` | public |
-| POST | `/portal/{storeSlug}/auth/magic-link/verify` | public |
+| POST | `/portal/{storeSlug}/auth/access` | public — body `{access_key:"{secret}-{phone}"}`; sets portal session |
+| POST | `/portal/{storeSlug}/auth/magic-link/request` | retired (410 `access_link_required`) |
+| GET | `/portal/{storeSlug}/auth/magic-link/peek` | legacy |
+| POST | `/portal/{storeSlug}/auth/magic-link/verify` | legacy (unconsumed tokens only) |
 | GET | `/portal/{storeSlug}/auth/session` | portal cookie |
 | POST | `/portal/{storeSlug}/auth/logout` | portal cookie |
 | GET | `/portal/{storeSlug}/dashboard` | portal |

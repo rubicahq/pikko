@@ -103,10 +103,15 @@ export const urls = {
     `${storefront()}/${slug}/live/${liveSlug}`,
   tracking: (token: string) => `/track/${encodeURIComponent(token)}`,
   trackingAbsolute: (token: string) => `${storefront()}/track/${encodeURIComponent(token)}`,
-  /** Stable customer portal home — shareable / reusable (not a one-time magic link). */
+  /** Portal session landing (not shareable — needs personal access URL). */
   portal: (storeSlug: string) => `/portal/${encodeURIComponent(storeSlug)}`,
   portalAbsolute: (storeSlug: string) =>
     `${storefront()}/portal/${encodeURIComponent(storeSlug)}`,
+  /** Durable shareable customer portal: /{slug}/customer/{secret}-{phone} */
+  portalCustomer: (storeSlug: string, secret: string, phone: string) =>
+    `/${encodeURIComponent(storeSlug)}/customer/${encodeURIComponent(`${secret}-${phone}`)}`,
+  portalCustomerAbsolute: (storeSlug: string, secret: string, phone: string) =>
+    `${storefront()}/${encodeURIComponent(storeSlug)}/customer/${encodeURIComponent(`${secret}-${phone}`)}`,
   api: (path: string) => {
     const base = api();
     const p = path.startsWith("/") ? path : `/${path}`;

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSession, getStore, serverFetch } from "@/lib/server-api";
+import { getSession, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { Badge } from "@/components/ui/badge";
 import { CustomerNotesForm } from "@/components/customers/customer-notes-form";
 import { CustomerPortalLink } from "@/components/customers/customer-portal-link";
+import { RotatePortalLinkButton } from "@/components/customers/rotate-portal-link-button";
 
 type CustomerDetail = {
   id: string;
@@ -36,22 +37,13 @@ export default async function CustomerDetailPage({
   const session = await getSession();
   if (!session) redirect(urls.auth());
 
-  const [data, store] = await Promise.all([
-    serverFetch<{ customer: CustomerDetail; portal_url?: string; store_slug?: string }>(
-      `/api/v1/stores/${storeId}/customers/${customerId}`,
-    ),
-    getStore(storeId),
-  ]);
+  const data = await serverFetch<{ customer: CustomerDetail; portal_url?: string; store_slug?: string }>(
+    `/api/v1/stores/${storeId}/customers/${customerId}`,
+  );
   if (!data?.customer) redirect(urls.storeCustomers(storeId));
   const c = data.customer;
   const orders = c.orders || [];
-  const portalUrl =
-    data.portal_url ||
-    (data.store_slug
-      ? urls.portalAbsolute(data.store_slug)
-      : store?.slug
-        ? urls.portalAbsolute(store.slug)
-        : null);
+  const portalUrl = data.portal_url || null;
 
   return (
     <div className="mx-auto max-w-dashboard">
@@ -67,8 +59,13 @@ export default async function CustomerDetailPage({
       </p>
 
       {portalUrl ? (
-        <section className="mt-6 rounded-[10px] border border-border bg-background-subtle/40 p-5">
+        <section className="mt-6 space-y-4 rounded-[10px] border border-border bg-background-subtle/40 p-5">
           <CustomerPortalLink url={portalUrl} />
+          <RotatePortalLinkButton storeId={storeId} customerId={c.id} />
+        </section>
+      ) : c.phone ? (
+        <section className="mt-6 rounded-[10px] border border-border bg-background-subtle/40 p-5">
+          <RotatePortalLinkButton storeId={storeId} customerId={c.id} />
         </section>
       ) : null}
 

@@ -13,7 +13,6 @@ import { CustomerPortalLink } from "@/components/customers/customer-portal-link"
 type CreateResult = {
   customer: { id: string; name: string; phone?: string | null };
   portal_url?: string;
-  portal_access_url?: string;
   store_slug?: string;
 };
 
@@ -54,16 +53,13 @@ export function CreateCustomerForm({ storeId }: { storeId: string }) {
     }
   }
 
-  const shareUrl =
-    created?.portal_url ||
-    (created?.store_slug ? urls.portalAbsolute(created.store_slug) : undefined);
-
   return (
     <div className="space-y-4 rounded-xl border border-border bg-background-subtle/60 p-4">
       <div>
         <h2 className="text-base font-medium text-foreground">Add customer</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Name and WhatsApp/phone only — no order required. You&apos;ll get a portal link to share.
+          Name and WhatsApp/phone only — no order required. You&apos;ll get a personal portal link to
+          share (secret + phone in the URL).
         </p>
       </div>
       <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
@@ -101,20 +97,7 @@ export function CreateCustomerForm({ storeId }: { storeId: string }) {
             Created {created.customer.name}
             {created.customer.phone ? ` · ${created.customer.phone}` : ""}
           </p>
-          {shareUrl ? <CustomerPortalLink url={shareUrl} /> : null}
-          {created.portal_access_url ? (
-            <p className="text-sm text-foreground-secondary">
-              <a
-                href={created.portal_access_url}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-foreground underline underline-offset-2"
-              >
-                Open as this customer
-              </a>
-              <span className="text-foreground-muted"> — one-time merchant preview link</span>
-            </p>
-          ) : null}
+          {created.portal_url ? <CustomerPortalLink url={created.portal_url} /> : null}
           <p>
             <a
               href={urls.storeCustomer(storeId, created.customer.id)}

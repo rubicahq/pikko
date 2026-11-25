@@ -247,8 +247,8 @@ var customerTemplates = []Template{
 		Code: "WA-C16", Audience: AudienceCustomer, Category: "portal",
 		Title: "Akses portal pelanggan",
 		Description: "Bagikan link portal untuk cek order & kredit.",
-		Body: "Halo {{customer_name}}! Kelola order Anda di portal {{store_name}}:\n{{portal_url}}\nLogin pakai email {{customer_email}}.",
-		Variables: []string{"customer_name", "store_name", "portal_url", "customer_email"},
+		Body: "Halo {{customer_name}}! Kelola order Anda di portal {{store_name}}:\n{{portal_url}}",
+		Variables: []string{"customer_name", "store_name", "portal_url"},
 		Surfaces:  []string{"customers", "orders", "messages"},
 	},
 	{

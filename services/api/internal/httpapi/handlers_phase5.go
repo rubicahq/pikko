@@ -149,15 +149,6 @@ func (h *Phase5Handlers) CreateCustomer(w http.ResponseWriter, r *http.Request) 
 		writeError(w, r, http.StatusInternalServerError, "create_failed", "Unable to create customer.")
 		return
 	}
-	if h.Portal != nil {
-		portalURL, accessURL, linkErr := h.Portal.IssueAccessLink(r.Context(), StoreID(r), res.Customer.ID)
-		if linkErr == nil {
-			if portalURL != "" {
-				res.PortalURL = portalURL
-			}
-			res.PortalAccessURL = accessURL
-		}
-	}
 	writeJSON(w, http.StatusCreated, res)
 }
 
@@ -177,16 +168,39 @@ func (h *Phase5Handlers) GetCustomer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := map[string]any{"customer": c}
-	if h.Commerce != nil && h.Commerce.URLs != nil {
-		var slug string
-		if qErr := h.Commerce.DB.QueryRow(r.Context(), `
-			SELECT slug FROM stores WHERE id=$1 AND archived_at IS NULL
-		`, StoreID(r)).Scan(&slug); qErr == nil && slug != "" {
-			out["store_slug"] = slug
-			out["portal_url"] = h.Commerce.URLs.PortalHome(slug)
+	if h.Commerce != nil {
+		if portalURL, slug, urlErr := h.Commerce.CustomerPortalURL(r.Context(), StoreID(r), id); urlErr == nil {
+			if slug != "" {
+				out["store_slug"] = slug
+			}
+			if portalURL != "" {
+				out["portal_url"] = portalURL
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Phase5Handlers) RotateCustomerPortalAccess(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("customerID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Customer not found.")
+		return
+	}
+	portalURL, slug, err := h.Commerce.RotatePortalAccessSecret(r.Context(), StoreID(r), id)
+	if err != nil {
+		if errors.Is(err, commerce.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Customer not found.")
+			return
+		}
+		writeError(w, r, http.StatusInternalServerError, "rotate_failed", "Unable to rotate portal link.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"portal_url": portalURL,
+		"store_slug": slug,
+	})
 }
 
 func (h *Phase5Handlers) PatchCustomer(w http.ResponseWriter, r *http.Request) {

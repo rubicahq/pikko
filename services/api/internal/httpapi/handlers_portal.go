@@ -87,12 +87,14 @@ func (h *PortalHandlers) mapErr(w http.ResponseWriter, r *http.Request, err erro
 	switch {
 	case errors.Is(err, portal.ErrInvalidEmail):
 		writeError(w, r, http.StatusBadRequest, "invalid_email", "Enter a valid email address.")
+	case errors.Is(err, portal.ErrAccessLinkRequired):
+		writeError(w, r, http.StatusGone, "access_link_required", "Use your personal customer portal link from the store.")
 	case errors.Is(err, portal.ErrCooldown):
 		writeError(w, r, http.StatusTooManyRequests, "cooldown", "Please wait before requesting another link.")
 	case errors.Is(err, portal.ErrRateLimited):
 		writeError(w, r, http.StatusTooManyRequests, "rate_limited", "Too many requests. Try again later.")
 	case errors.Is(err, portal.ErrInvalidToken):
-		writeError(w, r, http.StatusGone, "invalid_token", "This link has expired.")
+		writeError(w, r, http.StatusGone, "invalid_token", "This portal link is invalid or no longer works.")
 	case errors.Is(err, portal.ErrUnauthorized):
 		writeError(w, r, http.StatusUnauthorized, "unauthorized", "Not signed in.")
 	case errors.Is(err, portal.ErrNotFound), errors.Is(err, commerce.ErrNotFound):
@@ -135,17 +137,40 @@ func (h *PortalHandlers) RequestMagicLink(w http.ResponseWriter, r *http.Request
 		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
 		return
 	}
-	res, err := h.Portal.RequestMagicLink(r.Context(), slug, body.Email, ClientIP(r), r.UserAgent())
+	_, err := h.Portal.RequestMagicLink(r.Context(), slug, body.Email, ClientIP(r), r.UserAgent())
 	if err != nil {
 		h.mapErr(w, r, err)
 		return
 	}
+	writeError(w, r, http.StatusGone, "access_link_required", "Use your personal customer portal link.")
+}
+
+func (h *PortalHandlers) AuthenticateAccessKey(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("storeSlug")
+	var body struct {
+		AccessKey string `json:"access_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	key := strings.TrimSpace(body.AccessKey)
+	if key == "" {
+		key = strings.TrimSpace(r.URL.Query().Get("access_key"))
+	}
+	res, err := h.Portal.AuthenticateAccessKey(r.Context(), slug, key, ClientIP(r), r.UserAgent())
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	expires := time.Now().UTC().Add(h.Cfg.SessionTTL)
+	h.setPortalCookie(w, res.SessionToken, expires)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":               true,
-		"email":            res.Email,
-		"cooldown_seconds": res.CooldownSeconds,
-		"message":          "If this email can receive mail, a sign-in link is on the way.",
-		"dev_token":        res.DevToken,
+		"ok":            true,
+		"customer":      res.Customer,
+		"store":         res.Store,
+		"redirect_path": res.RedirectPath,
+		"session_token": res.SessionToken,
 	})
 }
 
