@@ -529,7 +529,27 @@ func TestAdminPaidByAdminPayment(t *testing.T) {
 	if order["payment_status"] != "paid" {
 		t.Fatalf("want paid got %v", order["payment_status"])
 	}
+	if order["order_status"] != "confirmed" {
+		t.Fatalf("want confirmed got %v", order["order_status"])
+	}
 	orderID := order["id"].(string)
+
+	// Ready-stock paid-by-admin demand must appear under Purchasing → Orders.
+	code, purch := doJSON(t, router, "GET", "/api/v1/stores/"+sid+"/purchasing?source=orders", tokenA, nil)
+	if code != 200 {
+		t.Fatalf("purchasing %d %v", code, purch)
+	}
+	found := false
+	for _, raw := range purch["purchasing"].([]any) {
+		line := raw.(map[string]any)
+		if line["product_id"] == productID && int(line["required_qty"].(float64)) >= 1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected paid-by-admin ready-stock demand in purchasing %#v", purch)
+	}
 	code, detail := doJSON(t, router, "GET", "/api/v1/stores/"+sid+"/orders/"+orderID, tokenA, nil)
 	if code != 200 {
 		t.Fatalf("get order %d %v", code, detail)

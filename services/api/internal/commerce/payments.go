@@ -338,9 +338,24 @@ func (s *Service) MarkPaidByAdmin(ctx context.Context, storeID, orderID, actorID
 		return nil, ErrInvalidTransition
 	}
 
+	// Confirm pending orders so paid-by-admin demand appears in Purchasing/Fulfilment.
+	nextOrderStatus := o.OrderStatus
+	if o.OrderStatus == OrderPendingConfirmation {
+		nextOrderStatus = OrderConfirmed
+	}
+	nextFulfillment := o.FulfillmentStatus
+	if o.PreorderBatchID != nil && (o.FulfillmentStatus == FulfillmentUnfulfilled || o.FulfillmentStatus == "") {
+		nextFulfillment = FulfillmentPurchasing
+	}
 	_, err = tx.Exec(ctx, `
-		UPDATE orders SET payment_status='paid', updated_at=now() WHERE id=$1 AND store_id=$2
-	`, orderID, storeID)
+		UPDATE orders SET
+			payment_status='paid',
+			order_status=$3,
+			confirmed_at=COALESCE(confirmed_at, CASE WHEN $3='confirmed' THEN now() ELSE NULL END),
+			fulfillment_status=$4,
+			updated_at=now()
+		WHERE id=$1 AND store_id=$2
+	`, orderID, storeID, nextOrderStatus, nextFulfillment)
 	if err != nil {
 		return nil, err
 	}
@@ -348,6 +363,18 @@ func (s *Service) MarkPaidByAdmin(ctx context.Context, storeID, orderID, actorID
 		INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, actor_user_id, reason)
 		VALUES ($1,$2,'payment',$3,'paid',$4,'paid_by_admin')
 	`, storeID, orderID, o.PaymentStatus, actorID)
+	if nextOrderStatus != o.OrderStatus {
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, actor_user_id, reason)
+			VALUES ($1,$2,'order',$3,$4,$5,'paid_by_admin')
+		`, storeID, orderID, o.OrderStatus, nextOrderStatus, actorID)
+	}
+	if nextFulfillment != o.FulfillmentStatus {
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, actor_user_id, reason)
+			VALUES ($1,$2,'fulfillment',$3,$4,$5,'paid_by_admin')
+		`, storeID, orderID, o.FulfillmentStatus, nextFulfillment, actorID)
+	}
 
 	if _, err := s.recomputeSettlementTx(ctx, tx, storeID, orderID); err != nil {
 		return nil, err

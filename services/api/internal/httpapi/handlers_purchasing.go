@@ -84,6 +84,22 @@ func (h *CommerceHandlers) StorePurchasing(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, map[string]any{"purchasing": list, "groupable_attributes": attributes})
 }
 
+func (h *CommerceHandlers) BulkPurchasingStatus(w http.ResponseWriter, r *http.Request) {
+	if !h.requirePurchasing(w, r) {
+		return
+	}
+	var in commerce.BulkPurchasingStatusInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
+		return
+	}
+	if err := h.Commerce.BulkUpdatePurchasingStatus(r.Context(), StoreID(r), UserID(r), in); err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (h *CommerceHandlers) UnavailableImpact(w http.ResponseWriter, r *http.Request) {
 	var in commerce.UnavailableImpactFilter
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {

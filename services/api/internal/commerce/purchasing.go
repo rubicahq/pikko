@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,15 +24,50 @@ type PurchasingLine struct {
 	CampaignID     *uuid.UUID `json:"campaign_id,omitempty"`
 	BatchID        *uuid.UUID `json:"batch_id,omitempty"`
 	BatchName      *string    `json:"batch_name,omitempty"`
-	RequiredQty    int        `json:"required_qty"`  // confirmed + paid
-	UnpaidDemand   int        `json:"unpaid_demand"` // confirmed but unpaid
+	CustomerID     *uuid.UUID `json:"customer_id,omitempty"`
+	CustomerName   *string    `json:"customer_name,omitempty"`
+	RequiredQty    int        `json:"required_qty"`  // paid demand (incl. paid-by-admin)
+	UnpaidDemand   int        `json:"unpaid_demand"` // unpaid / awaiting verification
 	PurchasedQty   int        `json:"purchased_qty"`
 	UnavailableQty int        `json:"unavailable_qty"`
 	AllocatedQty   int        `json:"allocated_qty"`
 	ReceivedQty    int        `json:"received_qty"`
 	OutstandingQty int        `json:"outstanding_qty"` // required - purchased (floored at 0)
+	LineStatus     string     `json:"line_status"`     // pending | partial | purchased | unavailable
 	Version        int        `json:"version,omitempty"`
 	GroupLabel     string     `json:"group_label,omitempty"`
+}
+
+// Purchasing line status values used by the workspace UI + bulk actions.
+const (
+	PurchasingStatusPending     = "pending"
+	PurchasingStatusPartial     = "partial"
+	PurchasingStatusPurchased   = "purchased"
+	PurchasingStatusUnavailable = "unavailable"
+)
+
+func computePurchasingLineStatus(required, purchased, unavailable int) string {
+	if required > 0 && unavailable >= required {
+		return PurchasingStatusUnavailable
+	}
+	if required > 0 && purchased >= required {
+		return PurchasingStatusPurchased
+	}
+	if purchased > 0 || unavailable > 0 {
+		return PurchasingStatusPartial
+	}
+	return PurchasingStatusPending
+}
+
+type BulkPurchasingStatusLine struct {
+	BatchID   *uuid.UUID `json:"batch_id,omitempty"`
+	ProductID uuid.UUID  `json:"product_id"`
+	VariantID *uuid.UUID `json:"variant_id,omitempty"`
+}
+
+type BulkPurchasingStatusInput struct {
+	Status string                     `json:"status"` // pending | purchased | unavailable
+	Lines  []BulkPurchasingStatusLine `json:"lines"`
 }
 
 type UpdatePurchasingInput struct {
@@ -143,6 +179,86 @@ func (s *Service) UpdatePurchasing(ctx context.Context, storeID, batchID, actorI
 		}
 	}
 	return tx.Commit(ctx)
+}
+
+// BulkUpdatePurchasingStatus applies pending/purchased/unavailable to selected demand lines.
+func (s *Service) BulkUpdatePurchasingStatus(ctx context.Context, storeID, actorID uuid.UUID, in BulkPurchasingStatusInput) error {
+	status := strings.ToLower(strings.TrimSpace(in.Status))
+	switch status {
+	case PurchasingStatusPending, PurchasingStatusPurchased, PurchasingStatusUnavailable:
+	default:
+		return ErrInvalidInput
+	}
+	if len(in.Lines) == 0 {
+		return ErrInvalidInput
+	}
+
+	for _, line := range in.Lines {
+		if line.ProductID == uuid.Nil {
+			return ErrInvalidInput
+		}
+		if line.BatchID != nil && *line.BatchID != uuid.Nil {
+			required := 0
+			_ = s.DB.QueryRow(ctx, `
+				SELECT COALESCE(SUM(oi.quantity),0)
+				FROM order_items oi
+				JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id
+				WHERE oi.store_id=$1 AND o.preorder_batch_id=$2 AND oi.product_id=$3
+				  AND (($4::uuid IS NULL AND oi.variant_id IS NULL) OR oi.variant_id=$4)
+				  AND o.payment_status='paid'
+				  AND o.order_status IN ('confirmed','completed','pending_confirmation')
+			`, storeID, *line.BatchID, line.ProductID, line.VariantID).Scan(&required)
+
+			purchased, unavailable := 0, 0
+			switch status {
+			case PurchasingStatusPurchased:
+				purchased = required
+			case PurchasingStatusUnavailable:
+				unavailable = required
+			}
+			if err := s.UpdatePurchasing(ctx, storeID, *line.BatchID, actorID, UpdatePurchasingInput{
+				ProductID:      line.ProductID,
+				VariantID:      line.VariantID,
+				PurchasedQty:   &purchased,
+				UnavailableQty: &unavailable,
+			}); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Ready-stock: map status onto availability + allocated_qty (no purchasing record).
+		avail := "available"
+		allocExpr := "0"
+		switch status {
+		case PurchasingStatusUnavailable:
+			avail = "unavailable"
+			allocExpr = "0"
+		case PurchasingStatusPurchased:
+			avail = "available"
+			allocExpr = "oi.quantity"
+		case PurchasingStatusPending:
+			avail = "available"
+			allocExpr = "0"
+		}
+		_, err := s.DB.Exec(ctx, `
+			UPDATE order_items oi SET
+				availability_status=$4,
+				allocated_qty=`+allocExpr+`
+			FROM orders o
+			WHERE oi.order_id=o.id AND oi.store_id=o.store_id
+			  AND oi.store_id=$1 AND oi.product_id=$2
+			  AND (($3::uuid IS NULL AND oi.variant_id IS NULL) OR oi.variant_id=$3)
+			  AND o.preorder_batch_id IS NULL
+			  AND o.payment_status='paid'
+			  AND o.order_status IN ('confirmed','completed','pending_confirmation')
+		`, storeID, line.ProductID, line.VariantID, avail)
+		if err != nil {
+			return err
+		}
+		_ = actorID
+	}
+	return nil
 }
 
 // AllocatePurchased assigns purchased qty to an order item with row-level locking

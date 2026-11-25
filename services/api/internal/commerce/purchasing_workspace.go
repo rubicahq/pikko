@@ -14,7 +14,7 @@ type PurchasingFilter struct {
 	CampaignID *uuid.UUID
 	VendorID   *uuid.UUID
 	BrandID    *uuid.UUID
-	GroupBy    string // variant (default) | vendor | brand | campaign
+	GroupBy    string // variant (default) | vendor | brand | campaign | customer | attribute:{id}
 }
 
 type PurchasingAttribute struct {
@@ -25,8 +25,10 @@ type PurchasingAttribute struct {
 // ListPurchasingAttributes returns only product attributes applied to products
 // present in the selected demand source.
 func (s *Service) ListPurchasingAttributes(ctx context.Context, storeID uuid.UUID, source string) ([]PurchasingAttribute, error) {
+	// Include paid ready-stock and preorder demand (batch optional).
 	join := `JOIN order_items oi ON oi.product_id=pav.product_id AND oi.store_id=pav.store_id
-		JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id AND o.order_status NOT IN ('cancelled') AND o.preorder_batch_id IS NOT NULL`
+		JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id AND o.order_status NOT IN ('cancelled')
+		  AND (o.payment_status='paid' OR o.preorder_batch_id IS NOT NULL)`
 	if source == "wishlist" {
 		join = `JOIN wishlist_items w ON w.product_id=pav.product_id AND w.store_id=pav.store_id`
 	}
@@ -101,6 +103,7 @@ func (s *Service) aggregateWishlistPurchasing(ctx context.Context, storeID uuid.
 		if f.BrandID != nil && (line.BrandID == nil || *line.BrandID != *f.BrandID) {
 			continue
 		}
+		line.LineStatus = computePurchasingLineStatus(line.RequiredQty, line.PurchasedQty, line.UnavailableQty)
 		filtered = append(filtered, line)
 	}
 	return s.decoratePurchasingGroups(ctx, storeID, filtered, f.GroupBy)
@@ -125,7 +128,7 @@ func (s *Service) decoratePurchasingGroups(ctx context.Context, storeID uuid.UUI
 				return nil, err
 			}
 		}
-	} else if groupBy == "brand" || groupBy == "vendor" || groupBy == "campaign" {
+	} else if groupBy == "brand" || groupBy == "vendor" || groupBy == "campaign" || groupBy == "customer" {
 		for i := range lines {
 			switch groupBy {
 			case "brand":
@@ -139,6 +142,10 @@ func (s *Service) decoratePurchasingGroups(ctx context.Context, storeID uuid.UUI
 			case "campaign":
 				if lines[i].BatchName != nil {
 					lines[i].GroupLabel = *lines[i].BatchName
+				}
+			case "customer":
+				if lines[i].CustomerName != nil && *lines[i].CustomerName != "" {
+					lines[i].GroupLabel = *lines[i].CustomerName
 				}
 			}
 			if lines[i].GroupLabel == "" {
@@ -170,7 +177,7 @@ func (s *Service) ListPurchasingEligibility(ctx context.Context, storeID uuid.UU
 		       COALESCE((
 		         SELECT COUNT(*) FROM orders o
 		         WHERE o.store_id=b.store_id AND o.preorder_batch_id=b.id
-		           AND o.order_status IN ('confirmed','completed')
+		           AND o.order_status IN ('confirmed','completed','pending_confirmation')
 		           AND o.payment_status='paid'
 		       ),0) AS paid_orders,
 		       COALESCE((
@@ -183,14 +190,22 @@ func (s *Service) ListPurchasingEligibility(ctx context.Context, storeID uuid.UU
 		         SELECT SUM(oi.quantity) FROM order_items oi
 		         JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id
 		         WHERE oi.store_id=b.store_id AND o.preorder_batch_id=b.id
-		           AND o.order_status IN ('confirmed','completed')
+		           AND o.order_status IN ('confirmed','completed','pending_confirmation')
 		           AND o.payment_status='paid'
 		       ),0) AS required_qty
 		FROM preorder_batches b
 		LEFT JOIN campaigns c ON c.id=b.campaign_id AND c.store_id=b.store_id
 		WHERE b.store_id=$1
-		  AND b.operational_status IN (
-		    'closed','purchasing','awaiting_arrival','arrived','fulfilling','completed'
+		  AND (
+		    b.operational_status IN (
+		      'closed','purchasing','awaiting_arrival','arrived','fulfilling','completed'
+		    )
+		    OR EXISTS (
+		      SELECT 1 FROM orders o
+		      WHERE o.store_id=b.store_id AND o.preorder_batch_id=b.id
+		        AND o.order_status NOT IN ('cancelled')
+		        AND o.payment_status='paid'
+		    )
 		  )
 		ORDER BY b.closes_at DESC, b.name
 	`, storeID)
@@ -228,6 +243,7 @@ func (s *Service) ListPurchasingEligibility(ctx context.Context, storeID uuid.UU
 
 // AggregatePurchasing consolidates demand by exact variant (default), optionally
 // filtered by campaign / batch / vendor / brand (PUR-01, PUR-04, PUR-05, VEN-03).
+// Paid orders (including paid-by-admin and ready-stock) count as required demand.
 func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f PurchasingFilter) ([]PurchasingLine, error) {
 	if f.Source == "wishlist" {
 		return s.aggregateWishlistPurchasing(ctx, storeID, f)
@@ -239,9 +255,15 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 	if groupBy == "" {
 		groupBy = "variant"
 	}
+	byCustomer := groupBy == "customer"
 
 	args := []any{storeID}
-	where := []string{"oi.store_id=$1", "o.order_status NOT IN ('cancelled')", "o.preorder_batch_id IS NOT NULL"}
+	// Include preorder demand and any paid (ready-stock or pending-confirmation) orders.
+	where := []string{
+		"oi.store_id=$1",
+		"o.order_status NOT IN ('cancelled')",
+		"(o.preorder_batch_id IS NOT NULL OR o.payment_status='paid')",
+	}
 	argN := 2
 	if f.BatchID != nil {
 		where = append(where, "o.preorder_batch_id=$"+strconv.Itoa(argN))
@@ -261,7 +283,16 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 
 	whereSQL := strings.Join(where, " AND ")
 
-	// Always aggregate demand at exact variant grain; enrich with preferred vendor / brand.
+	customerSelect := "NULL::uuid AS customer_id, NULL::text AS customer_name,"
+	customerGroup := ""
+	orderBy := "batch_name NULLS LAST, product_name, variant_label NULLS FIRST"
+	if byCustomer {
+		customerSelect = "o.customer_id AS customer_id, MAX(o.customer_name) AS customer_name,"
+		customerGroup = ", o.customer_id"
+		orderBy = "customer_name NULLS LAST, product_name, variant_label NULLS FIRST"
+	}
+
+	// Paid demand includes pending_confirmation (paid-by-admin before confirm) and ready-stock.
 	q := `
 		SELECT oi.product_id, oi.variant_id,
 		       MAX(oi.product_name) AS product_name,
@@ -275,9 +306,10 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 		         (array_agg(o.campaign_id) FILTER (WHERE o.campaign_id IS NOT NULL))[1],
 		         b.campaign_id
 		       ) AS campaign_id,
+		       ` + customerSelect + `
 		       COALESCE(SUM(oi.quantity) FILTER (
-		         WHERE o.order_status IN ('confirmed','completed')
-		           AND o.payment_status='paid'
+		         WHERE o.payment_status='paid'
+		           AND o.order_status IN ('confirmed','completed','pending_confirmation')
 		       ),0) AS required_qty,
 		       COALESCE(SUM(oi.quantity) FILTER (
 		         WHERE o.order_status IN ('confirmed','pending_confirmation')
@@ -285,13 +317,20 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 		       ),0) AS unpaid_demand
 		FROM order_items oi
 		JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id
-		JOIN preorder_batches b ON b.id=o.preorder_batch_id AND b.store_id=o.store_id
+		LEFT JOIN preorder_batches b ON b.id=o.preorder_batch_id AND b.store_id=o.store_id
 		LEFT JOIN products p ON p.id=oi.product_id AND p.store_id=oi.store_id
 		LEFT JOIN brands br ON br.id=p.brand_id AND br.store_id=p.store_id
 		WHERE ` + whereSQL + `
-		GROUP BY oi.product_id, oi.variant_id, p.brand_id, br.name, o.preorder_batch_id, b.campaign_id
-		ORDER BY batch_name NULLS LAST, product_name, variant_label NULLS FIRST
-	`
+		GROUP BY oi.product_id, oi.variant_id, p.brand_id, br.name, o.preorder_batch_id, b.campaign_id` + customerGroup + `
+		HAVING COALESCE(SUM(oi.quantity) FILTER (
+		         WHERE o.payment_status='paid'
+		           AND o.order_status IN ('confirmed','completed','pending_confirmation')
+		       ),0) > 0
+		    OR COALESCE(SUM(oi.quantity) FILTER (
+		         WHERE o.order_status IN ('confirmed','pending_confirmation')
+		           AND o.payment_status IN ('unpaid','awaiting_verification')
+		       ),0) > 0
+		ORDER BY ` + orderBy
 	rows, err := s.DB.Query(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -304,6 +343,7 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 		if err := rows.Scan(
 			&line.ProductID, &line.VariantID, &line.ProductName, &line.SKU, &line.VariantLabel,
 			&line.BrandID, &line.BrandName, &line.BatchID, &line.BatchName, &line.CampaignID,
+			&line.CustomerID, &line.CustomerName,
 			&line.RequiredQty, &line.UnpaidDemand,
 		); err != nil {
 			return nil, err
@@ -317,13 +357,17 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 	out := make([]PurchasingLine, 0, len(lines))
 	for _, line := range lines {
 		batchID := uuid.Nil
-		if line.BatchID != nil {
+		hasBatch := line.BatchID != nil
+		if hasBatch {
 			batchID = *line.BatchID
 		}
 
 		// Preferred vendor enrichment (VEN-03); filter when vendor_id set.
 		prefVendorID, prefVendorName := s.preferredVendor(ctx, storeID, line.ProductID)
 		if f.VendorID != nil {
+			if !hasBatch {
+				continue
+			}
 			if prefVendorID == nil || *prefVendorID != *f.VendorID {
 				// Still include if any purchasing record exists for this vendor.
 				var hasSplit bool
@@ -347,39 +391,77 @@ func (s *Service) AggregatePurchasing(ctx context.Context, storeID uuid.UUID, f 
 			line.VendorName = prefVendorName
 		}
 
-		if f.VendorID != nil {
+		if hasBatch {
+			if f.VendorID != nil {
+				_ = s.DB.QueryRow(ctx, `
+					SELECT COALESCE(SUM(purchased_qty),0), COALESCE(SUM(unavailable_qty),0),
+					       COALESCE(SUM(received_qty),0), COALESCE(MAX(version),0)
+					FROM preorder_purchasing_records
+					WHERE store_id=$1 AND batch_id=$2 AND product_id=$3
+					  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
+					  AND vendor_id=$5
+				`, storeID, batchID, line.ProductID, line.VariantID, *f.VendorID).Scan(
+					&line.PurchasedQty, &line.UnavailableQty, &line.ReceivedQty, &line.Version,
+				)
+			} else {
+				_ = s.DB.QueryRow(ctx, `
+					SELECT COALESCE(SUM(purchased_qty),0), COALESCE(SUM(unavailable_qty),0),
+					       COALESCE(SUM(received_qty),0), COALESCE(MAX(version),0)
+					FROM preorder_purchasing_records
+					WHERE store_id=$1 AND batch_id=$2 AND product_id=$3
+					  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
+				`, storeID, batchID, line.ProductID, line.VariantID).Scan(
+					&line.PurchasedQty, &line.UnavailableQty, &line.ReceivedQty, &line.Version,
+				)
+			}
 			_ = s.DB.QueryRow(ctx, `
-				SELECT COALESCE(SUM(purchased_qty),0), COALESCE(SUM(unavailable_qty),0),
-				       COALESCE(SUM(received_qty),0), COALESCE(MAX(version),0)
-				FROM preorder_purchasing_records
+				SELECT COALESCE(SUM(allocated_qty),0) FROM preorder_item_allocations
 				WHERE store_id=$1 AND batch_id=$2 AND product_id=$3
 				  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
-				  AND vendor_id=$5
-			`, storeID, batchID, line.ProductID, line.VariantID, *f.VendorID).Scan(
-				&line.PurchasedQty, &line.UnavailableQty, &line.ReceivedQty, &line.Version,
-			)
+			`, storeID, batchID, line.ProductID, line.VariantID).Scan(&line.AllocatedQty)
 		} else {
+			// Ready-stock: derive status from order-item availability.
+			var avail string
 			_ = s.DB.QueryRow(ctx, `
-				SELECT COALESCE(SUM(purchased_qty),0), COALESCE(SUM(unavailable_qty),0),
-				       COALESCE(SUM(received_qty),0), COALESCE(MAX(version),0)
-				FROM preorder_purchasing_records
-				WHERE store_id=$1 AND batch_id=$2 AND product_id=$3
-				  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
-			`, storeID, batchID, line.ProductID, line.VariantID).Scan(
-				&line.PurchasedQty, &line.UnavailableQty, &line.ReceivedQty, &line.Version,
-			)
+				SELECT CASE
+					WHEN COUNT(*) = 0 THEN 'pending'
+					WHEN BOOL_AND(oi.availability_status='unavailable') THEN 'unavailable'
+					WHEN BOOL_AND(oi.availability_status='available')
+					     AND BOOL_OR(oi.allocated_qty >= oi.quantity) THEN 'purchased'
+					WHEN COUNT(*) FILTER (WHERE oi.availability_status<>'available' OR oi.allocated_qty > 0) > 0 THEN 'partial'
+					ELSE 'pending'
+				END
+				FROM order_items oi
+				JOIN orders o ON o.id=oi.order_id AND o.store_id=oi.store_id
+				WHERE oi.store_id=$1 AND oi.product_id=$2
+				  AND (($3::uuid IS NULL AND oi.variant_id IS NULL) OR oi.variant_id=$3)
+				  AND o.preorder_batch_id IS NULL
+				  AND o.payment_status='paid'
+				  AND o.order_status IN ('confirmed','completed','pending_confirmation')
+				  AND ($4::uuid IS NULL OR o.customer_id=$4)
+			`, storeID, line.ProductID, line.VariantID, line.CustomerID).Scan(&avail)
+			switch avail {
+			case "unavailable":
+				line.UnavailableQty = line.RequiredQty
+				line.LineStatus = PurchasingStatusUnavailable
+			case "purchased":
+				line.PurchasedQty = line.RequiredQty
+				line.LineStatus = PurchasingStatusPurchased
+			case "partial":
+				line.LineStatus = PurchasingStatusPartial
+			default:
+				line.LineStatus = PurchasingStatusPending
+			}
 		}
-		_ = s.DB.QueryRow(ctx, `
-			SELECT COALESCE(SUM(allocated_qty),0) FROM preorder_item_allocations
-			WHERE store_id=$1 AND batch_id=$2 AND product_id=$3
-			  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
-		`, storeID, batchID, line.ProductID, line.VariantID).Scan(&line.AllocatedQty)
 
 		outQty := line.RequiredQty - line.PurchasedQty
 		if outQty < 0 {
 			outQty = 0
 		}
 		line.OutstandingQty = outQty
+		if line.LineStatus == "" {
+			line.LineStatus = computePurchasingLineStatus(line.RequiredQty, line.PurchasedQty, line.UnavailableQty)
+		}
 		out = append(out, line)
 	}
 
