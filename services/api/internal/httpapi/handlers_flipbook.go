@@ -155,13 +155,43 @@ func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"store": map[string]any{
-			"id":       store.ID,
-			"name":     store.Name,
-			"slug":     slug,
-			"whatsapp": store.WhatsApp,
+			"id":          store.ID,
+			"name":        store.Name,
+			"slug":        slug,
+			"whatsapp":    store.WhatsApp,
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog",
 		},
 		"pages": pages,
+	})
+}
+
+// PublicCatalogDoc returns the flipbook for one published catalog document.
+func (h *FlipbookHandlers) PublicCatalogDoc(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	catalogID, err := uuid.Parse(r.PathValue("catalogID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Catalog not found.")
+		return
+	}
+	store, pages, err := h.Flipbook.PublicByCatalog(r.Context(), slug, catalogID)
+	if err != nil {
+		if errors.Is(err, flipbook.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Catalog not found.")
+			return
+		}
+		writeError(w, r, http.StatusInternalServerError, "catalog_failed", "Unable to load catalog.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"store": map[string]any{
+			"id":          store.ID,
+			"name":        store.Name,
+			"slug":        slug,
+			"whatsapp":    store.WhatsApp,
+			"catalog_url": h.URLs.Storefront(slug) + "/catalog/" + catalogID.String(),
+		},
+		"catalog_id": catalogID,
+		"pages":      pages,
 	})
 }
 

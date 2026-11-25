@@ -2,12 +2,22 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPublicBatches, getPublicLives, getPublicProducts, getPublicStore } from "@/lib/server-api";
+import {
+  getPublicBatches,
+  getPublicCatalogs,
+  getPublicLives,
+  getPublicProducts,
+  getPublicStore,
+} from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { safeCssColor } from "@/lib/safe-css-color";
 import { storefrontIconsMetadata, storefrontLogoSrc } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
+import {
+  CATALOG_HOMEPAGE_LIMIT,
+  CatalogBannerCards,
+} from "@/components/storefront/catalog-banner-cards";
 
 type Props = { params: Promise<{ storeSlug: string }> };
 
@@ -42,10 +52,11 @@ export default async function PublicStorePage({ params }: Props) {
   if (!data) notFound();
   const { store } = data;
   const sf = store.storefront;
-  const [{ products }, batches, lives] = await Promise.all([
+  const [{ products }, batches, lives, catalogs] = await Promise.all([
     getPublicProducts(storeSlug),
     getPublicBatches(storeSlug),
     getPublicLives(storeSlug),
+    getPublicCatalogs(storeSlug),
   ]);
   const openBatches = batches.filter((b) => b.operational_status === "open" || b.operational_status === "scheduled");
   const openLives = lives.filter((l) => l.operational_status === "open" || l.operational_status === "scheduled");
@@ -74,8 +85,11 @@ export default async function PublicStorePage({ params }: Props) {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <Link href={`/${storeSlug}/catalog`} className="text-sm opacity-80 hover:opacity-100">
-            Catalog
+          <Link
+            href={catalogs.length > 0 ? urls.storefrontCatalogs(storeSlug) : `/${storeSlug}/catalog`}
+            className="text-sm opacity-80 hover:opacity-100"
+          >
+            Catalogs
           </Link>
           <CartBadge storeSlug={storeSlug} color={text} />
           {sf.whatsapp ? (
@@ -95,6 +109,21 @@ export default async function PublicStorePage({ params }: Props) {
         {sf.description && (
           <p className="max-w-reading text-base opacity-80">{sf.description}</p>
         )}
+
+        {catalogs.length > 0 ? (
+          <section className="mt-10">
+            <h2 className="text-xl font-medium">Catalogs</h2>
+            <CatalogBannerCards
+              storeSlug={storeSlug}
+              catalogs={catalogs}
+              limit={CATALOG_HOMEPAGE_LIMIT}
+              showExploreMore
+              borderColor={border}
+              surfaceColor={surface}
+              textColor={text}
+            />
+          </section>
+        ) : null}
 
         {openLives.length > 0 ? (
           <section className="mt-10">

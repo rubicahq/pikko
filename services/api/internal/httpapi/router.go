@@ -94,7 +94,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	flipSvc := &flipbook.Service{DB: d.DB}
 	flipH := &FlipbookHandlers{Flipbook: flipSvc, Catalog: catalogSvc, URLs: urlGen}
 	catalogDocSvc := &catalogs.Service{DB: d.DB}
-	catalogDocH := &CatalogDocHandlers{Catalogs: catalogDocSvc}
+	catalogDocH := &CatalogDocHandlers{Catalogs: catalogDocSvc, URLs: urlGen}
 	relH := &ProductRelationHandlers{Catalog: catalogSvc}
 	notifSvc := &notifications.Service{DB: d.DB}
 	analyticsSvc := &analytics.Service{DB: d.DB}
@@ -415,6 +415,8 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/categories", p2.PublicCategories)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog", flipH.PublicCatalog)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalog/products/{productID}", flipH.PublicHotspotProduct)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalogs", catalogDocH.PublicCatalogs)
+	mux.HandleFunc("GET /api/v1/public/stores/{slug}/catalogs/{catalogID}", flipH.PublicCatalogDoc)
 	mux.HandleFunc("GET /api/v1/public/files/{storeID}/{fileID}", p2.PublicFile)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders", commerceH.PublicBatches)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}/preorders/{batchSlug}", commerceH.PublicBatch)

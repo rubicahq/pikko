@@ -14,6 +14,7 @@ var PublicPurposes = map[string]struct{}{
 	"other":          {},
 	"catalog_page":   {},
 	"preorder_cover": {},
+	"catalog_cover":  {},
 	"import_crop":    {},
 }
 

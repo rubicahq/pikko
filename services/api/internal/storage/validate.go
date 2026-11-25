@@ -28,6 +28,7 @@ var PurposeLimits = map[string]UploadLimits{
 		AllowedMIME: []string{"image/png", "image/jpeg", "image/webp", "application/pdf"},
 	},
 	"preorder_cover": {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
+	"catalog_cover":  {MaxBytes: 5 << 20, AllowedMIME: []string{"image/png", "image/jpeg", "image/webp"}},
 	"catalog_csv": {
 		MaxBytes:    5 << 20,
 		AllowedMIME: []string{"text/csv", "text/plain", "application/csv", "application/vnd.ms-excel"},

@@ -96,6 +96,8 @@ export const urls = {
   storefrontCart: (slug: string) => `/${slug}/cart`,
   storefrontCheckout: (slug: string) => `/${slug}/checkout`,
   storefrontCatalog: (slug: string) => `${storefront()}/${slug}/catalog`,
+  storefrontCatalogs: (slug: string) => `/${slug}/catalogs`,
+  storefrontCatalogDoc: (slug: string, catalogId: string) => `/${slug}/catalog/${catalogId}`,
   storefrontProduct: (slug: string, productSlug: string) => `/${slug}/products/${productSlug}`,
   storefrontProductAbsolute: (slug: string, productSlug: string) =>
     `${storefront()}/${slug}/products/${productSlug}`,
