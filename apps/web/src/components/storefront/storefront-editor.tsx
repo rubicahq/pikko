@@ -287,6 +287,13 @@ export function StorefrontEditor({
 
           {section === "content" ? (
             <>
+              <label className="flex items-start gap-3 rounded-md border border-border p-4 text-sm">
+                <input type="checkbox" className="mt-1" checked={cfg.show_catalogs_on_home !== false}
+                  onChange={(e) => patch({ show_catalogs_on_home: e.target.checked })} />
+                <span><strong>Tampilkan katalog di beranda</strong><br />
+                  <span className="text-foreground-secondary">Katalog tetap bisa dibuka dari Live Shopping dan halaman Catalogs.</span>
+                </span>
+              </label>
               <div className="space-y-2">
                 <Label htmlFor="description">Store description</Label>
                 <textarea

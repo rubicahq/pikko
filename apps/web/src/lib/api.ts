@@ -175,6 +175,7 @@ export type StorefrontConfig = {
   contact_email?: string | null;
   whatsapp?: string | null;
   social_links?: Record<string, string>;
+  show_catalogs_on_home: boolean;
   updated_at: string;
   published_at?: string | null;
 };

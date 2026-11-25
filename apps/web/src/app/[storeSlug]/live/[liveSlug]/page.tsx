@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPublicLive, getPublicStore } from "@/lib/server-api";
+import { getPublicCatalogs, getPublicLive, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { storefrontIconsMetadata } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
+import { WishlistBadge } from "@/components/storefront/wishlist-badge";
 import { WishlistButton } from "@/components/storefront/wishlist-button";
 
 type Props = { params: Promise<{ storeSlug: string; liveSlug: string }> };
@@ -30,9 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function PublicLivePage({ params }: Props) {
   const { storeSlug, liveSlug } = await params;
   if (RESERVED_STOREFRONT_SLUGS.has(storeSlug)) notFound();
-  const [storeData, liveData] = await Promise.all([
+  const [storeData, liveData, allCatalogs] = await Promise.all([
     getPublicStore(storeSlug),
     getPublicLive(storeSlug, liveSlug),
+    getPublicCatalogs(storeSlug),
   ]);
   if (!storeData || !liveData?.live) notFound();
   const store = storeData.store;
@@ -42,6 +44,7 @@ export default async function PublicLivePage({ params }: Props) {
   const wishlistEnabled =
     live.wishlist_enabled === true || live.operational_status === "scheduled";
   const catalogs = live.catalogs || [];
+  const catalogCovers = new Map(allCatalogs.map((c) => [c.id, c.cover_url]));
 
   return (
     <div className="min-h-screen" style={{ background: sf.background_color, color: sf.text_color }}>
@@ -49,7 +52,10 @@ export default async function PublicLivePage({ params }: Props) {
         <Link href={urls.storefrontPath(storeSlug)} className="text-sm opacity-70 hover:opacity-100">
           ← {store.name}
         </Link>
-        <CartBadge storeSlug={storeSlug} color={sf.text_color} />
+        <div className="flex items-center gap-4">
+          {wishlistEnabled ? <WishlistBadge storeSlug={storeSlug} liveSlug={liveSlug} color={sf.text_color} /> : null}
+          <CartBadge storeSlug={storeSlug} color={sf.text_color} />
+        </div>
       </header>
       <main className="mx-auto max-w-dashboard px-4 pb-16 md:px-8">
         <p className="text-sm opacity-70 capitalize">
@@ -76,8 +82,7 @@ export default async function PublicLivePage({ params }: Props) {
         </p>
         {wishlistEnabled ? (
           <p className="mt-4 text-sm opacity-80">
-            Live belum dibuka. Jelajahi katalog dan simpan item ke wishlist — checkout tersedia saat
-            sesi dibuka.
+            Live belum dibuka. Buka katalog dan simpan produk pilihan ke wishlist.
           </p>
         ) : !open ? (
           <p className="mt-4 text-sm opacity-80">This live session is not accepting new orders.</p>
@@ -86,18 +91,22 @@ export default async function PublicLivePage({ params }: Props) {
         {catalogs.length > 0 ? (
           <section className="mt-8">
             <h2 className="text-lg font-medium">Catalogs</h2>
-            <ul className="mt-3 grid gap-3 sm:grid-cols-2">
+            <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {catalogs.map((c) => (
                 <li key={c.id}>
                   <Link
-                    href={`/${storeSlug}/catalog`}
-                    className="block rounded-md border p-4 transition-opacity hover:opacity-90"
+                    href={`/${storeSlug}/catalog/${c.id}?live=${encodeURIComponent(liveSlug)}`}
+                    className="block overflow-hidden rounded-xl border transition-opacity hover:opacity-90"
                     style={{ borderColor: sf.border_color || "#E1E3E8" }}
                   >
-                    <p className="font-medium">{c.title}</p>
+                    {catalogCovers.get(c.id) ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={catalogCovers.get(c.id)} alt="" className="aspect-[4/5] w-full object-cover" />
+                    ) : <div className="aspect-[4/5] bg-black/5" />}
+                    <div className="p-4"><p className="font-medium">{c.title}</p>
                     <p className="mt-1 text-xs opacity-70">
-                      {c.page_count ? `${c.page_count} pages` : "Catalog"} · browse
-                    </p>
+                      {c.page_count ? `${c.page_count} pages` : "Catalog"} · buka katalog
+                    </p></div>
                   </Link>
                 </li>
               ))}
@@ -105,7 +114,7 @@ export default async function PublicLivePage({ params }: Props) {
           </section>
         ) : null}
 
-        <ul className="mt-10 grid gap-6 md:grid-cols-2">
+        {!(wishlistEnabled && catalogs.length > 0) ? <ul className="mt-10 grid gap-6 md:grid-cols-2">
           {(live.products || []).map((p) => (
             <li
               key={p.product_id}
@@ -159,7 +168,7 @@ export default async function PublicLivePage({ params }: Props) {
               </div>
             </li>
           ))}
-        </ul>
+        </ul> : null}
       </main>
     </div>
   );

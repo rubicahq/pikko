@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FlipbookViewer } from "@/components/flipbook/flipbook-viewer";
+import { getPublicLive } from "@/lib/server-api";
 import { urls } from "@/lib/urls";
 
 const API = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -8,9 +9,10 @@ const CATALOG_ID_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function PublicCatalogDocPage({
-  params,
+  params, searchParams,
 }: {
   params: Promise<{ storeSlug: string; catalogId: string }>;
+  searchParams: Promise<{ live?: string }>;
 }) {
   const { storeSlug, catalogId } = await params;
   if (!CATALOG_ID_UUID.test(catalogId)) {
@@ -27,6 +29,10 @@ export default async function PublicCatalogDocPage({
     );
   }
 
+  const { live: requestedLive } = await searchParams;
+  const liveData = requestedLive ? await getPublicLive(storeSlug, requestedLive) : null;
+  const liveSlug = liveData?.live.wishlist_enabled &&
+    liveData.live.catalogs?.some((c) => c.id === catalogId) ? requestedLive : undefined;
   const res = await fetch(
     `${API}/api/v1/public/stores/${storeSlug}/catalogs/${catalogId}`,
     { cache: "no-store" },
@@ -65,6 +71,7 @@ export default async function PublicCatalogDocPage({
       storeName={data.store?.name || storeSlug}
       pages={data.pages || []}
       storeWhatsapp={data.store?.whatsapp || null}
+      liveSlug={liveSlug}
     />
   );
 }
