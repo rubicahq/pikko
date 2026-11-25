@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Sparkles, Wrench } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { apiFetch, ApiError } from "@/lib/api";
+import { Description as DialogDescription } from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,23 +14,13 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
-type ConnieTool = {
-  name: string;
-  description: string;
-  inputSchema?: Record<string, unknown>;
-};
-
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
-  toolsUsed?: string[];
 };
 
 type ChatResponse = {
   message: { role: string; content: string };
-  tools_used?: string[];
-  ai_configured: boolean;
-  mode: string;
 };
 
 const QUICK_PROMPTS = [
@@ -51,34 +42,8 @@ export function ConniePanel({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [tools, setTools] = useState<ConnieTool[]>([]);
-  const [aiConfigured, setAiConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    async function loadTools() {
-      try {
-        const data = await apiFetch<{
-          tools: ConnieTool[];
-          ai_configured: boolean;
-        }>(`/api/v1/stores/${storeId}/connie/tools`);
-        if (cancelled) return;
-        setTools(data.tools || []);
-        setAiConfigured(!!data.ai_configured);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof ApiError ? e.message : "Unable to load Connie tools.");
-        }
-      }
-    }
-    loadTools();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, storeId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -110,10 +75,8 @@ export function ConniePanel({
         {
           role: "assistant",
           content: data.message?.content || "…",
-          toolsUsed: data.tools_used,
         },
       ]);
-      setAiConfigured(!!data.ai_configured);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Connie chat failed.");
     } finally {
@@ -140,21 +103,20 @@ export function ConniePanel({
       </SheetTrigger>
       <SheetContent
         side="right"
-        className="w-[min(100%,28rem)] bg-warm-feature/40"
+        className="h-dvh w-[min(100%,28rem)]"
       >
-        <SheetHeader className="bg-background">
+        <SheetHeader className="shrink-0">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-brand" strokeWidth={1.75} />
             Ask Connie
           </SheetTitle>
-          <p className="mt-1 text-sm text-foreground-secondary">
-            Store ops teammate — {tools.length} tools
-            {aiConfigured ? " · AI on" : " · tool mode"}
-          </p>
+          <DialogDescription className="mt-1 text-sm text-foreground-secondary">
+            Tanya Connie tentang pesanan, produk, atau operasional toko.
+          </DialogDescription>
         </SheetHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4">
-          <div className="flex flex-wrap gap-1.5">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+          <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pt-4">
             {QUICK_PROMPTS.map((p) => (
               <button
                 key={p}
@@ -168,43 +130,18 @@ export function ConniePanel({
             ))}
           </div>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-border bg-background p-3">
-            {messages.length === 0 ? (
-              <div className="space-y-2 text-sm text-foreground-secondary">
-                <p>
-                  Tanya Connie tentang orders, products, catalogs, customers,
-                  campaigns, packing, finance, atau subscription.
-                </p>
-                <p className="flex items-start gap-1.5 text-xs text-foreground-muted">
-                  <Wrench className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  Setiap jawaban bisa memanggil MCP tools dengan isolasi toko +
-                  RBAC.
-                </p>
-              </div>
-            ) : null}
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
             {messages.map((m, i) => (
               <div
                 key={`${m.role}-${i}`}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm whitespace-pre-wrap",
+                  "rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap",
                   m.role === "user"
                     ? "ml-6 bg-ink text-foreground-inverse"
                     : "mr-2 bg-warm-feature text-foreground",
                 )}
               >
                 {m.content}
-                {m.toolsUsed && m.toolsUsed.length > 0 ? (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {m.toolsUsed.map((t) => (
-                      <span
-                        key={t}
-                        className="rounded bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
               </div>
             ))}
             {busy ? (
@@ -217,13 +154,13 @@ export function ConniePanel({
           </div>
 
           {error ? (
-            <p className="text-sm text-error" role="alert">
+            <p className="px-4 text-sm text-error" role="alert">
               {error}
             </p>
           ) : null}
 
           <form
-            className="flex gap-2"
+            className="flex shrink-0 items-center gap-2 border-t border-border px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
             onSubmit={(e) => {
               e.preventDefault();
               void send(input);
