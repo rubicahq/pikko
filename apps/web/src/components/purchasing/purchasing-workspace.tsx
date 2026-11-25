@@ -186,19 +186,22 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         title="Purchasing"
         description="Aggregate paid demand by exact variant, record purchases per vendor, allocate arrivals, and hand off to receiving."
         actions={
-          <Button asChild variant="outline">
-            <Link href={urls.storeVendors(storeId)}>Vendors</Link>
-            {" · "}
-            <Link
-              href={urls.storeMessages(storeId, {
-                audience: "vendor",
-                code: "WA-V02",
-                ...(vendorId ? { vendor_id: vendorId } : {}),
-              })}
-            >
-              WhatsApp vendor
-            </Link>
-          </Button>
+          <>
+            <Button asChild variant="outline">
+              <Link href={urls.storeVendors(storeId)}>Vendors</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link
+                href={urls.storeMessages(storeId, {
+                  audience: "vendor",
+                  code: "WA-V02",
+                  ...(vendorId ? { vendor_id: vendorId } : {}),
+                })}
+              >
+                WhatsApp vendor
+              </Link>
+            </Button>
+          </>
         }
       />
 
