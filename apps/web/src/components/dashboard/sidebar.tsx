@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { Store as StoreType, User } from "@/lib/api";
 import { Wordmark } from "@/components/brand/wordmark";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import {
-  CONNIE_NAV,
   liveSettingsWorkspace,
   matchWorkspace,
   storeHref,
@@ -110,28 +109,6 @@ export function DashboardSidebar({
           collapsed && "px-2",
         )}
       >
-        <div
-          title="Connie — coming soon"
-          className={cn(
-            "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground",
-            "bg-warm-feature",
-            collapsed && "justify-center px-0",
-          )}
-          aria-disabled
-        >
-          <Sparkles className="h-5 w-5 shrink-0 text-brand" strokeWidth={1.75} />
-          {!collapsed ? (
-            <>
-              <span className="truncate">{CONNIE_NAV.label}</span>
-              <span className="ml-auto rounded-sm bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                Soon
-              </span>
-            </>
-          ) : (
-            <span className="sr-only">Connie — coming soon</span>
-          )}
-        </div>
-
         {storeId && settings ? (
           <Link
             href={storeHref(storeId, settings.defaultHref)}

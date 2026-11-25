@@ -184,7 +184,7 @@ SSOT: `apps/web/src/components/dashboard/nav-config.ts` (`PRIMARY_WORKSPACES`, `
 
 ### Sidebar (top → bottom)
 
-Logo → store switcher → View store → divider → **7 primary items** → flex space → Connie (compact) → Settings → My Account dropdown.
+Logo → store switcher → View store → divider → **7 primary items** → flex space → Settings → My Account dropdown.
 
 No Workspace / Operations / Relationships / Manage group labels. No accordion / expandable submenus.
 
@@ -201,7 +201,7 @@ No Workspace / Operations / Relationships / Manage group labels. No accordion / 
 \*Hidden until built (`implemented: false`).
 
 **Settings** (utility): General, Team, Business Rules, Payment Settings, WhatsApp Templates (`/messages`).  
-**Header utilities:** Messages, Notifications (Search omitted until implemented). Connie: 44px peach gradient, Coming Soon — no AI backend.
+**Header utilities (right):** **Ask Connie** (compact peach chip + Soon — no AI backend), Messages, Notifications (Search omitted until implemented).
 
 Nav items: height 40px, gap 4, radius 10, icons 20px stroke ~1.75, label 14/500.  
 **Active:** `#F0F1F3` bg, `#15191E` text (600), icon `#FF3D00` — **not** a solid orange row.  
@@ -279,7 +279,7 @@ Dense and practical:
 
 ## 20. Connie
 
-Team persona entry (sidebar + Overview warm panel). Visual only until an AI backend exists — no fabricated insights, no new AI API in this redesign.
+**Ask Connie** lives in the global header top-right (with Messages / Notifications). Overview may still show a warm panel. Visual only until an AI backend exists — no fabricated insights, no new AI API in this redesign. Not in the sidebar.
 
 ---
 
@@ -346,7 +346,7 @@ Prefer typecheck, lint, build, and targeted unit/API tests. No full Playwright s
 - [x] Hybrid nav: 7 primary workspaces + contextual header tabs
 - [x] Primary buttons Ink Black; brand orange selective
 - [x] Overview is vertical hierarchy (not four KPI cards)
-- [x] Connie is compact visual entry only
+- [x] Ask Connie is compact header utility (Coming Soon) — not in sidebar
 - [x] Unimplemented nav remains hidden
 - [x] No API/DB/auth/RBAC/workflow regressions
 - [x] `docs/DESIGN_SYSTEM.md` matches this authority
