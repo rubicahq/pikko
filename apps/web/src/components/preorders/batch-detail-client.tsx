@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BatchCoverEditor, BatchVariantPairing } from "@/components/preorders/batch-cover-variants";
+import { CatalogAttach } from "@/components/catalog/catalog-attach";
 
 type BatchProduct = {
   id: string;
@@ -100,6 +101,7 @@ export function BatchDetailClient({
   return (
     <div className="mt-8 space-y-6">
       {error ? <p className="text-sm text-error">{error}</p> : null}
+      <CatalogAttach storeId={storeId} mode="preorder" targetId={batch.id} />
       <div className="flex flex-wrap gap-2">
         {batch.operational_status === "open" ? (
           <Button

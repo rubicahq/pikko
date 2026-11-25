@@ -57,8 +57,12 @@ type Job struct {
 	ItemCount      int        `json:"item_count"`
 	WarningCount   int        `json:"warning_count"`
 	ProgressPct    int        `json:"progress_pct"`
+	ProgressStage  string     `json:"progress_stage"`
+	ProgressPage   *int       `json:"progress_page,omitempty"`
+	ProgressPages  *int       `json:"progress_pages,omitempty"`
 	ErrorMessage   *string    `json:"error_message,omitempty"`
 	AIProvider     *string    `json:"ai_provider,omitempty"`
+	CatalogID      *uuid.UUID `json:"catalog_id,omitempty"`
 	IdempotencyKey string     `json:"idempotency_key"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
@@ -67,7 +71,9 @@ type Job struct {
 
 const jobSelectCols = `
 	id, store_id, COALESCE(source_type,'pdf'), pdf_file_id, csv_file_id, extract_images, status, page_count,
-	item_count, COALESCE(warning_count,0), progress_pct, error_message, ai_provider, idempotency_key, created_at, updated_at, completed_at
+	item_count, COALESCE(warning_count,0), progress_pct,
+	COALESCE(progress_stage,'queued'), progress_page, progress_pages,
+	error_message, ai_provider, idempotency_key, created_at, updated_at, completed_at
 `
 
 func scanJob(row interface {
@@ -76,13 +82,17 @@ func scanJob(row interface {
 	var j Job
 	err := row.Scan(
 		&j.ID, &j.StoreID, &j.SourceType, &j.PDFFileID, &j.CSVFileID, &j.ExtractImages, &j.Status, &j.PageCount,
-		&j.ItemCount, &j.WarningCount, &j.ProgressPct, &j.ErrorMessage, &j.AIProvider, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
+		&j.ItemCount, &j.WarningCount, &j.ProgressPct, &j.ProgressStage, &j.ProgressPage, &j.ProgressPages,
+		&j.ErrorMessage, &j.AIProvider, &j.IdempotencyKey, &j.CreatedAt, &j.UpdatedAt, &j.CompletedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
 	if j.SourceType == "" {
 		j.SourceType = "pdf"
+	}
+	if j.ProgressStage == "" {
+		j.ProgressStage = "queued"
 	}
 	return &j, nil
 }
@@ -100,6 +110,8 @@ type Item struct {
 	Description      *string         `json:"description,omitempty"`
 	Brand            *string         `json:"brand,omitempty"`
 	PriceIDR         *int64          `json:"price_idr,omitempty"`
+	PriceNormalIDR   *int64          `json:"price_normal_idr,omitempty"`
+	PriceDiscountIDR *int64          `json:"price_discount_idr,omitempty"`
 	SKU              *string         `json:"sku,omitempty"`
 	CategoryName     *string         `json:"category_name,omitempty"`
 	VariantInfo      json.RawMessage `json:"variant_info,omitempty"`
@@ -236,7 +248,17 @@ func (s *Service) GetJob(ctx context.Context, storeID, jobID uuid.UUID) (*Job, e
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return j, err
+	if err != nil {
+		return nil, err
+	}
+	var catalogID uuid.UUID
+	cerr := s.DB.QueryRow(ctx, `
+		SELECT id FROM catalogs WHERE store_id=$1 AND source_import_job_id=$2
+	`, storeID, jobID).Scan(&catalogID)
+	if cerr == nil {
+		j.CatalogID = &catalogID
+	}
+	return j, nil
 }
 
 func (s *Service) ListJobs(ctx context.Context, storeID uuid.UUID, limit int) ([]Job, error) {
@@ -267,7 +289,7 @@ func (s *Service) ListItems(ctx context.Context, storeID, jobID uuid.UUID) ([]It
 	}
 	rows, err := s.DB.Query(ctx, `
 		SELECT id, job_id, display_order, selected, COALESCE(review_status,'pending'), uncertain, confidence_pct, warning,
-		       name, description, brand, price_idr, sku, category_name, variant_info, image_file_id, page_number,
+		       name, description, brand, price_idr, price_normal_idr, price_discount_idr, sku, category_name, variant_info, image_file_id, page_number,
 		       bbox_x_pct, bbox_y_pct, bbox_width_pct, bbox_height_pct, created_product_id, created_at, updated_at
 		FROM catalog_import_items WHERE store_id=$1 AND job_id=$2 ORDER BY display_order, created_at
 	`, storeID, jobID)
@@ -280,7 +302,7 @@ func (s *Service) ListItems(ctx context.Context, storeID, jobID uuid.UUID) ([]It
 		var it Item
 		if err := rows.Scan(
 			&it.ID, &it.JobID, &it.DisplayOrder, &it.Selected, &it.ReviewStatus, &it.Uncertain, &it.ConfidencePct, &it.Warning,
-			&it.Name, &it.Description, &it.Brand, &it.PriceIDR, &it.SKU, &it.CategoryName, &it.VariantInfo, &it.ImageFileID, &it.PageNumber,
+			&it.Name, &it.Description, &it.Brand, &it.PriceIDR, &it.PriceNormalIDR, &it.PriceDiscountIDR, &it.SKU, &it.CategoryName, &it.VariantInfo, &it.ImageFileID, &it.PageNumber,
 			&it.BBoxXPct, &it.BBoxYPct, &it.BBoxWidthPct, &it.BBoxHeightPct, &it.CreatedProductID, &it.CreatedAt, &it.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -294,16 +316,18 @@ func (s *Service) ListItems(ctx context.Context, storeID, jobID uuid.UUID) ([]It
 }
 
 type ItemPatch struct {
-	Selected     *bool    `json:"selected"`
-	ReviewStatus *string  `json:"review_status"`
-	Uncertain    *bool    `json:"uncertain"`
-	Name         *string  `json:"name"`
-	Description  *string  `json:"description"`
-	Brand        *string  `json:"brand"`
-	PriceIDR     *int64   `json:"price_idr"`
-	SKU          *string  `json:"sku"`
-	CategoryName *string  `json:"category_name"`
-	Warning      *string  `json:"warning"`
+	Selected         *bool   `json:"selected"`
+	ReviewStatus     *string `json:"review_status"`
+	Uncertain        *bool   `json:"uncertain"`
+	Name             *string `json:"name"`
+	Description      *string `json:"description"`
+	Brand            *string `json:"brand"`
+	PriceIDR         *int64  `json:"price_idr"`
+	PriceNormalIDR   *int64  `json:"price_normal_idr"`
+	PriceDiscountIDR *int64  `json:"price_discount_idr"`
+	SKU              *string `json:"sku"`
+	CategoryName     *string `json:"category_name"`
+	Warning          *string `json:"warning"`
 }
 
 func (s *Service) PatchItem(ctx context.Context, storeID, jobID, itemID uuid.UUID, in ItemPatch) (*Item, error) {
@@ -361,7 +385,23 @@ func (s *Service) PatchItem(ctx context.Context, storeID, jobID, itemID uuid.UUI
 			return nil, fmt.Errorf("%w: price_idr must be a non-negative integer", ErrInvalidInput)
 		}
 		cur.PriceIDR = in.PriceIDR
+		if cur.PriceNormalIDR == nil && cur.PriceDiscountIDR == nil {
+			cur.PriceNormalIDR = in.PriceIDR
+		}
 	}
+	if in.PriceNormalIDR != nil {
+		if *in.PriceNormalIDR < 0 {
+			return nil, fmt.Errorf("%w: price_normal_idr must be a non-negative integer", ErrInvalidInput)
+		}
+		cur.PriceNormalIDR = in.PriceNormalIDR
+	}
+	if in.PriceDiscountIDR != nil {
+		if *in.PriceDiscountIDR < 0 {
+			return nil, fmt.Errorf("%w: price_discount_idr must be a non-negative integer", ErrInvalidInput)
+		}
+		cur.PriceDiscountIDR = in.PriceDiscountIDR
+	}
+	cur.PriceIDR = effectivePriceIDR(cur.PriceNormalIDR, cur.PriceDiscountIDR)
 	if in.SKU != nil {
 		cur.SKU = in.SKU
 	}
@@ -373,10 +413,12 @@ func (s *Service) PatchItem(ctx context.Context, storeID, jobID, itemID uuid.UUI
 	}
 	_, err = s.DB.Exec(ctx, `
 		UPDATE catalog_import_items SET
-			selected=$4, review_status=$5, uncertain=$6, name=$7, description=$8, brand=$9, price_idr=$10,
-			sku=$11, category_name=$12, warning=$13, updated_at=now()
+			selected=$4, review_status=$5, uncertain=$6, name=$7, description=$8, brand=$9,
+			price_idr=$10, price_normal_idr=$11, price_discount_idr=$12,
+			sku=$13, category_name=$14, warning=$15, updated_at=now()
 		WHERE id=$1 AND store_id=$2 AND job_id=$3
-	`, itemID, storeID, jobID, cur.Selected, cur.ReviewStatus, cur.Uncertain, cur.Name, cur.Description, cur.Brand, cur.PriceIDR,
+	`, itemID, storeID, jobID, cur.Selected, cur.ReviewStatus, cur.Uncertain, cur.Name, cur.Description, cur.Brand,
+		cur.PriceIDR, cur.PriceNormalIDR, cur.PriceDiscountIDR,
 		cur.SKU, cur.CategoryName, cur.Warning)
 	if err != nil {
 		return nil, err
@@ -476,12 +518,12 @@ func (s *Service) getItem(ctx context.Context, storeID, jobID, itemID uuid.UUID)
 	var it Item
 	err := s.DB.QueryRow(ctx, `
 		SELECT id, job_id, display_order, selected, COALESCE(review_status,'pending'), uncertain, confidence_pct, warning,
-		       name, description, brand, price_idr, sku, category_name, variant_info, image_file_id, page_number,
+		       name, description, brand, price_idr, price_normal_idr, price_discount_idr, sku, category_name, variant_info, image_file_id, page_number,
 		       bbox_x_pct, bbox_y_pct, bbox_width_pct, bbox_height_pct, created_product_id, created_at, updated_at
 		FROM catalog_import_items WHERE id=$1 AND store_id=$2 AND job_id=$3
 	`, itemID, storeID, jobID).Scan(
 		&it.ID, &it.JobID, &it.DisplayOrder, &it.Selected, &it.ReviewStatus, &it.Uncertain, &it.ConfidencePct, &it.Warning,
-		&it.Name, &it.Description, &it.Brand, &it.PriceIDR, &it.SKU, &it.CategoryName, &it.VariantInfo, &it.ImageFileID, &it.PageNumber,
+		&it.Name, &it.Description, &it.Brand, &it.PriceIDR, &it.PriceNormalIDR, &it.PriceDiscountIDR, &it.SKU, &it.CategoryName, &it.VariantInfo, &it.ImageFileID, &it.PageNumber,
 		&it.BBoxXPct, &it.BBoxYPct, &it.BBoxWidthPct, &it.BBoxHeightPct, &it.CreatedProductID, &it.CreatedAt, &it.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -582,17 +624,17 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 			skipped++
 			continue // skip nameless — do not fabricate
 		}
-		price := int64(0)
-		if it.PriceIDR != nil {
-			price = *it.PriceIDR
-		}
+		base, compareAt, contact := resolveImportPrices(it)
+		contactFlag := contact
 		write := catalog.ProductWriteInput{
 			Product: catalog.ProductInput{
-				Name:         name,
-				Description:  it.Description,
-				SKU:          it.SKU,
-				Brand:        it.Brand,
-				BasePriceIDR: price,
+				Name:              name,
+				Description:       it.Description,
+				SKU:               it.SKU,
+				Brand:             it.Brand,
+				BasePriceIDR:      base,
+				CompareAtPriceIDR: compareAt,
+				ContactForPrice:   &contactFlag,
 			},
 		}
 		status := "draft"
@@ -625,12 +667,8 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 			WHERE id=$1 AND store_id=$2
 		`, it.ID, storeID, p.ID)
 
-		// Create hotspot candidate when bbox + page known
-		if it.PageNumber != nil && it.BBoxXPct != nil && it.BBoxYPct != nil && it.BBoxWidthPct != nil && it.BBoxHeightPct != nil {
-			x, y, w, h, ok := clampHotspotBBox(*it.BBoxXPct, *it.BBoxYPct, *it.BBoxWidthPct, *it.BBoxHeightPct)
-			if !ok {
-				continue
-			}
+		// Bind product to page: real hotspot when bbox known, else list-only for active-page list
+		if it.PageNumber != nil {
 			var pageID uuid.UUID
 			err := s.DB.QueryRow(ctx, `
 				SELECT id FROM catalog_pages
@@ -638,11 +676,19 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 				LIMIT 1
 			`, storeID, jobID, *it.PageNumber).Scan(&pageID)
 			if err == nil {
+				listOnly := true
+				x, y, w, h := 0.0, 0.0, 1.0, 1.0
+				if it.BBoxXPct != nil && it.BBoxYPct != nil && it.BBoxWidthPct != nil && it.BBoxHeightPct != nil {
+					if cx, cy, cw, ch, ok := clampHotspotBBox(*it.BBoxXPct, *it.BBoxYPct, *it.BBoxWidthPct, *it.BBoxHeightPct); ok {
+						x, y, w, h = cx, cy, cw, ch
+						listOnly = false
+					}
+				}
 				_, err = s.DB.Exec(ctx, `
 					INSERT INTO catalog_page_hotspots (
-						store_id, catalog_page_id, product_id, import_item_id, x_pct, y_pct, width_pct, height_pct
-					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-				`, storeID, pageID, p.ID, it.ID, x, y, w, h)
+						store_id, catalog_page_id, product_id, import_item_id, x_pct, y_pct, width_pct, height_pct, list_only
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+				`, storeID, pageID, p.ID, it.ID, x, y, w, h, listOnly)
 				if err == nil {
 					hotspots++
 				}
@@ -654,8 +700,29 @@ func (s *Service) Confirm(ctx context.Context, storeID, jobID uuid.UUID, in Conf
 		return nil, fmt.Errorf("%w: no eligible items to confirm — select items with a name, or fix rejected/empty lines", ErrInvalidInput)
 	}
 
+	// Ensure a reusable catalog document from this import (standalone until linked).
+	title := "Catalog " + job.CreatedAt.Format("2006-01-02")
+	var catalogID uuid.UUID
+	cerr := s.DB.QueryRow(ctx, `
+		SELECT id FROM catalogs WHERE store_id=$1 AND source_import_job_id=$2
+	`, storeID, jobID).Scan(&catalogID)
+	if errors.Is(cerr, pgx.ErrNoRows) {
+		_ = s.DB.QueryRow(ctx, `
+			INSERT INTO catalogs (store_id, title, status, source_import_job_id)
+			VALUES ($1,$2,'draft',$3) RETURNING id
+		`, storeID, title, jobID).Scan(&catalogID)
+	}
+	if catalogID != uuid.Nil {
+		_, _ = s.DB.Exec(ctx, `
+			UPDATE catalog_pages SET catalog_id=$3, updated_at=now()
+			WHERE store_id=$1 AND source_import_job_id=$2
+		`, storeID, jobID, catalogID)
+	}
+
 	_, err = s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET status='completed', progress_pct=100, completed_at=now(), updated_at=now()
+		UPDATE catalog_import_jobs
+		SET status='completed', progress_pct=100, progress_stage='completed',
+		    progress_page=NULL, completed_at=now(), updated_at=now()
 		WHERE id=$1 AND store_id=$2
 	`, jobID, storeID)
 	if err != nil {
@@ -705,7 +772,8 @@ func (s *Service) Retry(ctx context.Context, storeID, jobID uuid.UUID) (*Job, er
 	}
 	_, err = s.DB.Exec(ctx, `
 		UPDATE catalog_import_jobs
-		SET status='pending', progress_pct=0, item_count=0, warning_count=0, error_message=NULL,
+		SET status='pending', progress_pct=0, progress_stage='queued', progress_page=NULL, progress_pages=NULL,
+		    item_count=0, warning_count=0, error_message=NULL,
 		    ai_provider=NULL, job_queue_id=$3, updated_at=now()
 		WHERE id=$1 AND store_id=$2
 	`, jobID, storeID, qJob.ID)
@@ -735,10 +803,20 @@ func (s *Service) ProcessJob(ctx context.Context, queueJob *jobs.Job) error {
 	return s.processImport(ctx, storeID, jobID)
 }
 
+func (s *Service) setProgress(ctx context.Context, storeID, jobID uuid.UUID, pct int, stage string, page, pages *int) {
+	_, _ = s.DB.Exec(ctx, `
+		UPDATE catalog_import_jobs
+		SET progress_pct=$3, progress_stage=$4, progress_page=$5, progress_pages=$6, updated_at=now()
+		WHERE id=$1 AND store_id=$2
+	`, jobID, storeID, pct, stage, page, pages)
+}
+
 func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) error {
 	lim := s.limits()
 	_, err := s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET status='processing', progress_pct=5, updated_at=now() WHERE id=$1 AND store_id=$2
+		UPDATE catalog_import_jobs
+		SET status='processing', progress_pct=5, progress_stage='uploading', updated_at=now()
+		WHERE id=$1 AND store_id=$2
 	`, jobID, storeID)
 	if err != nil {
 		return err
@@ -766,6 +844,8 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 	}
 	_ = f
 
+	s.setProgress(ctx, storeID, jobID, 15, "splitting_pages", nil, nil)
+
 	renderer := s.Renderer
 	if renderer == nil {
 		renderer = pdfutil.NewRenderer()
@@ -777,9 +857,11 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 	if len(pages) > lim.MaxPages {
 		return s.failJob(ctx, storeID, jobID, fmt.Errorf("page limit exceeded"))
 	}
+	totalPages := len(pages)
+	s.setProgress(ctx, storeID, jobID, 30, "splitting_pages", nil, &totalPages)
 	_, _ = s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET page_count=$3, progress_pct=30, updated_at=now() WHERE id=$1 AND store_id=$2
-	`, jobID, storeID, len(pages))
+		UPDATE catalog_import_jobs SET page_count=$3, updated_at=now() WHERE id=$1 AND store_id=$2
+	`, jobID, storeID, totalPages)
 
 	// Clear previous draft pages/items so retries stay idempotent.
 	_, _ = s.DB.Exec(ctx, `
@@ -821,10 +903,6 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		})
 	}
 
-	_, _ = s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET progress_pct=55, updated_at=now() WHERE id=$1 AND store_id=$2
-	`, jobID, storeID)
-
 	extractor := s.AI
 	if extractor == nil {
 		extractor = ai.NewMockExtractor()
@@ -834,77 +912,93 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		UPDATE catalog_import_jobs SET ai_provider=$3, updated_at=now() WHERE id=$1 AND store_id=$2
 	`, jobID, storeID, provider)
 
-	result, err := extractor.ExtractCatalog(ctx, ai.ExtractRequest{
-		Pages:         aiPages,
-		ExtractImages: job.ExtractImages,
-		MaxItems:      lim.MaxItems,
-	})
-	if err != nil {
-		return s.failJob(ctx, storeID, jobID, fmt.Errorf("AI extraction failed: %w", err))
-	}
-
 	count := 0
 	warnCount := 0
-	for i, ex := range result.Items {
-		if count >= lim.MaxItems {
-			break
+	displayOrder := 0
+	for i, pageImg := range aiPages {
+		pageNum := pageImg.PageNumber
+		pct := 55
+		if totalPages > 0 {
+			pct = 55 + (40 * i / totalPages)
 		}
-		ex.NormalizeConfidence()
-		variant := ex.VariantInfo
-		if len(variant) == 0 {
-			variant = json.RawMessage(`{}`)
+		s.setProgress(ctx, storeID, jobID, pct, "analyzing", &pageNum, &totalPages)
+
+		result, err := extractor.ExtractCatalog(ctx, ai.ExtractRequest{
+			Pages:         []ai.PageImage{pageImg},
+			ExtractImages: job.ExtractImages,
+			MaxItems:      lim.MaxItems - count,
+		})
+		if err != nil {
+			return s.failJob(ctx, storeID, jobID, fmt.Errorf("AI extraction failed on page %d: %w", pageNum, err))
 		}
-		var imageID *uuid.UUID
-		if job.ExtractImages && ex.PageNumber != nil {
-			// Attach page image as provisional product image when crop unavailable
-			if pid, ok := pageIDByNumber[*ex.PageNumber]; ok {
-				var fid uuid.UUID
-				err := s.DB.QueryRow(ctx, `SELECT image_file_id FROM catalog_pages WHERE id=$1 AND store_id=$2`, pid, storeID).Scan(&fid)
-				if err == nil {
-					imageID = &fid
+
+		for _, ex := range result.Items {
+			if count >= lim.MaxItems {
+				break
+			}
+			ex.NormalizePrices()
+			ex.NormalizeConfidence()
+			if ex.PageNumber == nil {
+				p := pageNum
+				ex.PageNumber = &p
+			}
+			variant := ex.VariantInfo
+			if len(variant) == 0 {
+				variant = json.RawMessage(`{}`)
+			}
+			var imageID *uuid.UUID
+			if job.ExtractImages && ex.PageNumber != nil {
+				if pid, ok := pageIDByNumber[*ex.PageNumber]; ok {
+					var fid uuid.UUID
+					err := s.DB.QueryRow(ctx, `SELECT image_file_id FROM catalog_pages WHERE id=$1 AND store_id=$2`, pid, storeID).Scan(&fid)
+					if err == nil {
+						imageID = &fid
+					}
 				}
 			}
-		}
-		if ex.Uncertain || (ex.Warning != nil && strings.TrimSpace(*ex.Warning) != "") {
-			warnCount++
-		}
-		reviewStatus := "pending"
-		selected := true
-		name := ""
-		if ex.Name != nil {
-			name = strings.TrimSpace(*ex.Name)
-		}
-		if name == "" {
-			selected = false
-			reviewStatus = "rejected"
-			if ex.Warning == nil {
-				w := "missing product name"
-				ex.Warning = &w
-				ex.Uncertain = true
+			if ex.Uncertain || (ex.Warning != nil && strings.TrimSpace(*ex.Warning) != "") {
 				warnCount++
 			}
+			reviewStatus := "pending"
+			selected := true
+			name := ""
+			if ex.Name != nil {
+				name = strings.TrimSpace(*ex.Name)
+			}
+			if name == "" {
+				selected = false
+				reviewStatus = "rejected"
+				if ex.Warning == nil {
+					w := "missing product name"
+					ex.Warning = &w
+					ex.Uncertain = true
+					warnCount++
+				}
+			}
+			rawItem, _ := json.Marshal(ex)
+			_, err = s.DB.Exec(ctx, `
+				INSERT INTO catalog_import_items (
+					store_id, job_id, display_order, selected, review_status, uncertain, confidence_pct, warning,
+					name, description, brand, price_idr, price_normal_idr, price_discount_idr, sku, category_name, variant_info,
+					image_file_id, page_number, bbox_x_pct, bbox_y_pct, bbox_width_pct, bbox_height_pct, raw_extraction
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+			`, storeID, jobID, displayOrder, selected, reviewStatus, ex.Uncertain, ex.ConfidencePct, ex.Warning,
+				ex.Name, ex.Description, ex.Brand, ex.PriceIDR, ex.PriceNormalIDR, ex.PriceDiscountIDR, ex.SKU, ex.Category, variant,
+				imageID, ex.PageNumber, ex.BBoxXPct, ex.BBoxYPct, ex.BBoxWidthPct, ex.BBoxHeightPct, rawItem)
+			if err != nil {
+				return s.failJob(ctx, storeID, jobID, err)
+			}
+			count++
+			displayOrder++
 		}
-		rawItem, _ := json.Marshal(ex)
-		_, err = s.DB.Exec(ctx, `
-			INSERT INTO catalog_import_items (
-				store_id, job_id, display_order, selected, review_status, uncertain, confidence_pct, warning,
-				name, description, brand, price_idr, sku, category_name, variant_info,
-				image_file_id, page_number, bbox_x_pct, bbox_y_pct, bbox_width_pct, bbox_height_pct, raw_extraction
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
-		`, storeID, jobID, i, selected, reviewStatus, ex.Uncertain, ex.ConfidencePct, ex.Warning,
-			ex.Name, ex.Description, ex.Brand, ex.PriceIDR, ex.SKU, ex.Category, variant,
-			imageID, ex.PageNumber, ex.BBoxXPct, ex.BBoxYPct, ex.BBoxWidthPct, ex.BBoxHeightPct, rawItem)
-		if err != nil {
-			return s.failJob(ctx, storeID, jobID, err)
-		}
-		count++
 	}
 
 	_, err = s.DB.Exec(ctx, `
 		UPDATE catalog_import_jobs
-		SET status='review_required', item_count=$3, warning_count=$4, progress_pct=100, updated_at=now()
+		SET status='review_required', item_count=$3, warning_count=$4, progress_pct=100,
+		    progress_stage='ready_for_review', progress_page=NULL, progress_pages=$5, updated_at=now()
 		WHERE id=$1 AND store_id=$2
-	`, jobID, storeID, count, warnCount)
+	`, jobID, storeID, count, warnCount, totalPages)
 	if err != nil {
 		return err
 	}
@@ -952,7 +1046,9 @@ func (s *Service) failJob(ctx context.Context, storeID, jobID uuid.UUID, cause e
 		s.Logger.Error("catalog_import_failed", "store_id", storeID, "job_id", jobID, "error", msg)
 	}
 	_, _ = s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET status='failed', error_message=$3, updated_at=now() WHERE id=$1 AND store_id=$2
+		UPDATE catalog_import_jobs
+		SET status='failed', progress_stage='failed', error_message=$3, updated_at=now()
+		WHERE id=$1 AND store_id=$2
 	`, jobID, storeID, msg)
 	_ = s.Outbox.Write(ctx, &storeID, "catalog_import_failed", map[string]any{
 		"import_job_id": jobID.String(),

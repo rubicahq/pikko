@@ -23,6 +23,8 @@ type ImportItem = {
   description?: string | null;
   brand?: string | null;
   price_idr?: number | null;
+  price_normal_idr?: number | null;
+  price_discount_idr?: number | null;
   sku?: string | null;
   category_name?: string | null;
   image_url?: string;
@@ -34,12 +36,42 @@ type Job = {
   id: string;
   status: string;
   progress_pct: number;
+  progress_stage?: string;
+  progress_page?: number | null;
+  progress_pages?: number | null;
   item_count: number;
   warning_count?: number;
   error_message?: string | null;
   ai_provider?: string | null;
   source_type?: string;
 };
+
+function progressStageLabel(job: Job): string {
+  const stage = job.progress_stage || "";
+  switch (stage) {
+    case "queued":
+      return "Queued — waiting to start";
+    case "uploading":
+      return "Upload received — preparing PDF";
+    case "splitting_pages":
+      return job.progress_pages
+        ? `Splitting pages (${job.progress_pages} page${job.progress_pages === 1 ? "" : "s"})`
+        : "Splitting pages";
+    case "analyzing":
+      if (job.progress_page != null && job.progress_pages != null) {
+        return `Analyzing page ${job.progress_page} of ${job.progress_pages}`;
+      }
+      return "Analyzing pages with AI";
+    case "ready_for_review":
+      return "Ready for review";
+    case "completed":
+      return "Completed";
+    case "failed":
+      return "Failed";
+    default:
+      return `Progress ${job.progress_pct}%`;
+  }
+}
 
 type Filter = "all" | "selected" | "uncertain" | "rejected";
 
@@ -262,7 +294,10 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
             style={{ width: `${Math.min(100, Math.max(0, job.progress_pct))}%` }}
           />
         </div>
-        <p className="text-xs text-foreground-muted">Progress {job.progress_pct}%</p>
+        <p className="text-xs text-foreground-muted">
+          {progressStageLabel(job)}
+          {job.progress_pct > 0 && job.progress_pct < 100 ? ` · ${job.progress_pct}%` : ""}
+        </p>
       </div>
 
       {job.error_message && (
@@ -272,7 +307,7 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
       )}
       {(job.status === "pending" || job.status === "processing") && (
         <p className="text-sm text-foreground-secondary">
-          Processing pages and extracting products. This page updates automatically.
+          {progressStageLabel(job)}. You can leave this page — the job continues in the background.
         </p>
       )}
       {error && <p className="text-sm text-error">{error}</p>}
@@ -438,18 +473,40 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
                       />
                     </div>
                     <div>
-                      <Label>Price (IDR)</Label>
+                      <Label>Normal price (IDR)</Label>
                       <IdrInput
-                        value={it.price_idr}
+                        value={it.price_normal_idr ?? it.price_idr}
                         disabled={!reviewing || !!it.created_product_id}
                         onValueChange={(n) =>
                           setItems((prev) =>
-                            prev.map((x) => (x.id === it.id ? { ...x, price_idr: n } : x)),
+                            prev.map((x) =>
+                              x.id === it.id ? { ...x, price_normal_idr: n, price_idr: n } : x,
+                            ),
                           )
                         }
                         onBlur={(e) =>
                           patchItem(it.id, {
-                            price_idr: parseIDRInput(e.target.value),
+                            price_normal_idr: parseIDRInput(e.target.value),
+                          })
+                        }
+                      />
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        Leave empty for “Hubungi Penjual” on the storefront.
+                      </p>
+                    </div>
+                    <div>
+                      <Label>Discount price (IDR)</Label>
+                      <IdrInput
+                        value={it.price_discount_idr}
+                        disabled={!reviewing || !!it.created_product_id}
+                        onValueChange={(n) =>
+                          setItems((prev) =>
+                            prev.map((x) => (x.id === it.id ? { ...x, price_discount_idr: n } : x)),
+                          )
+                        }
+                        onBlur={(e) =>
+                          patchItem(it.id, {
+                            price_discount_idr: parseIDRInput(e.target.value),
                           })
                         }
                       />

@@ -205,6 +205,7 @@ export type Product = {
   category_name?: string | null;
   base_price_idr: number;
   compare_at_price_idr?: number | null;
+  contact_for_price?: boolean;
   ready_stock_eligible: boolean;
   preorder_eligible: boolean;
   availability: string;

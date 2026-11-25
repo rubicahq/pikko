@@ -17,33 +17,52 @@ var (
 )
 
 type Page struct {
-	ID                 uuid.UUID  `json:"id"`
-	StoreID            uuid.UUID  `json:"store_id"`
-	ImageFileID        uuid.UUID  `json:"image_file_id"`
-	ImageURL           string     `json:"image_url,omitempty"`
-	DisplayOrder       int        `json:"display_order"`
-	Status             string     `json:"status"`
-	SourceImportJobID  *uuid.UUID `json:"source_import_job_id,omitempty"`
-	PageNumber         *int       `json:"page_number,omitempty"`
-	Hotspots           []Hotspot  `json:"hotspots,omitempty"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	StoreID           uuid.UUID  `json:"store_id"`
+	ImageFileID       uuid.UUID  `json:"image_file_id"`
+	ImageURL          string     `json:"image_url,omitempty"`
+	DisplayOrder      int        `json:"display_order"`
+	Status            string     `json:"status"`
+	SourceImportJobID *uuid.UUID `json:"source_import_job_id,omitempty"`
+	CatalogID         *uuid.UUID `json:"catalog_id,omitempty"`
+	PageNumber        *int       `json:"page_number,omitempty"`
+	Hotspots          []Hotspot  `json:"hotspots,omitempty"`
+	Items             []PageItem `json:"items,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type Hotspot struct {
-	ID            uuid.UUID  `json:"id"`
-	CatalogPageID uuid.UUID  `json:"catalog_page_id"`
-	ProductID     *uuid.UUID `json:"product_id,omitempty"`
-	ProductSlug   string     `json:"product_slug,omitempty"`
-	ProductName   string     `json:"product_name,omitempty"`
-	ProductStatus string     `json:"product_status,omitempty"`
-	ImportItemID  *uuid.UUID `json:"import_item_id,omitempty"`
-	XPct          float64    `json:"x_pct"`
-	YPct          float64    `json:"y_pct"`
-	WidthPct      float64    `json:"width_pct"`
-	HeightPct     float64    `json:"height_pct"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	CatalogPageID     uuid.UUID  `json:"catalog_page_id"`
+	ProductID         *uuid.UUID `json:"product_id,omitempty"`
+	ProductSlug       string     `json:"product_slug,omitempty"`
+	ProductName       string     `json:"product_name,omitempty"`
+	ProductStatus     string     `json:"product_status,omitempty"`
+	ImportItemID      *uuid.UUID `json:"import_item_id,omitempty"`
+	XPct              float64    `json:"x_pct"`
+	YPct              float64    `json:"y_pct"`
+	WidthPct          float64    `json:"width_pct"`
+	HeightPct         float64    `json:"height_pct"`
+	ListOnly          bool       `json:"list_only"`
+	BasePriceIDR      *int64     `json:"base_price_idr,omitempty"`
+	CompareAtPriceIDR *int64     `json:"compare_at_price_idr,omitempty"`
+	ContactForPrice   bool       `json:"contact_for_price"`
+	PrimaryImageURL   string     `json:"primary_image_url,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// PageItem is the storefront right-pane row for the active flipbook page.
+type PageItem struct {
+	ProductID         uuid.UUID `json:"product_id"`
+	ProductSlug       string    `json:"product_slug"`
+	ProductName       string    `json:"product_name"`
+	BasePriceIDR      int64     `json:"base_price_idr"`
+	CompareAtPriceIDR *int64    `json:"compare_at_price_idr,omitempty"`
+	ContactForPrice   bool      `json:"contact_for_price"`
+	PrimaryImageURL   string    `json:"primary_image_url,omitempty"`
+	HotspotID         uuid.UUID `json:"hotspot_id,omitempty"`
 }
 
 type Service struct {
@@ -52,7 +71,7 @@ type Service struct {
 
 func (s *Service) ListPages(ctx context.Context, storeID uuid.UUID, publishedOnly bool) ([]Page, error) {
 	q := `
-		SELECT id, store_id, image_file_id, display_order, status, source_import_job_id, page_number, created_at, updated_at
+		SELECT id, store_id, image_file_id, display_order, status, source_import_job_id, catalog_id, page_number, created_at, updated_at
 		FROM catalog_pages WHERE store_id=$1`
 	if publishedOnly {
 		q += ` AND status='published'`
@@ -66,7 +85,7 @@ func (s *Service) ListPages(ctx context.Context, storeID uuid.UUID, publishedOnl
 	var out []Page
 	for rows.Next() {
 		var p Page
-		if err := rows.Scan(&p.ID, &p.StoreID, &p.ImageFileID, &p.DisplayOrder, &p.Status, &p.SourceImportJobID, &p.PageNumber, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.StoreID, &p.ImageFileID, &p.DisplayOrder, &p.Status, &p.SourceImportJobID, &p.CatalogID, &p.PageNumber, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 		p.ImageURL = publicFileURL(storeID, p.ImageFileID)
@@ -78,8 +97,38 @@ func (s *Service) ListPages(ctx context.Context, storeID uuid.UUID, publishedOnl
 			return nil, err
 		}
 		out[i].Hotspots = hs
+		out[i].Items = pageItemsFromHotspots(hs)
 	}
 	return out, nil
+}
+
+func pageItemsFromHotspots(hs []Hotspot) []PageItem {
+	out := make([]PageItem, 0, len(hs))
+	seen := map[uuid.UUID]struct{}{}
+	for _, h := range hs {
+		if h.ProductID == nil || h.ProductName == "" {
+			continue
+		}
+		if _, ok := seen[*h.ProductID]; ok {
+			continue
+		}
+		seen[*h.ProductID] = struct{}{}
+		base := int64(0)
+		if h.BasePriceIDR != nil {
+			base = *h.BasePriceIDR
+		}
+		out = append(out, PageItem{
+			ProductID:         *h.ProductID,
+			ProductSlug:       h.ProductSlug,
+			ProductName:       h.ProductName,
+			BasePriceIDR:      base,
+			CompareAtPriceIDR: h.CompareAtPriceIDR,
+			ContactForPrice:   h.ContactForPrice,
+			PrimaryImageURL:   h.PrimaryImageURL,
+			HotspotID:         h.ID,
+		})
+	}
+	return out
 }
 
 func publicFileURL(storeID, fileID uuid.UUID) string {
@@ -93,8 +142,15 @@ func merchantFileURL(storeID, fileID uuid.UUID) string {
 func (s *Service) listHotspots(ctx context.Context, storeID, pageID uuid.UUID, publishedProductsOnly bool) ([]Hotspot, error) {
 	q := `
 		SELECT h.id, h.catalog_page_id, h.product_id, h.import_item_id,
-		       h.x_pct, h.y_pct, h.width_pct, h.height_pct, h.created_at, h.updated_at,
-		       p.slug, p.name, p.status
+		       h.x_pct, h.y_pct, h.width_pct, h.height_pct, COALESCE(h.list_only,false),
+		       h.created_at, h.updated_at,
+		       p.slug, p.name, p.status, p.base_price_idr, p.compare_at_price_idr, COALESCE(p.contact_for_price,false),
+		       (
+		         SELECT pi.file_id FROM product_images pi
+		         WHERE pi.product_id=p.id AND pi.store_id=p.store_id
+		         ORDER BY pi.is_primary DESC, pi.display_order
+		         LIMIT 1
+		       )
 		FROM catalog_page_hotspots h
 		LEFT JOIN products p ON p.id = h.product_id AND p.store_id = h.store_id
 		WHERE h.store_id=$1 AND h.catalog_page_id=$2
@@ -112,10 +168,12 @@ func (s *Service) listHotspots(ctx context.Context, storeID, pageID uuid.UUID, p
 	for rows.Next() {
 		var h Hotspot
 		var slug, name, status *string
+		var base *int64
+		var imgFile *uuid.UUID
 		if err := rows.Scan(
 			&h.ID, &h.CatalogPageID, &h.ProductID, &h.ImportItemID,
-			&h.XPct, &h.YPct, &h.WidthPct, &h.HeightPct, &h.CreatedAt, &h.UpdatedAt,
-			&slug, &name, &status,
+			&h.XPct, &h.YPct, &h.WidthPct, &h.HeightPct, &h.ListOnly, &h.CreatedAt, &h.UpdatedAt,
+			&slug, &name, &status, &base, &h.CompareAtPriceIDR, &h.ContactForPrice, &imgFile,
 		); err != nil {
 			return nil, err
 		}
@@ -128,9 +186,13 @@ func (s *Service) listHotspots(ctx context.Context, storeID, pageID uuid.UUID, p
 		if status != nil {
 			h.ProductStatus = *status
 		}
+		h.BasePriceIDR = base
+		if imgFile != nil {
+			h.PrimaryImageURL = publicFileURL(storeID, *imgFile)
+		}
 		out = append(out, h)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 type ReorderInput struct {
@@ -297,17 +359,26 @@ func (s *Service) DeleteHotspot(ctx context.Context, storeID, hotspotID uuid.UUI
 func (s *Service) getHotspot(ctx context.Context, storeID, id uuid.UUID) (*Hotspot, error) {
 	var h Hotspot
 	var slug, name, status *string
+	var base *int64
+	var imgFile *uuid.UUID
 	err := s.DB.QueryRow(ctx, `
 		SELECT h.id, h.catalog_page_id, h.product_id, h.import_item_id,
-		       h.x_pct, h.y_pct, h.width_pct, h.height_pct, h.created_at, h.updated_at,
-		       p.slug, p.name, p.status
+		       h.x_pct, h.y_pct, h.width_pct, h.height_pct, COALESCE(h.list_only,false),
+		       h.created_at, h.updated_at,
+		       p.slug, p.name, p.status, p.base_price_idr, p.compare_at_price_idr, COALESCE(p.contact_for_price,false),
+		       (
+		         SELECT pi.file_id FROM product_images pi
+		         WHERE pi.product_id=p.id AND pi.store_id=p.store_id
+		         ORDER BY pi.is_primary DESC, pi.display_order
+		         LIMIT 1
+		       )
 		FROM catalog_page_hotspots h
 		LEFT JOIN products p ON p.id=h.product_id AND p.store_id=h.store_id
 		WHERE h.id=$1 AND h.store_id=$2
 	`, id, storeID).Scan(
 		&h.ID, &h.CatalogPageID, &h.ProductID, &h.ImportItemID,
-		&h.XPct, &h.YPct, &h.WidthPct, &h.HeightPct, &h.CreatedAt, &h.UpdatedAt,
-		&slug, &name, &status,
+		&h.XPct, &h.YPct, &h.WidthPct, &h.HeightPct, &h.ListOnly, &h.CreatedAt, &h.UpdatedAt,
+		&slug, &name, &status, &base, &h.CompareAtPriceIDR, &h.ContactForPrice, &imgFile,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -324,29 +395,40 @@ func (s *Service) getHotspot(ctx context.Context, storeID, id uuid.UUID) (*Hotsp
 	if status != nil {
 		h.ProductStatus = *status
 	}
+	h.BasePriceIDR = base
+	if imgFile != nil {
+		h.PrimaryImageURL = publicFileURL(storeID, *imgFile)
+	}
 	return &h, nil
 }
 
+// PublicStore holds public storefront fields for the catalog viewer.
+type PublicStore struct {
+	ID       uuid.UUID
+	Name     string
+	WhatsApp *string
+}
+
 // PublicByStoreSlug returns published flipbook pages for a published store.
-func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (storeID uuid.UUID, storeName string, pages []Page, err error) {
+func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (store PublicStore, pages []Page, err error) {
 	err = s.DB.QueryRow(ctx, `
-		SELECT id, name FROM stores
-		WHERE slug=$1 AND archived_at IS NULL AND publication_status='published'
-	`, slug).Scan(&storeID, &storeName)
+		SELECT s.id, s.name, sf.whatsapp
+		FROM stores s
+		LEFT JOIN storefront_configs sf ON sf.store_id = s.id AND sf.channel = 'published'
+		WHERE s.slug=$1 AND s.archived_at IS NULL AND s.publication_status='published'
+	`, slug).Scan(&store.ID, &store.Name, &store.WhatsApp)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, "", nil, ErrNotFound
+		return PublicStore{}, nil, ErrNotFound
 	}
 	if err != nil {
-		return uuid.Nil, "", nil, err
+		return PublicStore{}, nil, err
 	}
-	pages, err = s.ListPages(ctx, storeID, true)
+	pages, err = s.ListPages(ctx, store.ID, true)
 	if err != nil {
-		return uuid.Nil, "", nil, err
+		return PublicStore{}, nil, err
 	}
-	// Enrich merchant image URLs as public
 	for i := range pages {
-		pages[i].ImageURL = publicFileURL(storeID, pages[i].ImageFileID)
-		// Filter hotspots without published product for public
+		pages[i].ImageURL = publicFileURL(store.ID, pages[i].ImageFileID)
 		filtered := pages[i].Hotspots[:0]
 		for _, h := range pages[i].Hotspots {
 			if h.ProductID != nil && h.ProductStatus == "published" {
@@ -354,8 +436,9 @@ func (s *Service) PublicByStoreSlug(ctx context.Context, slug string) (storeID u
 			}
 		}
 		pages[i].Hotspots = filtered
+		pages[i].Items = pageItemsFromHotspots(filtered)
 	}
-	return storeID, storeName, pages, nil
+	return store, pages, nil
 }
 
 // MerchantList attaches merchant file URLs.

@@ -97,8 +97,8 @@ func (s *Service) StartCSV(ctx context.Context, storeID, userID uuid.UUID, in CS
 		_, err = s.DB.Exec(ctx, `
 			INSERT INTO catalog_import_items (
 				store_id, job_id, display_order, selected, review_status, uncertain, confidence_pct, warning,
-				name, description, brand, price_idr, sku, category_name, variant_info, raw_extraction
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'{}'::jsonb,$15::jsonb)
+				name, description, brand, price_idr, price_normal_idr, sku, category_name, variant_info, raw_extraction
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12,$13,$14,'{}'::jsonb,$15::jsonb)
 		`, storeID, jobID, i, row.Selected, reviewStatus, row.Uncertain, conf, warning,
 			row.Name, row.Description, row.Brand, row.PriceIDR, row.SKU, row.Category,
 			fmt.Sprintf(`{"stock_quantity":%s,"ready_stock_eligible":%v,"preorder_eligible":%v,"row":%d}`,

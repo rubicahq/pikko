@@ -42,6 +42,7 @@ export default async function PublicCatalogPage({
       storeSlug={storeSlug}
       storeName={data.store?.name || storeSlug}
       pages={data.pages || []}
+      storeWhatsapp={data.store?.whatsapp || null}
     />
   );
 }
