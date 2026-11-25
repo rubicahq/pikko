@@ -227,17 +227,40 @@ export function StorefrontEditor({
 
               {(
                 [
-                  ["logo", "Logo", "image/png,image/jpeg,image/webp,image/svg+xml"],
+                  [
+                    "logo",
+                    "Logo",
+                    "image/png,image/jpeg,image/webp,image/svg+xml",
+                    cfg.logo_url,
+                  ],
                   [
                     "favicon",
                     "Favicon",
                     "image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon",
+                    cfg.favicon_url,
                   ],
-                  ["store_icon", "Store icon", "image/png,image/jpeg,image/webp"],
+                  [
+                    "store_icon",
+                    "Store icon",
+                    "image/png,image/jpeg,image/webp",
+                    cfg.store_icon_url,
+                  ],
                 ] as const
-              ).map(([purpose, label, accept]) => (
+              ).map(([purpose, label, accept, preview]) => (
                 <div key={purpose} className="space-y-2">
                   <Label htmlFor={purpose}>{label}</Label>
+                  {preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview}
+                      alt=""
+                      className="h-12 w-12 rounded-md border border-border object-contain"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-md border border-dashed border-border text-[10px] text-foreground-muted">
+                      None
+                    </div>
+                  )}
                   <Input
                     id={purpose}
                     type="file"
@@ -254,8 +277,8 @@ export function StorefrontEditor({
                   />
                   <p className="text-xs text-foreground-muted">
                     {purpose === "favicon"
-                      ? "Up to 2 MB — converted to a multi-size favicon on upload."
-                      : "Up to 2 MB."}
+                      ? "Up to 2 MB — converted to a multi-size favicon on upload. Publish to show on the live store."
+                      : "Up to 2 MB. Publish to show on the live store."}
                   </p>
                 </div>
               ))}

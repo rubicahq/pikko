@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublicProduct, getPublicProductBatches, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
+import { storefrontIconsMetadata } from "@/lib/storefront-branding";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { AddToCartButton } from "@/components/storefront/add-to-cart-button";
 import { CartBadge } from "@/components/storefront/cart-badge";
@@ -23,9 +24,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const sf = storeData.store.storefront;
   const title = `${p.name} · ${storeData.store.name}`;
   const description = p.description || `Buy ${p.name} from ${storeData.store.name}.`;
-  const favicon = sf.favicon_file_id
-    ? urls.publicFile(storeData.store.id, sf.favicon_file_id)
-    : undefined;
   return {
     title,
     description,
@@ -35,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url: urls.storefrontProductAbsolute(storeSlug, productSlug),
     },
-    icons: favicon ? { icon: favicon } : undefined,
+    icons: storefrontIconsMetadata(storeData.store.id, sf),
   };
 }
 
