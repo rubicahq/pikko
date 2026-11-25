@@ -25,8 +25,10 @@
 | 000014 | `whatsapp_templates` | WhatsApp template send log (Agent 10) |
 | 000015 | `pdf_import_hardening` | Import confidence/review + job metadata (Agent 11) |
 | 000016 | `live_shopping` | Featured SKUs, live_quick_adds, source/revision types (Agent 12) |
+| 000017 | `customers_phone_create` | Create customer with phone without an order |
+| 000018 | `catalog_pdf_flow` | Progress stages, dual prices, catalogs + links, product relations |
 
-Next free version: **`000017_…`** (Agents 13+).
+Next free version: **`000019_…`**.
 
 ---
 
