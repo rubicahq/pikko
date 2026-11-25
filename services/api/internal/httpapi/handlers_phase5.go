@@ -176,7 +176,17 @@ func (h *Phase5Handlers) GetCustomer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusInternalServerError, "get_failed", "Unable to load customer.")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"customer": c})
+	out := map[string]any{"customer": c}
+	if h.Commerce != nil && h.Commerce.URLs != nil {
+		var slug string
+		if qErr := h.Commerce.DB.QueryRow(r.Context(), `
+			SELECT slug FROM stores WHERE id=$1 AND archived_at IS NULL
+		`, StoreID(r)).Scan(&slug); qErr == nil && slug != "" {
+			out["store_slug"] = slug
+			out["portal_url"] = h.Commerce.URLs.PortalHome(slug)
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Phase5Handlers) PatchCustomer(w http.ResponseWriter, r *http.Request) {
