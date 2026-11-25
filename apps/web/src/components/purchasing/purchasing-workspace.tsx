@@ -58,8 +58,6 @@ type PurchasingLine = {
 
 type GroupableAttribute = { id: string; label: string };
 
-type Vendor = { id: string; name: string; status: string };
-
 type Tab = "requirements" | "eligibility" | "receiving";
 
 export function PurchasingWorkspace({ storeId }: { storeId: string }) {
@@ -71,9 +69,7 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   const [lines, setLines] = useState<PurchasingLine[]>([]);
   const [attributes, setAttributes] = useState<GroupableAttribute[]>([]);
   const [source, setSource] = useState<"orders" | "wishlist">("orders");
-  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [batchId, setBatchId] = useState("");
-  const [vendorId, setVendorId] = useState("");
   const [groupBy, setGroupBy] = useState("variant");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [unavailDrafts, setUnavailDrafts] = useState<Record<string, string>>({});
@@ -98,25 +94,23 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
   >([]);
 
   const lineKey = useCallback((l: PurchasingLine) => {
-    return `${l.batch_id || ""}:${l.product_id}:${l.variant_id || ""}:${l.vendor_id || ""}`;
+    return `${l.batch_id || ""}:${l.product_id}:${l.variant_id || ""}`;
   }, []);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [elig, purch, vend, recv] = await Promise.all([
+      const [elig, purch, recv] = await Promise.all([
         apiFetch<{ eligibility: Eligibility[] }>(
           `/api/v1/stores/${storeId}/purchasing/eligibility`,
         ),
         apiFetch<{ purchasing: PurchasingLine[]; groupable_attributes: GroupableAttribute[] }>(
           `/api/v1/stores/${storeId}/purchasing?${new URLSearchParams({
             ...(source === "orders" && batchId ? { batch_id: batchId } : {}),
-            ...(vendorId ? { vendor_id: vendorId } : {}),
             source,
             group_by: groupBy,
           }).toString()}`,
         ),
-        apiFetch<{ vendors: Vendor[] }>(`/api/v1/stores/${storeId}/vendors`),
         apiFetch<{ receiving: typeof receiving }>(
           `/api/v1/stores/${storeId}/receiving`,
         ),
@@ -124,12 +118,11 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
       setEligibility(elig.eligibility || []);
       setLines(purch.purchasing || []);
       setAttributes(purch.groupable_attributes || []);
-      setVendors((vend.vendors || []).filter((v) => v.status === "active"));
       setReceiving(recv.receiving || []);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load purchasing.");
     }
-  }, [storeId, batchId, vendorId, groupBy, source]);
+  }, [storeId, batchId, groupBy, source]);
 
   const displayLines = useMemo(() => groupBy === "variant"
     ? lines
@@ -161,7 +154,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         body: {
           product_id: line.product_id,
           variant_id: line.variant_id || undefined,
-          vendor_id: vendorId || line.vendor_id || undefined,
           purchased_qty: purchased,
           unavailable_qty: Number.isFinite(unavailable) ? unavailable : 0,
           expected_version: line.version || undefined,
@@ -195,7 +187,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         method: "POST",
         body: {
           batch_id: batchId,
-          vendor_id: vendorId || undefined,
           notes: "Created from purchasing workspace",
           lines: bodyLines,
         },
@@ -215,22 +206,9 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
         title="Purchasing"
         description="Review order demand and customer wishlist interest by product or attribute. Record purchases from orders and hand off to receiving."
         actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href={urls.storeVendors(storeId)}>Vendors</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link
-                href={urls.storeMessages(storeId, {
-                  audience: "vendor",
-                  code: "WA-V02",
-                  ...(vendorId ? { vendor_id: vendorId } : {}),
-                })}
-              >
-                WhatsApp vendor
-              </Link>
-            </Button>
-          </>
+          <Button asChild variant="outline">
+            <Link href={urls.storeAttributes(storeId)}>Attributes</Link>
+          </Button>
         }
       />
 
@@ -287,21 +265,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
             </label>
             </> : null}
             <label className="space-y-1 text-sm">
-              <span className="text-foreground-muted">Vendor</span>
-              <select
-                className="block h-10 min-w-[12rem] rounded-md border border-border bg-background px-3"
-                value={vendorId}
-                onChange={(e) => setVendorId(e.target.value)}
-              >
-                <option value="">All vendors</option>
-                {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
               <span className="text-foreground-muted">Group</span>
               <select
                 className="block h-10 min-w-[10rem] rounded-md border border-border bg-background px-3"
@@ -309,10 +272,13 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                 onChange={(e) => setGroupBy(e.target.value)}
               >
                 <option value="variant">Exact variant</option>
-                <option value="vendor">By vendor</option>
                 <option value="brand">By native brand</option>
                 <option value="campaign">By campaign</option>
-                {attributes.map((attribute) => <option key={attribute.id} value={`attribute:${attribute.id}`}>By {attribute.label}</option>)}
+                {attributes.map((attribute) => (
+                  <option key={attribute.id} value={`attribute:${attribute.id}`}>
+                    By {attribute.label}
+                  </option>
+                ))}
               </select>
             </label>
             {source === "orders" ? <Button type="button" variant="outline" disabled={busy || !batchId} onClick={() => void createReceivingFromBatch()}>
@@ -332,7 +298,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                   <TableHead sticky>Product / variant</TableHead>
                   {groupBy !== "variant" ? <TableHead sticky>Group</TableHead> : null}
                   <TableHead sticky>{source === "wishlist" ? "Live shopping" : "Batch"}</TableHead>
-                  <TableHead sticky>Vendor</TableHead>
                   <TableHead sticky className="text-right">
                     {source === "wishlist" ? "Wishlisted" : "Required"}
                   </TableHead>
@@ -370,9 +335,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
                       {groupBy !== "variant" ? <TableCell className="font-medium">{line.group_label || "Unspecified"}</TableCell> : null}
                       <TableCell className="text-sm text-foreground-secondary">
                         {line.batch_name || "—"}
-                      </TableCell>
-                      <TableCell className="text-sm text-foreground-secondary">
-                        {line.vendor_name || "Unassigned"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{line.required_qty}</TableCell>
                       {source === "orders" ? <>
@@ -485,7 +447,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead sticky>Batch</TableHead>
-                <TableHead sticky>Vendor</TableHead>
                 <TableHead sticky>Status</TableHead>
                 <TableHead sticky>Notes</TableHead>
                 <TableHead sticky />
@@ -495,7 +456,6 @@ export function PurchasingWorkspace({ storeId }: { storeId: string }) {
               {receiving.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell>{r.batch_name || "—"}</TableCell>
-                  <TableCell>{r.vendor_name || "—"}</TableCell>
                   <TableCell>
                     <StatusBadge status={r.status} />
                   </TableCell>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Wordmark } from "@/components/brand/wordmark";
+import { HQDocumentTitle } from "@/components/hq/document-title";
 import { hqFetch } from "@/lib/hq-api";
 
 const TABS = [
@@ -36,6 +37,7 @@ export function HQShell({
 
   return (
     <div className="min-h-screen bg-background-subtle text-foreground">
+      <HQDocumentTitle />
       <header className="border-b border-border bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-6">
           <div className="flex items-center gap-3">

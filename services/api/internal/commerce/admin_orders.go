@@ -27,11 +27,14 @@ type AdminCreateOrderInput struct {
 	CustomerNotes     *string          `json:"customer_notes,omitempty"`
 	InternalNotes     *string          `json:"internal_notes,omitempty"`
 	PaymentMethodID   *uuid.UUID       `json:"payment_method_id,omitempty"`
-	CampaignID        *uuid.UUID       `json:"campaign_id,omitempty"`
-	PreorderBatchID   *uuid.UUID       `json:"preorder_batch_id,omitempty"`
-	IdempotencyKey    string           `json:"idempotency_key"`
-	Source            string           `json:"source,omitempty"` // admin | csv_import
-	SkipEmails        bool             `json:"-"`
+	// PaymentOption: "bank_transfer" (default) or "paid_by_admin".
+	// paid_by_admin marks the order paid immediately so it appears in Fulfilment.
+	PaymentOption   string     `json:"payment_option,omitempty"`
+	CampaignID      *uuid.UUID `json:"campaign_id,omitempty"`
+	PreorderBatchID *uuid.UUID `json:"preorder_batch_id,omitempty"`
+	IdempotencyKey  string     `json:"idempotency_key"`
+	Source          string     `json:"source,omitempty"` // admin | csv_import
+	SkipEmails      bool       `json:"-"`
 }
 
 // adminOrderRelations is the store-scoped campaign / preorder link for an order.
@@ -404,19 +407,30 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 		sellingModel = "preorder"
 	}
 
+	paymentOption := strings.TrimSpace(strings.ToLower(in.PaymentOption))
+	if paymentOption == "" {
+		paymentOption = PaymentOptionBankTransfer
+	}
+	if paymentOption != PaymentOptionBankTransfer && paymentOption != PaymentOptionPaidByAdmin {
+		return nil, ErrInvalidInput
+	}
+	paidByAdmin := paymentOption == PaymentOptionPaidByAdmin
+
 	var pm *PaymentMethod
-	if in.PaymentMethodID != nil {
-		pm, err = s.getPaymentMethod(ctx, storeID, *in.PaymentMethodID)
-		if err != nil || !pm.IsEnabled {
-			return nil, ErrInvalidInput
-		}
-	} else {
-		// Prefer first enabled method so bank-transfer evidence path stays available.
-		methods, _ := s.ListPaymentMethods(ctx, storeID)
-		for i := range methods {
-			if methods[i].IsEnabled {
-				pm = &methods[i]
-				break
+	if !paidByAdmin {
+		if in.PaymentMethodID != nil {
+			pm, err = s.getPaymentMethod(ctx, storeID, *in.PaymentMethodID)
+			if err != nil || !pm.IsEnabled {
+				return nil, ErrInvalidInput
+			}
+		} else {
+			// Prefer first enabled method so bank-transfer evidence path stays available.
+			methods, _ := s.ListPaymentMethods(ctx, storeID)
+			for i := range methods {
+				if methods[i].IsEnabled {
+					pm = &methods[i]
+					break
+				}
 			}
 		}
 	}
@@ -467,9 +481,13 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	if sellingModel == "preorder" {
 		initialFulfillment = FulfillmentPurchasing
 	}
+	initialPayment := PaymentUnpaid
+	if paidByAdmin {
+		initialPayment = PaymentPaid
+	}
 
 	var deadline *time.Time
-	if pm != nil {
+	if pm != nil && !paidByAdmin {
 		d := now.Add(time.Duration(pm.PaymentDeadlineHours) * time.Hour)
 		deadline = &d
 	}
@@ -502,20 +520,20 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 			requires_approval, source, created_by_user_id, campaign_id
 		) VALUES (
 			$1,$2,$3,$4,$5,
-			$6,'unpaid',$7,$8,
-			$9,$10,$11,$12,
-			$12,$12,
-			$13,$14,$15,$16,
-			$17,$18,$19,$20,
-			$21,$22,$23,$24,
-			$25,$26,$27,$28,
-			$29,$30,$31,
-			$32,$33,
-			$34,$35,$36,$37
+			$6,$7,$8,$9,
+			$10,$11,$12,$13,
+			$13,$13,
+			$14,$15,$16,$17,
+			$18,$19,$20,$21,
+			$22,$23,$24,$25,
+			$26,$27,$28,$29,
+			$30,$31,$32,
+			$33,$34,
+			$35,$36,$37,$38
 		)
 		RETURNING id
 	`, storeID, customerID, orderNumber, in.IdempotencyKey, sellingModel,
-		orderStatus, initialFulfillment, currency,
+		orderStatus, initialPayment, initialFulfillment, currency,
 		subtotal, shipFee, eval.HandlingFeeIDR, total,
 		in.FulfillmentMethod, name, emailAddr, in.CustomerPhone,
 		shipRecipient, shipPhone, shipLine1, shipLine2,
@@ -532,9 +550,9 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	_, err = tx.Exec(ctx, `
 		INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, actor_user_id, reason)
 		VALUES ($1,$2,'order',NULL,$3,$4,$5),
-		       ($1,$2,'payment',NULL,'unpaid',$4,$5),
-		       ($1,$2,'fulfillment',NULL,$6,$4,$5)
-	`, storeID, orderID, orderStatus, actorID, source, initialFulfillment)
+		       ($1,$2,'payment',NULL,$6,$4,$5),
+		       ($1,$2,'fulfillment',NULL,$7,$4,$5)
+	`, storeID, orderID, orderStatus, actorID, source, initialPayment, initialFulfillment)
 	if err != nil {
 		return nil, err
 	}
@@ -628,15 +646,33 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	}
 
 	var paymentID *uuid.UUID
-	if pm != nil {
+	if paidByAdmin {
+		note := "Paid by admin"
+		var pid uuid.UUID
+		err = tx.QueryRow(ctx, `
+			INSERT INTO payments (
+				store_id, order_id, payment_method_id, method_type, amount_idr, status,
+				instructions_snapshot, verified_at, verified_by, payment_kind, note
+			) VALUES ($1,$2,NULL,$3,$4,'verified',$5,now(),$6,$7,$5)
+			RETURNING id
+		`, storeID, orderID, MethodTypePaidByAdmin, total, note, actorID, PaymentKindFull,
+		).Scan(&pid)
+		if err != nil {
+			return nil, err
+		}
+		paymentID = &pid
+		if _, err := s.recomputeSettlementTx(ctx, tx, storeID, orderID); err != nil {
+			return nil, err
+		}
+	} else if pm != nil {
 		var pid uuid.UUID
 		err = tx.QueryRow(ctx, `
 			INSERT INTO payments (
 				store_id, order_id, payment_method_id, method_type, amount_idr, status,
 				bank_name_snapshot, account_holder_snapshot, account_number_snapshot, instructions_snapshot
-			) VALUES ($1,$2,$3,'bank_transfer',$4,'pending',$5,$6,$7,$8)
+			) VALUES ($1,$2,$3,$4,$5,'pending',$6,$7,$8,$9)
 			RETURNING id
-		`, storeID, orderID, pm.ID, total, pm.BankName, pm.AccountHolder, pm.AccountNumber, pm.Instructions,
+		`, storeID, orderID, pm.ID, MethodTypeBankTransfer, total, pm.BankName, pm.AccountHolder, pm.AccountNumber, pm.Instructions,
 		).Scan(&pid)
 		if err != nil {
 			return nil, err

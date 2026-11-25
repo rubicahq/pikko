@@ -359,6 +359,7 @@ func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}/revisions", storePerm(rbac.PermOrdersRead, commerceH.ListOrderRevisions))
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}/item-events", storePerm(rbac.PermOrdersRead, commerceH.ListOrderItemEvents))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/orders/{orderID}/items/{itemID}", storePerm(rbac.PermOrdersWrite, commerceH.AdjustOrderItemQty))
+	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/paid-by-admin", storePerm(rbac.PermOrdersPayments, commerceH.MarkPaidByAdmin))
 	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/verify", storePerm(rbac.PermOrdersPayments, commerceH.VerifyPayment))
 	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/payments/{paymentID}/reject", storePerm(rbac.PermOrdersPayments, commerceH.RejectPayment))
 	mux.Handle("GET /api/v1/stores/{storeID}/orders/{orderID}/payments", storePerm(rbac.PermOrdersPayments, commerceH.ListOrderPayments))

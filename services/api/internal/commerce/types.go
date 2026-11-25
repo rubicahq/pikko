@@ -59,6 +59,12 @@ const (
 	FulfillmentShipping     = "shipping"
 	FulfillmentFreeShipping = "free_shipping"
 	FulfillmentPickup       = "pickup"
+
+	MethodTypeBankTransfer = "bank_transfer"
+	MethodTypePaidByAdmin  = "paid_by_admin"
+
+	PaymentOptionBankTransfer = "bank_transfer"
+	PaymentOptionPaidByAdmin  = "paid_by_admin"
 )
 
 type PaymentMethod struct {

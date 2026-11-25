@@ -101,6 +101,25 @@ export function OrderActions({
           </>
         ) : null}
 
+        {paymentStatus !== "paid" &&
+        orderStatus !== "cancelled" &&
+        orderStatus !== "completed" ? (
+          <Button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              run(async () => {
+                await apiFetch(
+                  `/api/v1/stores/${storeId}/orders/${orderId}/payments/paid-by-admin`,
+                  { method: "POST", body: {} },
+                );
+              })
+            }
+          >
+            Mark paid by admin
+          </Button>
+        ) : null}
+
         {paymentId && hasEvidence && paymentStatus === "awaiting_verification" ? (
           <>
             <Button

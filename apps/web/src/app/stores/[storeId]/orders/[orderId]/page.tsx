@@ -57,9 +57,11 @@ export default async function OrderDetailPage({
     payment?: {
       id: string;
       status: string;
+      method_type?: string;
       bank_name_snapshot?: string | null;
       account_number_snapshot?: string | null;
       amount_idr: number;
+      note?: string | null;
       evidence?: { id: string; submitted_at: string; content_type?: string }[];
     } | null;
   }>(`/api/v1/stores/${storeId}/orders/${orderId}`);
@@ -191,27 +193,44 @@ export default async function OrderDetailPage({
       {p ? (
         <section className="mt-6 rounded-[10px] border border-border p-5">
           <h2 className="text-base font-medium">Payment</h2>
-          <p className="mt-2 text-sm capitalize">{p.status.replaceAll("_", " ")}</p>
-          <p className="mt-1 text-sm text-foreground-secondary">
-            {p.bank_name_snapshot} · {p.account_number_snapshot} · {formatIDR(p.amount_idr)}
+          <p className="mt-2 text-sm capitalize">
+            {p.method_type === "paid_by_admin"
+              ? "Paid by admin"
+              : (p.method_type || "bank transfer").replaceAll("_", " ")}
+            {" · "}
+            {p.status.replaceAll("_", " ")}
           </p>
-          {(p.evidence || []).length ? (
-            <ul className="mt-4 space-y-2 text-sm">
-              {p.evidence!.map((ev) => (
-                <li key={ev.id}>
-                  <a
-                    className="text-brand-accessible-dark underline"
-                    href={`/api/v1/stores/${storeId}/orders/evidence/${ev.id}/file`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Evidence {new Date(ev.submitted_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })}
-                  </a>
-                </li>
-              ))}
-            </ul>
+          {p.method_type === "paid_by_admin" ? (
+            <p className="mt-1 text-sm text-foreground-secondary">
+              {p.note || "Marked paid by admin"} · {formatIDR(p.amount_idr)}
+            </p>
           ) : (
-            <p className="mt-3 text-sm text-foreground-secondary">No payment proof yet.</p>
+            <>
+              <p className="mt-1 text-sm text-foreground-secondary">
+                {p.bank_name_snapshot} · {p.account_number_snapshot} · {formatIDR(p.amount_idr)}
+              </p>
+              {(p.evidence || []).length ? (
+                <ul className="mt-4 space-y-2 text-sm">
+                  {p.evidence!.map((ev) => (
+                    <li key={ev.id}>
+                      <a
+                        className="text-brand-accessible-dark underline"
+                        href={`/api/v1/stores/${storeId}/orders/evidence/${ev.id}/file`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Evidence{" "}
+                        {new Date(ev.submitted_at).toLocaleString("id-ID", {
+                          timeZone: "Asia/Jakarta",
+                        })}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-foreground-secondary">No payment proof yet.</p>
+              )}
+            </>
           )}
         </section>
       ) : null}

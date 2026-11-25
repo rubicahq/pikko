@@ -97,7 +97,7 @@ export function ReceivingDetail({
         title="Receiving"
         description={
           rec
-            ? `${rec.batch_name || "Batch"} · ${rec.vendor_name || "No vendor"}`
+            ? rec.batch_name || "Batch"
             : "Record goods received against purchasing."
         }
         actions={

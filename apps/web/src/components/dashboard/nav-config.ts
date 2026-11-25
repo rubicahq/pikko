@@ -169,7 +169,8 @@ export const PRIMARY_WORKSPACES: WorkspaceDef[] = [
         label: "Vendors",
         href: "vendors",
         matchPrefixes: ["vendors"],
-        implemented: true,
+        // Soft-deprecated: sourcing/grouping uses product attributes + Fulfilment groups.
+        implemented: false,
         permission: "purchasing.read",
       },
     ],
