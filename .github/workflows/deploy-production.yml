@@ -64,12 +64,14 @@ jobs:
 
       - name: Normalize inputs
         id: normalize
+        env:
+          INPUT_REF: ${{ inputs.ref }}
+          INPUT_CONFIRM_DEPLOY: ${{ inputs.confirm_deploy }}
         run: |
           set -euo pipefail
-          REF="${{ inputs.ref }}"
-          REF="${REF:-main}"
+          REF="${INPUT_REF:-main}"
           # Allow only simple refs (branch/tag/SHA-ish); reject path tricks.
-          if [[ ! "$REF" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+          if [[ ${#REF} -gt 128 || ! "$REF" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ || "$REF" == *"//"* || "$REF" == */ || "$REF" == *".."* ]]; then
             echo "::error::Invalid ref: ${REF}"
             exit 1
           fi
@@ -78,7 +80,7 @@ jobs:
             exit 1
           fi
           RUN_DEPLOY=false
-          if [[ "${{ inputs.confirm_deploy }}" == "true" ]]; then
+          if [[ "${INPUT_CONFIRM_DEPLOY}" == "true" ]]; then
             RUN_DEPLOY=true
           fi
           echo "deploy_ref=${REF}" >> "$GITHUB_OUTPUT"
