@@ -90,7 +90,7 @@ Both `dry-run` and `deploy` jobs use `environment: production`. With required re
 
 ## Commands Codex Cloud can run later
 
-Prerequisite: `gh` authenticated as an identity with Actions write + Contents as needed; secrets + deploy pubkey already installed; firewall allows GitHub Actions egress (or a self-hosted runner).
+Prerequisite: `gh` authenticated as an identity with Actions write + Contents as needed; secrets + deploy pubkey already installed; clients always use **`-p 2021`**; deploy IP not fail2banned; Lighthouse Firewall allows the source (or use a self-hosted runner on the VPS).
 
 ### 1) Dry-run only (safe)
 
@@ -138,7 +138,7 @@ Expect the Step Summary to show deployed SHA and smoke outcome.
 | GitHub identity | `rubicahq` (user account connected to Cursor) |
 | `rubicahq/pikko` permissions | `admin`, `maintain`, `push`, `pull` — **can push branches and open PRs** |
 | PR for this change | Opened from branch `cursor/codex-cloud-deploy-actions-4029` |
-| SSH from agent VM to `:2021` | TCP reaches sshd; **Permission denied (publickey)** without deploy key (expected). Sibling Codex “Connection refused” may be a different egress IP / firewall allowlist — see VPS diag. |
+| SSH from Actions / Cursor cloud VM to `:2021` | TCP reaches sshd; **Permission denied (publickey)** without deploy key (expected). |
 
 ### What Codex Cloud needs (minimum)
 
@@ -166,16 +166,35 @@ For a human or Codex-held classic PAT used only for deploy automation:
 
 Fine-grained PAT minimums: Contents R/W, Actions R/W, Workflows R/W, Metadata R.
 
+## VPS SSH facts (read-only diag, 2026-11-25)
+
+Source: Project store `internal/codex-deploy-vps-ssh-diag.md` (host `VM-0-116-ubuntu`, public IP `43.163.99.95`, Tencent Cloud Lighthouse Singapore). No firewall/sshd changes were made by that diag.
+
+| Fact | Detail |
+| --- | --- |
+| Listen | `sshd` on `0.0.0.0:2021` and `[::]:2021` |
+| Port 22 | **Not listening** — clients that omit `-p 2021` often get **Connection refused** |
+| UFW | Active; **ALLOW** inbound TCP 2021 (Anywhere); UFW is not blocking 2021 |
+| Public inbound | Works — admin sessions + AWS-range sources reach `sshd` pre-auth |
+| Cursor self-hosted worker | **Outbound** bridge to `https://api2.cursor.sh` — does **not** need inbound SSH from the internet |
+| Codex / GitHub Actions SSH deploy | Needs **inbound** TCP `:2021` + an authorized deploy key |
+| fail2ban | Jail on port **2021**; ban action `reject with icmp port-unreachable` → client sees **refused**. Watch bans / add GHA·Codex egress to `ignoreip` during first runs |
+| Provider panel | **Tencent Lighthouse** (Singapore) → instance Firewall: confirm TCP **2021** inbound (additive; do **not** remove admin paths). Also check YunJing / Cloud Firewall if used |
+| Cursor cloud / Actions probe | From an Actions cloud VM: `:2021` reachable; **Permission denied (publickey)** without deploy key |
+
+**Always use `-p 2021`.** GitHub Actions → SSH is viable once the deploy key is authorized and the client IP is not fail2banned / SG-blocked. **Safer optional path:** self-hosted GitHub Actions runner on this VPS (or keep using the Cursor self-hosted worker) so deploys do not depend on ephemeral cloud egress dialing inbound SSH.
+
 ## Owner action checklist
 
 Do these **before** relying on Codex to deploy:
 
-### A. Firewall / SSH reachability
+### A. Firewall / SSH reachability (always `-p 2021`)
 
-- [ ] Confirm provider/security-group / `ufw` / cloud firewall allows **inbound TCP 2021** from **GitHub-hosted Actions egress** (or use a self-hosted runner on the VPS / allowed network)
-- [ ] If Codex Cloud previously saw **Connection refused** on 2021, fix allowlists for that egress IP range (not only the Cursor agent IP)
-- [ ] VPS diag sibling report: see Project store `internal/codex-deploy-vps-ssh-diag.md` when available (**pending VPS diag** if that file is not yet present)
-- [ ] Do **not** open SSH to the world broader than needed; prefer allowlist or self-hosted runner
+- [ ] Document and enforce **`-p 2021` everywhere** (Codex, GHA, runbooks). Port **22 is not listening** — wrong port → Connection refused
+- [ ] **Tencent Lighthouse** (Singapore) → instance `43.163.99.95` / `VM-0-116-ubuntu` → **Firewall**: confirm inbound **TCP 2021** (keep existing admin allow paths; add deploy access additively). Check YunJing / Cloud Firewall if enabled
+- [ ] **fail2ban** (`sshd` jail on 2021): during first GHA/Codex runs, watch `fail2ban-client status sshd`; add fixed egress to `ignoreip` or avoid auth spam that triggers REJECT→refused
+- [ ] Prefer safer path if possible: **self-hosted GHA runner on the VPS** (or Cursor self-hosted worker outbound to `api2.cursor.sh`) so production deploy does not require inbound SSH from ephemeral Actions IPs
+- [ ] If using hosted Actions → SSH: confirm Lighthouse still allows that source; UFW already ALLOWs 2021; remaining host-side risks are fail2ban + missing deploy key
 
 ### B. Deploy identity on VPS
 
@@ -188,7 +207,7 @@ Do these **before** relying on Codex to deploy:
 
 - [ ] Create Environment `production`
 - [ ] Set required reviewers (owner)
-- [ ] Set all five secrets listed above
+- [ ] Set all five secrets listed above (`DEPLOY_SSH_PORT=2021`)
 - [ ] Capture `DEPLOY_SSH_KNOWN_HOSTS` via `ssh-keyscan -p 2021 43.163.99.95`
 
 ### D. Codex / GitHub App permissions
@@ -208,3 +227,4 @@ Do these **before** relying on Codex to deploy:
 - `docs/DEPLOYMENT.md` — VPS topology, surfaces, first-time setup
 - `docs/DEPLOYMENT_RUNBOOK.md` — day-2 ops entrypoint
 - `scripts/deploy.sh` — pull, selective rebuild, smoke, rollback
+- Project store `internal/codex-deploy-vps-ssh-diag.md` — full read-only VPS SSH diagnostic
