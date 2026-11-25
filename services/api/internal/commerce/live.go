@@ -23,33 +23,33 @@ var ErrLiveQuickAddDisabled = errors.New("live quick-add disabled")
 var ErrLiveQuotaExceeded = errors.New("live quota exceeded")
 
 type LiveProductStock struct {
-	ID                uuid.UUID  `json:"id"`
-	CampaignID        uuid.UUID  `json:"campaign_id"`
-	ProductID         uuid.UUID  `json:"product_id"`
-	ProductName       string     `json:"product_name"`
-	ProductSlug       string     `json:"product_slug"`
-	BasePriceIDR      int64      `json:"base_price_idr"`
-	PriceOverrideIDR  *int64     `json:"price_override_idr,omitempty"`
-	EffectivePriceIDR int64      `json:"effective_price_idr"`
-	QuantityLimit     *int       `json:"quantity_limit,omitempty"`
-	SoldQty           int        `json:"sold_qty"`
-	RemainingQty      *int       `json:"remaining_qty,omitempty"`
-	Availability      string     `json:"availability"`
-	Featured          bool       `json:"featured"`
-	DisplayOrder      int        `json:"display_order"`
-	InventoryMode     string     `json:"inventory_mode,omitempty"`
-	StockAvailable    *int       `json:"stock_available,omitempty"`
+	ID                uuid.UUID     `json:"id"`
+	CampaignID        uuid.UUID     `json:"campaign_id"`
+	ProductID         uuid.UUID     `json:"product_id"`
+	ProductName       string        `json:"product_name"`
+	ProductSlug       string        `json:"product_slug"`
+	BasePriceIDR      int64         `json:"base_price_idr"`
+	PriceOverrideIDR  *int64        `json:"price_override_idr,omitempty"`
+	EffectivePriceIDR int64         `json:"effective_price_idr"`
+	QuantityLimit     *int          `json:"quantity_limit,omitempty"`
+	SoldQty           int           `json:"sold_qty"`
+	RemainingQty      *int          `json:"remaining_qty,omitempty"`
+	Availability      string        `json:"availability"`
+	Featured          bool          `json:"featured"`
+	DisplayOrder      int           `json:"display_order"`
+	InventoryMode     string        `json:"inventory_mode,omitempty"`
+	StockAvailable    *int          `json:"stock_available,omitempty"`
 	Variants          []LiveVariant `json:"variants,omitempty"`
 }
 
 type LiveVariant struct {
-	ID               uuid.UUID `json:"id"`
-	OptionKey        string    `json:"option_key"`
-	SKU              *string   `json:"sku,omitempty"`
-	PriceOverrideIDR *int64    `json:"price_override_idr,omitempty"`
-	EffectivePriceIDR int64    `json:"effective_price_idr"`
-	StockQuantity    *int      `json:"stock_quantity,omitempty"`
-	Availability     string    `json:"availability"`
+	ID                uuid.UUID `json:"id"`
+	OptionKey         string    `json:"option_key"`
+	SKU               *string   `json:"sku,omitempty"`
+	PriceOverrideIDR  *int64    `json:"price_override_idr,omitempty"`
+	EffectivePriceIDR int64     `json:"effective_price_idr"`
+	StockQuantity     *int      `json:"stock_quantity,omitempty"`
+	Availability      string    `json:"availability"`
 }
 
 type LiveSession struct {
@@ -74,44 +74,44 @@ type LiveSession struct {
 }
 
 type LiveFeedEntry struct {
-	OrderID         uuid.UUID `json:"order_id"`
-	OrderNumber     string    `json:"order_number"`
-	CustomerName    string    `json:"customer_name"`
-	CustomerEmail   string    `json:"customer_email"`
-	CustomerPhone   *string   `json:"customer_phone,omitempty"`
-	OrderStatus     string    `json:"order_status"`
-	PaymentStatus   string    `json:"payment_status"`
-	Source          string    `json:"source"`
-	TotalIDR        int64     `json:"total_idr"`
-	ItemCount       int       `json:"item_count"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
-	LatestProduct   *string   `json:"latest_product,omitempty"`
-	LatestQty       *int      `json:"latest_qty,omitempty"`
+	OrderID       uuid.UUID `json:"order_id"`
+	OrderNumber   string    `json:"order_number"`
+	CustomerName  string    `json:"customer_name"`
+	CustomerEmail string    `json:"customer_email"`
+	CustomerPhone *string   `json:"customer_phone,omitempty"`
+	OrderStatus   string    `json:"order_status"`
+	PaymentStatus string    `json:"payment_status"`
+	Source        string    `json:"source"`
+	TotalIDR      int64     `json:"total_idr"`
+	ItemCount     int       `json:"item_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	LatestProduct *string   `json:"latest_product,omitempty"`
+	LatestQty     *int      `json:"latest_qty,omitempty"`
 }
 
 type LiveQuickAddInput struct {
-	OrderID        *uuid.UUID `json:"order_id,omitempty"`
-	CustomerID     *uuid.UUID `json:"customer_id,omitempty"`
-	CustomerName   string     `json:"customer_name,omitempty"`
-	CustomerEmail  string     `json:"customer_email,omitempty"`
-	CustomerPhone  *string    `json:"customer_phone,omitempty"`
-	ProductID      uuid.UUID  `json:"product_id"`
-	VariantID      *uuid.UUID `json:"variant_id,omitempty"`
-	Quantity       int        `json:"quantity"`
-	IdempotencyKey string     `json:"idempotency_key"`
-	FulfillmentMethod string  `json:"fulfillment_method,omitempty"`
-	InternalNotes  *string    `json:"internal_notes,omitempty"`
+	OrderID           *uuid.UUID `json:"order_id,omitempty"`
+	CustomerID        *uuid.UUID `json:"customer_id,omitempty"`
+	CustomerName      string     `json:"customer_name,omitempty"`
+	CustomerEmail     string     `json:"customer_email,omitempty"`
+	CustomerPhone     *string    `json:"customer_phone,omitempty"`
+	ProductID         uuid.UUID  `json:"product_id"`
+	VariantID         *uuid.UUID `json:"variant_id,omitempty"`
+	Quantity          int        `json:"quantity"`
+	IdempotencyKey    string     `json:"idempotency_key"`
+	FulfillmentMethod string     `json:"fulfillment_method,omitempty"`
+	InternalNotes     *string    `json:"internal_notes,omitempty"`
 }
 
 type LiveQuickAddResult struct {
-	Order         *Order           `json:"order"`
-	AddedItemID   uuid.UUID        `json:"added_item_id"`
-	CreatedOrder  bool             `json:"created_order"`
-	QuickAddID    uuid.UUID        `json:"quick_add_id"`
-	TrackingToken string           `json:"tracking_token,omitempty"`
-	TrackingURL   string           `json:"tracking_url,omitempty"`
-	Session       *LiveSession     `json:"session,omitempty"`
+	Order         *Order       `json:"order"`
+	AddedItemID   uuid.UUID    `json:"added_item_id"`
+	CreatedOrder  bool         `json:"created_order"`
+	QuickAddID    uuid.UUID    `json:"quick_add_id"`
+	TrackingToken string       `json:"tracking_token,omitempty"`
+	TrackingURL   string       `json:"tracking_url,omitempty"`
+	Session       *LiveSession `json:"session,omitempty"`
 }
 
 type PublicLiveCampaign struct {
@@ -821,9 +821,9 @@ func (s *Service) LiveQuickAdd(ctx context.Context, storeID, campaignID, actorID
 		}
 	}
 	analytics.Emit(ctx, s.DB, storeID, "live.quick_add", &actorID, map[string]any{
-		"campaign_id": campaignID.String(),
-		"order_id":    orderID.String(),
-		"quantity":    in.Quantity,
+		"campaign_id":   campaignID.String(),
+		"order_id":      orderID.String(),
+		"quantity":      in.Quantity,
 		"created_order": createdOrder,
 	})
 	return res, nil
@@ -843,7 +843,19 @@ func (s *Service) ListPublicLiveCampaigns(ctx context.Context, storeSlug string)
 	rows, err := s.DB.Query(ctx, `
 		SELECT c.id, c.name, c.slug, c.description, c.opens_at, c.closes_at,
 		       c.operational_status, c.cover_file_id,
-		       COALESCE((SELECT COUNT(*) FROM campaign_products cp WHERE cp.campaign_id=c.id),0)
+		       COALESCE((
+                 SELECT COUNT(DISTINCT product_id) FROM (
+                   SELECT cp.product_id FROM campaign_products cp
+                   WHERE cp.campaign_id=c.id
+                   UNION
+                   SELECT h.product_id FROM catalog_campaigns cc
+                   JOIN catalogs cat ON cat.id=cc.catalog_id AND cat.status='published'
+                   JOIN catalog_pages pg ON pg.catalog_id=cat.id AND pg.status='published'
+                   JOIN catalog_page_hotspots h ON h.catalog_page_id=pg.id AND h.product_id IS NOT NULL
+                   JOIN products p ON p.id=h.product_id AND p.store_id=c.store_id AND p.status='published'
+                   WHERE cc.campaign_id=c.id AND cc.store_id=c.store_id
+                 ) linked
+               ),0)
 		FROM campaigns c
 		WHERE c.store_id=$1 AND c.campaign_type='live' AND c.publication_status='published'
 		  AND c.operational_status IN ('scheduled','open','closed')
@@ -910,8 +922,52 @@ func (s *Service) GetPublicLiveCampaign(ctx context.Context, storeSlug, campaign
 			filtered = append(filtered, p)
 		}
 	}
+	if sess.WishlistEnabled {
+		linked, err := s.listLinkedCatalogWishlistProducts(ctx, st.ID, campaignID)
+		if err != nil {
+			return nil, err
+		}
+		seen := make(map[uuid.UUID]bool, len(filtered))
+		for _, p := range filtered {
+			seen[p.ProductID] = true
+		}
+		for _, p := range linked {
+			if !seen[p.ProductID] {
+				filtered = append(filtered, p)
+				seen[p.ProductID] = true
+			}
+		}
+	}
 	sess.Products = filtered
 	return sess, nil
+}
+
+// listLinkedCatalogWishlistProducts exposes published catalog items during a scheduled live.
+func (s *Service) listLinkedCatalogWishlistProducts(ctx context.Context, storeID, campaignID uuid.UUID) ([]LiveProductStock, error) {
+	rows, err := s.DB.Query(ctx, `
+        SELECT DISTINCT p.id, p.name, p.slug, p.base_price_idr
+        FROM catalog_campaigns cc
+        JOIN catalogs cat ON cat.id=cc.catalog_id AND cat.status='published'
+        JOIN catalog_pages pg ON pg.catalog_id=cat.id AND pg.status='published'
+        JOIN catalog_page_hotspots h ON h.catalog_page_id=pg.id AND h.product_id IS NOT NULL
+        JOIN products p ON p.id=h.product_id AND p.store_id=$1 AND p.status='published'
+        WHERE cc.store_id=$1 AND cc.campaign_id=$2
+        ORDER BY p.name
+    `, storeID, campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []LiveProductStock{}
+	for rows.Next() {
+		p := LiveProductStock{CampaignID: campaignID, Availability: "available"}
+		if err := rows.Scan(&p.ProductID, &p.ProductName, &p.ProductSlug, &p.BasePriceIDR); err != nil {
+			return nil, err
+		}
+		p.EffectivePriceIDR = p.BasePriceIDR
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // SearchLiveOrders finds recent orders for quick-add target selection (by email/phone/number).
