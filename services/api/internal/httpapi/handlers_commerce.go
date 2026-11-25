@@ -24,12 +24,27 @@ type CommerceHandlers struct {
 	Cfg       *config.Config
 }
 
+func commerceInvalidInputMessage(err error) string {
+	msg := err.Error()
+	msg = strings.TrimPrefix(msg, "invalid input: ")
+	msg = strings.TrimPrefix(msg, "invalid input")
+	msg = strings.TrimSpace(msg)
+	if msg == "" {
+		return "Invalid input."
+	}
+	r := []rune(msg)
+	if r[0] >= 'a' && r[0] <= 'z' {
+		r[0] = r[0] - ('a' - 'A')
+	}
+	return string(r)
+}
+
 func (h *CommerceHandlers) mapErr(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, commerce.ErrNotFound), errors.Is(err, commerce.ErrStoreUnavailable):
 		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
 	case errors.Is(err, commerce.ErrInvalidInput):
-		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid input.")
+		writeError(w, r, http.StatusBadRequest, "invalid_input", commerceInvalidInputMessage(err))
 	case errors.Is(err, commerce.ErrCheckoutDisabled):
 		writeError(w, r, http.StatusConflict, "checkout_disabled", "Checkout is not available for this store yet.")
 	case errors.Is(err, commerce.ErrPriceChanged):

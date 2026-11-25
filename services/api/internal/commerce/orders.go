@@ -190,6 +190,9 @@ type UpdateOrderStatusInput struct {
 	FulfillmentStatus *string `json:"fulfillment_status,omitempty"`
 	InternalNotes     *string `json:"internal_notes,omitempty"`
 	CancelReason      *string `json:"cancel_reason,omitempty"`
+	// Optional relation edits: omit to leave unchanged; empty string clears; UUID sets.
+	CampaignID      *string `json:"campaign_id,omitempty"`
+	PreorderBatchID *string `json:"preorder_batch_id,omitempty"`
 }
 
 func (s *Service) UpdateOrder(ctx context.Context, storeID, orderID, actorID uuid.UUID, in UpdateOrderStatusInput) (*Order, error) {
@@ -313,6 +316,71 @@ func (s *Service) UpdateOrder(ctx context.Context, storeID, orderID, actorID uui
 		`, orderID, storeID, in.InternalNotes)
 		if err != nil {
 			return nil, err
+		}
+	}
+
+	if in.CampaignID != nil || in.PreorderBatchID != nil {
+		var inCamp, inBatch *uuid.UUID
+		if in.CampaignID != nil {
+			raw := strings.TrimSpace(*in.CampaignID)
+			if raw != "" {
+				id, perr := uuid.Parse(raw)
+				if perr != nil {
+					return nil, fmt.Errorf("%w: campaign_id must be a valid UUID or empty", ErrInvalidInput)
+				}
+				inCamp = &id
+			}
+		} else {
+			inCamp = o.CampaignID
+		}
+		if in.PreorderBatchID != nil {
+			raw := strings.TrimSpace(*in.PreorderBatchID)
+			if raw != "" {
+				id, perr := uuid.Parse(raw)
+				if perr != nil {
+					return nil, fmt.Errorf("%w: preorder_batch_id must be a valid UUID or empty", ErrInvalidInput)
+				}
+				inBatch = &id
+			}
+		} else {
+			inBatch = o.PreorderBatchID
+		}
+		rels, rerr := s.resolveAdminOrderRelations(ctx, storeID, inCamp, inBatch, nil)
+		if rerr != nil {
+			return nil, rerr
+		}
+		// When caller clears one side explicitly, do not auto-fill it back from the other.
+		if in.CampaignID != nil && strings.TrimSpace(*in.CampaignID) == "" {
+			rels.CampaignID = nil
+		}
+		if in.PreorderBatchID != nil && strings.TrimSpace(*in.PreorderBatchID) == "" {
+			rels.BatchID = nil
+			rels.BatchName = nil
+			rels.BatchSlug = nil
+			rels.ETAStart = nil
+			rels.ETAEnd = nil
+		}
+		_, err = tx.Exec(ctx, `
+			UPDATE orders SET
+				campaign_id=$3,
+				preorder_batch_id=$4,
+				batch_name_snapshot=$5,
+				batch_slug_snapshot=$6,
+				batch_eta_start_snapshot=$7,
+				batch_eta_end_snapshot=$8,
+				updated_at=now()
+			WHERE id=$1 AND store_id=$2
+		`, orderID, storeID, rels.CampaignID, rels.BatchID, rels.BatchName, rels.BatchSlug, rels.ETAStart, rels.ETAEnd)
+		if err != nil {
+			return nil, err
+		}
+		revNum, rerr := s.nextRevisionNumber(ctx, tx, orderID)
+		if rerr == nil {
+			_, _ = tx.Exec(ctx, `
+				INSERT INTO order_revisions (
+					store_id, order_id, revision_number, change_type, summary, actor_user_id
+				) VALUES ($1,$2,$3,'notes','Updated campaign / preorder relation',$4)
+			`, storeID, orderID, revNum, actorID)
 		}
 	}
 
