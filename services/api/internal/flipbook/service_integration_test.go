@@ -170,6 +170,7 @@ func TestFlipbookPublishAndPublicHotspots(t *testing.T) {
 	pdf := pdfutil.MinimalPDF()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("catalog_name", "Flipbook Catalog")
 	fw, _ := mw.CreateFormFile("file", "c.pdf")
 	_, _ = fw.Write(pdf)
 	_ = mw.Close()

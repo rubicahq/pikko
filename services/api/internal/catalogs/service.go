@@ -43,7 +43,7 @@ type CreateFromImportInput struct {
 func (s *Service) EnsureFromImport(ctx context.Context, storeID, jobID uuid.UUID, title string) (*Catalog, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		title = "Catalog import"
+		return nil, fmt.Errorf("%w: catalog name is required", ErrInvalidInput)
 	}
 	var id uuid.UUID
 	existing, gerr := s.GetByImportJob(ctx, storeID, jobID)

@@ -147,6 +147,7 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	pdf := pdfutil.MinimalPDF()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("catalog_name", "Store A Lookbook")
 	fw, err := mw.CreateFormFile("file", "catalog.pdf")
 	if err != nil {
 		t.Fatal(err)
@@ -167,18 +168,43 @@ func TestPDFImportFlowAndCrossStoreIsolation(t *testing.T) {
 	}
 	var startResp struct {
 		Job struct {
-			ID     string `json:"id"`
-			Status string `json:"status"`
+			ID           string `json:"id"`
+			Status       string `json:"status"`
+			CatalogTitle string `json:"catalog_title"`
+			CatalogID    string `json:"catalog_id"`
 		} `json:"job"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &startResp); err != nil {
 		t.Fatal(err)
 	}
 	jobID := startResp.Job.ID
+	if startResp.Job.CatalogTitle != "Store A Lookbook" {
+		t.Fatalf("catalog_title=%q", startResp.Job.CatalogTitle)
+	}
+	if startResp.Job.CatalogID == "" {
+		t.Fatal("expected draft catalog_id on start")
+	}
+
+	// Missing name is rejected
+	var bufMissing bytes.Buffer
+	mwMissing := multipart.NewWriter(&bufMissing)
+	fwMissing, _ := mwMissing.CreateFormFile("file", "catalog.pdf")
+	_, _ = fwMissing.Write(pdf)
+	_ = mwMissing.Close()
+	reqMissing := httptest.NewRequest(http.MethodPost, "/api/v1/stores/"+storeA.String()+"/catalog-imports", &bufMissing)
+	reqMissing.Header.Set("Content-Type", mwMissing.FormDataContentType())
+	reqMissing.Header.Set("Authorization", "Bearer "+tokA)
+	reqMissing.Header.Set("Idempotency-Key", "test-import-missing-name")
+	rrMissing := httptest.NewRecorder()
+	router.ServeHTTP(rrMissing, reqMissing)
+	if rrMissing.Code != http.StatusBadRequest {
+		t.Fatalf("missing name status %d body %s", rrMissing.Code, rrMissing.Body.String())
+	}
 
 	// Idempotent replay
 	var buf2 bytes.Buffer
 	mw2 := multipart.NewWriter(&buf2)
+	_ = mw2.WriteField("catalog_name", "Store A Lookbook")
 	fw2, _ := mw2.CreateFormFile("file", "catalog.pdf")
 	_, _ = fw2.Write(pdf)
 	_ = mw2.Close()
@@ -315,6 +341,7 @@ func TestE2EB_PDFImportToPublicFlipbook(t *testing.T) {
 	pdf := pdfutil.MinimalPDF()
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
+	_ = mw.WriteField("catalog_name", "E2EB Lookbook")
 	fw, _ := mw.CreateFormFile("file", "catalog.pdf")
 	_, _ = fw.Write(pdf)
 	_ = mw.Close()
