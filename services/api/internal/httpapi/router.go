@@ -419,6 +419,7 @@ func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
 	// Agent 06: store-wide purchasing workspace, unavailable impact, receiving
 	mux.Handle("GET /api/v1/stores/{storeID}/purchasing", storePerm(rbac.PermPurchasingRead, commerceH.StorePurchasing))
 	mux.Handle("GET /api/v1/stores/{storeID}/purchasing/eligibility", storePerm(rbac.PermPurchasingRead, commerceH.PurchasingEligibility))
+	mux.Handle("POST /api/v1/stores/{storeID}/purchasing/status", storePerm(rbac.PermPurchasingWrite, commerceH.BulkPurchasingStatus))
 	mux.Handle("POST /api/v1/stores/{storeID}/purchasing/unavailable-impact", storePerm(rbac.PermPurchasingRead, commerceH.UnavailableImpact))
 	mux.Handle("POST /api/v1/stores/{storeID}/orders/{orderID}/items/{itemID}/unavailable", storePerm(rbac.PermPurchasingWrite, commerceH.MarkOrderItemUnavailable))
 	mux.Handle("GET /api/v1/stores/{storeID}/receiving", storePerm(rbac.PermPurchasingRead, commerceH.ListReceiving))

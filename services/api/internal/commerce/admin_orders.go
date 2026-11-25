@@ -473,7 +473,8 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	orderStatus := OrderConfirmed
 	var confirmedAt *time.Time
 	confirmedAt = &now
-	if eval.RequiresApproval {
+	// Paid-by-admin skips pending confirmation so the order enters Fulfilment/Purchasing immediately.
+	if eval.RequiresApproval && !paidByAdmin {
 		orderStatus = OrderPendingConfirmation
 		confirmedAt = nil
 	}

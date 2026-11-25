@@ -145,7 +145,8 @@ export const PRIMARY_WORKSPACES: WorkspaceDef[] = [
         href: "purchasing?tab=receiving",
         matchPrefixes: ["purchasing/receiving", "receiving"],
         search: { key: "tab", value: "receiving" },
-        implemented: true,
+        // Soft-hidden for now — purchasing workspace focuses on paid demand + status.
+        implemented: false,
         permission: "purchasing.read",
       },
       {
