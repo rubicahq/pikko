@@ -103,7 +103,14 @@ func (s *Service) productOnLiveCampaign(ctx context.Context, storeID, campaignID
 			SELECT 1 FROM campaign_products cp
 			JOIN campaigns c ON c.id=cp.campaign_id
 			WHERE cp.campaign_id=$1 AND cp.product_id=$2 AND c.store_id=$3 AND c.campaign_type='live'
-		)
+		) OR EXISTS(
+            SELECT 1 FROM catalog_campaigns cc
+            JOIN catalogs cat ON cat.id=cc.catalog_id AND cat.status='published'
+            JOIN catalog_pages pg ON pg.catalog_id=cat.id AND pg.status='published'
+            JOIN catalog_page_hotspots h ON h.catalog_page_id=pg.id AND h.product_id=$2
+            JOIN products p ON p.id=h.product_id AND p.store_id=$3 AND p.status='published'
+            WHERE cc.campaign_id=$1 AND cc.store_id=$3
+        )
 	`, campaignID, productID, storeID).Scan(&ok)
 	return ok, err
 }
