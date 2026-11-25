@@ -9,6 +9,7 @@ import {
   type AttributeDefinition,
   type Product,
 } from "@/lib/api";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,9 +104,16 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [attributes, setAttributes] = useState<AttributeDefinition[]>([]);
   const [addProductFor, setAddProductFor] = useState<{ key: string; name: string } | null>(null);
+  const [suggestAnchor, setSuggestAnchor] = useState<HTMLElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const syncingRelation = useRef(false);
+
+  function dismissProductSuggest() {
+    setSuggestQ(null);
+    setSuggestions([]);
+    setSuggestAnchor(null);
+  }
 
   useEffect(() => {
     void Promise.all([
@@ -292,8 +300,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   }
 
   function pickSuggest(lineKey: string, s: Suggest) {
-    setSuggestQ(null);
-    setSuggestions([]);
+    dismissProductSuggest();
     updateLine(lineKey, {
       product_id: s.product_id,
       product_label: s.name,
@@ -549,13 +556,16 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
             {lines.map((line, row) => (
               <tr key={line.key} className="border-t border-border align-top">
                 <td className="px-3 py-1.5 text-foreground-muted tabular-nums">{row + 1}</td>
-                <td className="relative px-2 py-1">
+                <td className="px-2 py-1">
                   <Input
                     ref={(el) => {
                       inputRefs.current[`${row}-0`] = el;
                     }}
                     value={line.product_label}
-                    onFocus={() => setActiveCell({ row, col: 0 })}
+                    onFocus={(e) => {
+                      setActiveCell({ row, col: 0 });
+                      setSuggestAnchor(e.currentTarget);
+                    }}
                     onChange={(e) => {
                       updateLine(line.key, {
                         product_label: e.target.value,
@@ -565,65 +575,22 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
                         needs_option: false,
                         error: undefined,
                       });
+                      setSuggestAnchor(e.currentTarget);
                       setSuggestQ({ key: line.key, q: e.target.value });
                     }}
-                    onKeyDown={(e) => onGridKeyDown(e, row, 0)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        dismissProductSuggest();
+                        return;
+                      }
+                      onGridKeyDown(e, row, 0);
+                    }}
                     placeholder="Search product or SKU…"
                     className="h-9 border-transparent bg-transparent px-1 focus-visible:border-border"
                     aria-label={`Product row ${row + 1}`}
+                    autoComplete="off"
                   />
-                  {suggestQ?.key === line.key && suggestQ.q.trim().length > 0 ? (
-                    <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-background shadow-sm">
-                      {suggestions.length === 0 ? (
-                        <li className="px-3 py-2 text-sm text-foreground-muted">
-                          No matches.{" "}
-                          <button
-                            type="button"
-                            className="font-medium text-foreground underline underline-offset-2"
-                            onClick={() =>
-                              setAddProductFor({ key: line.key, name: suggestQ.q.trim() })
-                            }
-                          >
-                            Add product
-                          </button>
-                        </li>
-                      ) : (
-                        <>
-                          {suggestions.map((s) => (
-                            <li key={`${s.product_id}-${s.variant_id || ""}`}>
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-background-subtle"
-                                onClick={() => pickSuggest(line.key, s)}
-                              >
-                                <span>
-                                  {s.name}
-                                  {s.variant_label ? ` · ${s.variant_label}` : ""}
-                                  {s.sku ? (
-                                    <span className="text-foreground-muted"> · {s.sku}</span>
-                                  ) : null}
-                                </span>
-                                <span className="tabular-nums text-foreground-secondary">
-                                  {formatIDR(s.unit_price_idr)}
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                          <li className="border-t border-border">
-                            <button
-                              type="button"
-                              className="w-full px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-background-subtle"
-                              onClick={() =>
-                                setAddProductFor({ key: line.key, name: suggestQ.q.trim() })
-                              }
-                            >
-                              + Add new product
-                            </button>
-                          </li>
-                        </>
-                      )}
-                    </ul>
-                  ) : null}
                   {line.variants && line.variants.length > 0 ? (
                     <OrderProductOptionChips
                       variants={line.variants}
@@ -642,7 +609,10 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
                     type="number"
                     min={1}
                     value={line.quantity}
-                    onFocus={() => setActiveCell({ row, col: 1 })}
+                    onFocus={() => {
+                      setActiveCell({ row, col: 1 });
+                      dismissProductSuggest();
+                    }}
                     onChange={(e) =>
                       updateLine(line.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
                     }
@@ -664,6 +634,68 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           </tbody>
         </table>
       </div>
+
+      <AnchoredPortal
+        anchor={suggestAnchor}
+        open={!!suggestQ && suggestQ.q.trim().length > 0}
+        onDismiss={dismissProductSuggest}
+      >
+        <ul>
+          {suggestions.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-foreground-muted">
+              No matches.{" "}
+              <button
+                type="button"
+                className="font-medium text-foreground underline underline-offset-2"
+                onClick={() => {
+                  if (!suggestQ) return;
+                  setAddProductFor({ key: suggestQ.key, name: suggestQ.q.trim() });
+                  dismissProductSuggest();
+                }}
+              >
+                Add product
+              </button>
+            </li>
+          ) : (
+            <>
+              {suggestions.map((s) => (
+                <li key={`${s.product_id}-${s.variant_id || ""}`}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-background-subtle"
+                    onClick={() => {
+                      if (!suggestQ) return;
+                      pickSuggest(suggestQ.key, s);
+                    }}
+                  >
+                    <span>
+                      {s.name}
+                      {s.variant_label ? ` · ${s.variant_label}` : ""}
+                      {s.sku ? <span className="text-foreground-muted"> · {s.sku}</span> : null}
+                    </span>
+                    <span className="tabular-nums text-foreground-secondary">
+                      {formatIDR(s.unit_price_idr)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              <li className="border-t border-border">
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm font-medium text-foreground hover:bg-background-subtle"
+                  onClick={() => {
+                    if (!suggestQ) return;
+                    setAddProductFor({ key: suggestQ.key, name: suggestQ.q.trim() });
+                    dismissProductSuggest();
+                  }}
+                >
+                  + Add new product
+                </button>
+              </li>
+            </>
+          )}
+        </ul>
+      </AnchoredPortal>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
