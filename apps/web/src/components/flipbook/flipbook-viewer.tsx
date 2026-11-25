@@ -7,8 +7,12 @@ import {
   List,
   Minus,
   Plus,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WishlistBadge } from "@/components/storefront/wishlist-badge";
+import { WishlistButton } from "@/components/storefront/wishlist-button";
+import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +51,41 @@ export type FlipPage = {
   items?: FlipPageItem[];
 };
 
-/** Display-only PDF etalase — page images + navigation. No cart / wishlist / contact CTAs. */
+type WishlistPick = {
+  product_id: string;
+  product_name: string;
+  base_price_idr?: number | null;
+  compare_at_price_idr?: number | null;
+  contact_for_price?: boolean;
+};
+
+function PriceBlock({
+  contact,
+  base,
+  compareAt,
+}: {
+  contact?: boolean;
+  base: number;
+  compareAt?: number | null;
+}) {
+  if (contact) {
+    return <span className="font-medium text-foreground">Hubungi Penjual</span>;
+  }
+  if (compareAt != null && compareAt > base) {
+    return (
+      <span className="inline-flex flex-wrap items-baseline gap-2">
+        <span className="font-medium text-foreground">{formatIDR(base)}</span>
+        <span className="text-xs text-foreground-muted line-through">{formatIDR(compareAt)}</span>
+      </span>
+    );
+  }
+  return <span className="font-medium text-foreground">{formatIDR(base)}</span>;
+}
+
+/**
+ * Catalog flipbook etalase. With `liveSlug`, restores hotspot hover outlines +
+ * scheduled-live wishlist affordances. Without live, stays display-only (no cart/AI).
+ */
 export function FlipbookViewer({
   storeSlug,
   storeName,
@@ -60,11 +98,13 @@ export function FlipbookViewer({
   storeWhatsapp?: string | null;
   liveSlug?: string;
 }) {
+  const wishlistMode = Boolean(liveSlug);
   const [index, setIndex] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [showThumbs, setShowThumbs] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [flipping, setFlipping] = useState<"next" | "prev" | null>(null);
+  const [picked, setPicked] = useState<WishlistPick | null>(null);
   const touchX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -76,6 +116,28 @@ export function FlipbookViewer({
   }, []);
 
   const page = pages[index];
+
+  const pageItems = useMemo((): FlipPageItem[] => {
+    if (!wishlistMode || !page) return [];
+    if (page.items && page.items.length > 0) return page.items;
+    const fromHs: FlipPageItem[] = [];
+    const seen = new Set<string>();
+    for (const hs of page.hotspots || []) {
+      if (!hs.product_id || !hs.product_name || seen.has(hs.product_id)) continue;
+      seen.add(hs.product_id);
+      fromHs.push({
+        product_id: hs.product_id,
+        product_slug: hs.product_slug || "",
+        product_name: hs.product_name,
+        base_price_idr: hs.base_price_idr ?? 0,
+        compare_at_price_idr: hs.compare_at_price_idr,
+        contact_for_price: hs.contact_for_price,
+        primary_image_url: hs.primary_image_url,
+        hotspot_id: hs.id,
+      });
+    }
+    return fromHs;
+  }, [page, wishlistMode]);
 
   const go = useCallback(
     (dir: "next" | "prev") => {
@@ -96,6 +158,7 @@ export function FlipbookViewer({
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") go("next");
       if (e.key === "ArrowLeft") go("prev");
+      if (e.key === "Escape") setPicked(null);
       if (e.key === "+" || e.key === "=") setZoom((z) => Math.min(2.5, z + 0.25));
       if (e.key === "-") setZoom((z) => Math.max(1, z - 0.25));
     }
@@ -107,6 +170,21 @@ export function FlipbookViewer({
     () => `${storeName} catalog — page ${index + 1} of ${pages.length}`,
     [storeName, index, pages.length],
   );
+
+  function openWishlistPick(hs: FlipHotspot | FlipPageItem) {
+    if (!wishlistMode || !("product_id" in hs) || !hs.product_id) return;
+    const name =
+      "product_name" in hs && hs.product_name
+        ? hs.product_name
+        : "Product";
+    setPicked({
+      product_id: hs.product_id,
+      product_name: name,
+      base_price_idr: hs.base_price_idr,
+      compare_at_price_idr: hs.compare_at_price_idr,
+      contact_for_price: hs.contact_for_price,
+    });
+  }
 
   if (!pages.length) {
     return (
@@ -145,6 +223,7 @@ export function FlipbookViewer({
           <p className="text-xs text-foreground-secondary">{title}</p>
         </div>
         <div className="flex items-center gap-1">
+          {liveSlug ? <WishlistBadge storeSlug={storeSlug} liveSlug={liveSlug} color="#15191E" /> : null}
           <Button type="button" variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(1, z - 0.25))}>
             <Minus className="h-4 w-4" strokeWidth={1.75} />
           </Button>
@@ -157,8 +236,20 @@ export function FlipbookViewer({
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-        <section className="relative flex flex-1 flex-col items-center justify-center overflow-hidden p-4">
+      <div
+        className={cn(
+          "mx-auto w-full flex-1",
+          wishlistMode
+            ? "grid max-w-6xl grid-cols-1 gap-0 lg:h-[calc(100dvh-65px)] lg:min-h-0 lg:flex-none lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.7fr)]"
+            : "flex max-w-5xl flex-col",
+        )}
+      >
+        <section
+          className={cn(
+            "relative flex flex-col items-center justify-center overflow-hidden p-4",
+            wishlistMode ? "lg:border-r lg:border-border" : "flex-1",
+          )}
+        >
           <Button
             type="button"
             variant="outline"
@@ -174,7 +265,10 @@ export function FlipbookViewer({
             type="button"
             variant="outline"
             size="icon"
-            className="absolute right-3 z-10 hidden sm:inline-flex"
+            className={cn(
+              "absolute right-3 z-10 hidden sm:inline-flex",
+              wishlistMode && "lg:right-[calc(0%+12px)]",
+            )}
             aria-label="Next page"
             disabled={index >= pages.length - 1}
             onClick={() => go("next")}
@@ -210,7 +304,39 @@ export function FlipbookViewer({
             aria-label={title}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={page.image_url} alt="" className="block h-auto max-h-[78dvh] w-auto max-w-full select-none" draggable={false} />
+            <img
+              src={page.image_url}
+              alt=""
+              className={cn(
+                "block h-auto w-auto max-w-full select-none",
+                wishlistMode ? "max-h-[70dvh] lg:max-h-[calc(100dvh-120px)]" : "max-h-[78dvh]",
+              )}
+              draggable={false}
+            />
+            {wishlistMode &&
+              (page.hotspots || [])
+                .filter((hs) => !hs.list_only)
+                .map((hs) => (
+                  <button
+                    key={hs.id}
+                    type="button"
+                    className="group absolute min-h-[28px] min-w-[28px] border border-transparent bg-transparent transition-colors hover:border-brand hover:bg-brand/10 focus-visible:border-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-dark"
+                    style={{
+                      left: `${hs.x_pct}%`,
+                      top: `${hs.y_pct}%`,
+                      width: `${Math.max(hs.width_pct, 4)}%`,
+                      height: `${Math.max(hs.height_pct, 4)}%`,
+                    }}
+                    aria-label={hs.product_name ? `Wishlist ${hs.product_name}` : "Add to wishlist"}
+                    onClick={() => openWishlistPick(hs)}
+                  >
+                    {hs.product_name && (
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-max max-w-[min(16rem,80vw)] -translate-x-1/2 rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md group-hover:block group-focus-visible:block">
+                        {hs.product_name} · Wishlist
+                      </span>
+                    )}
+                  </button>
+                ))}
           </div>
 
           <div className="mt-3 flex items-center justify-center gap-3 sm:hidden">
@@ -225,6 +351,60 @@ export function FlipbookViewer({
             </Button>
           </div>
         </section>
+
+        {wishlistMode && liveSlug ? (
+          <aside className="flex min-h-0 flex-col border-t border-border bg-background lg:overflow-hidden lg:border-t-0">
+            <div className="shrink-0 border-b border-border px-4 py-3">
+              <h2 className="text-sm font-semibold text-foreground">Items on this page</h2>
+              <p className="text-xs text-foreground-secondary">
+                Page {index + 1} of {pages.length}
+              </p>
+            </div>
+            <ul className="min-h-0 flex-1 space-y-0 overflow-y-auto overscroll-contain p-2" aria-live="polite">
+              {pageItems.length === 0 && (
+                <li className="px-3 py-8 text-center text-sm text-foreground-secondary">
+                  Tidak ada item di halaman ini
+                </li>
+              )}
+              {pageItems.map((it) => (
+                <li
+                  key={it.product_id}
+                  className="rounded-md border border-transparent p-3 hover:border-border hover:bg-surface-hover"
+                >
+                  <div className="flex gap-3">
+                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md border border-border bg-surface">
+                      {it.primary_image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={urls.api(it.primary_image_url)} alt="" className="h-full w-full object-cover" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{it.product_name}</p>
+                      <div className="mt-0.5 text-sm">
+                        <PriceBlock
+                          contact={it.contact_for_price}
+                          base={it.base_price_idr}
+                          compareAt={it.compare_at_price_idr}
+                        />
+                      </div>
+                      <div className="mt-2">
+                        <WishlistButton
+                          storeSlug={storeSlug}
+                          liveSlug={liveSlug}
+                          productId={it.product_id}
+                          productName={it.product_name}
+                          primaryColor="#C83200"
+                          buttonFg="#FFFFFF"
+                          enabled
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        ) : null}
       </div>
 
       {showThumbs && (
@@ -248,6 +428,48 @@ export function FlipbookViewer({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {picked && liveSlug && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-dark/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={picked.product_name}
+          onClick={() => setPicked(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-lg border border-border bg-background p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-medium text-foreground">{picked.product_name}</h2>
+                <p className="mt-1 text-sm text-foreground-secondary">
+                  <PriceBlock
+                    contact={picked.contact_for_price}
+                    base={picked.base_price_idr ?? 0}
+                    compareAt={picked.compare_at_price_idr}
+                  />
+                </p>
+              </div>
+              <button type="button" aria-label="Close" onClick={() => setPicked(null)}>
+                <X className="h-5 w-5" strokeWidth={1.75} />
+              </button>
+            </div>
+            <div className="mt-5">
+              <WishlistButton
+                storeSlug={storeSlug}
+                liveSlug={liveSlug}
+                productId={picked.product_id}
+                productName={picked.product_name}
+                primaryColor="#C83200"
+                buttonFg="#FFFFFF"
+                enabled
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
