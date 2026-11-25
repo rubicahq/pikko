@@ -184,6 +184,76 @@ export type Category = {
   sort_order: number;
 };
 
+/** Fixed 10-color palette for attribute options (API-enforced). */
+export const ATTRIBUTE_OPTION_COLORS = [
+  "coral",
+  "peach",
+  "amber",
+  "lime",
+  "teal",
+  "sky",
+  "indigo",
+  "violet",
+  "rose",
+  "slate",
+] as const;
+
+export type AttributeOptionColor = (typeof ATTRIBUTE_OPTION_COLORS)[number];
+
+export const ATTRIBUTE_OPTION_COLOR_HEX: Record<AttributeOptionColor, string> = {
+  coral: "#FF3D00",
+  peach: "#FF8050",
+  amber: "#F59E0B",
+  lime: "#84CC16",
+  teal: "#14B8A6",
+  sky: "#0EA5E9",
+  indigo: "#6366F1",
+  violet: "#8B5CF6",
+  rose: "#F43F5E",
+  slate: "#64748B",
+};
+
+export type AttributeType =
+  | "single_option"
+  | "multiple_option"
+  | "short_text"
+  | "number";
+
+export type AttributeOption = {
+  id: string;
+  attribute_id: string;
+  label: string;
+  color: AttributeOptionColor | string;
+  sort_order: number;
+};
+
+export type AttributeDefinition = {
+  id: string;
+  store_id: string;
+  key: string;
+  name: string;
+  label: string;
+  type: AttributeType | string;
+  data_type: AttributeType | string;
+  options: AttributeOption[];
+  is_required: boolean;
+  display_order: number;
+};
+
+export type ProductAttributeValue = {
+  id: string;
+  product_id: string;
+  attribute_id: string;
+  attribute_key?: string;
+  attribute_name?: string;
+  attribute_label?: string;
+  type?: string;
+  data_type?: string;
+  value_text?: string | null;
+  value_number?: number | null;
+  option_ids?: string[];
+};
+
 export type ProductImage = {
   id: string;
   file_id: string;

@@ -193,12 +193,12 @@ No Workspace / Operations / Relationships / Manage group labels. No accordion / 
 | Overview | `/overview` | Summary, Analytics |
 | Orders | `/orders` | All Orders, Preorders, Live Shopping, Payments |
 | Fulfillment | `/purchasing` | Purchasing, Receiving (`?tab=receiving`), Packing, Shipments, Vendors |
-| Products | `/products` | All Products, Catalogs · Attributes\* |
+| Products | `/products` | All Products, Catalogs, Attributes |
 | Campaigns | `/campaigns` | All / Active (`?status=active`) / Completed (`?status=completed`) |
 | Customers | `/customers` | All Customers · Store Credit\* |
 | Storefront | `/storefront` | Appearance, Content (`?tab=content`), Preview (`?tab=preview`) |
 
-\*Hidden until built (`implemented: false`).
+\*Store Credit remains hidden until built (`implemented: false`).
 
 **Settings** (utility): General, Team, Business Rules, Payment Settings, WhatsApp Templates (`/messages`).  
 **Header utilities (right):** **Ask Connie** (compact peach chip + Soon — no AI backend), Messages, Notifications (Search omitted until implemented).

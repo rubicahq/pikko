@@ -194,6 +194,44 @@ func (h *Phase2Handlers) UpdateAttributeDefinition(w http.ResponseWriter, r *htt
 	writeJSON(w, http.StatusOK, map[string]any{"attribute": a})
 }
 
+func (h *Phase2Handlers) DeleteAttributeDefinition(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("attributeID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
+		return
+	}
+	if err := h.Catalog.DeleteAttributeDefinition(r.Context(), StoreID(r), id); err != nil {
+		h.writeCatalogErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *Phase2Handlers) SetProductAttributesBulk(w http.ResponseWriter, r *http.Request) {
+	productID, err := uuid.Parse(r.PathValue("productID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Not found.")
+		return
+	}
+	var body struct {
+		Values []catalog.SetAttributeValueInput `json:"values"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	if err := h.Catalog.SetProductAttributesBulk(r.Context(), StoreID(r), productID, body.Values); err != nil {
+		h.writeCatalogErr(w, r, err)
+		return
+	}
+	list, err := h.Catalog.ListProductAttributes(r.Context(), StoreID(r), productID)
+	if err != nil {
+		h.writeCatalogErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"values": list})
+}
+
 func (h *Phase2Handlers) ListProductAttributes(w http.ResponseWriter, r *http.Request) {
 	productID, err := uuid.Parse(r.PathValue("productID"))
 	if err != nil {

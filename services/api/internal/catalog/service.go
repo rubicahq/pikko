@@ -340,10 +340,11 @@ type OptionDef struct {
 }
 
 type ProductWriteInput struct {
-	Product  ProductInput  `json:"product"`
-	Options  []OptionDef   `json:"options"`
-	Variants []VariantInput `json:"variants"`
-	ImageIDs []uuid.UUID   `json:"image_file_ids"`
+	Product    ProductInput             `json:"product"`
+	Options    []OptionDef              `json:"options"`
+	Variants   []VariantInput           `json:"variants"`
+	ImageIDs   []uuid.UUID              `json:"image_file_ids"`
+	Attributes []SetAttributeValueInput `json:"attributes,omitempty"`
 }
 
 func (s *Service) CreateProduct(ctx context.Context, storeID uuid.UUID, in ProductWriteInput) (*Product, error) {
@@ -385,11 +386,8 @@ func (s *Service) CreateProduct(ctx context.Context, storeID uuid.UUID, in Produ
 	if !validStatus(status) || !validAvail(avail) || (inv != "finite" && inv != "unlimited") {
 		return nil, ErrInvalidInput
 	}
-	if p.CategoryID != nil {
-		if _, err := s.getCategory(ctx, storeID, *p.CategoryID); err != nil {
-			return nil, ErrInvalidInput
-		}
-	}
+	// Product Category is no longer first-class; always persist NULL.
+	p.CategoryID = nil
 
 	tx, err := s.DB.Begin(ctx)
 	if err != nil {
@@ -425,6 +423,11 @@ func (s *Service) CreateProduct(ctx context.Context, storeID uuid.UUID, in Produ
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	if len(in.Attributes) > 0 {
+		if err := s.SetProductAttributesBulk(ctx, storeID, id, in.Attributes); err != nil {
+			return nil, err
+		}
 	}
 	return s.GetProduct(ctx, storeID, id, false)
 }
@@ -493,10 +496,8 @@ func (s *Service) UpdateProduct(ctx context.Context, storeID, productID uuid.UUI
 	if p.BrandID != nil {
 		brandID = p.BrandID
 	}
-	cat := cur.CategoryID
-	if p.CategoryID != nil {
-		cat = p.CategoryID
-	}
+	// Product Category is no longer first-class; clear any prior link.
+	var cat *uuid.UUID
 	compare := cur.CompareAtPriceIDR
 	if p.CompareAtPriceIDR != nil {
 		compare = p.CompareAtPriceIDR
@@ -561,6 +562,11 @@ func (s *Service) UpdateProduct(ctx context.Context, storeID, productID uuid.UUI
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
+	}
+	if in.Attributes != nil {
+		if err := s.SetProductAttributesBulk(ctx, storeID, productID, in.Attributes); err != nil {
+			return nil, err
+		}
 	}
 	return s.GetProduct(ctx, storeID, productID, false)
 }
