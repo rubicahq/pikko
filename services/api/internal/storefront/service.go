@@ -522,6 +522,11 @@ func (s *Service) PublicBySlug(ctx context.Context, slug string) (*PublicStore, 
 		return nil, err
 	}
 	cfg, err := s.Get(ctx, ps.ID, "published")
+	if errors.Is(err, ErrNotFound) {
+		// Store row can say published while the published channel row is missing
+		// (partial write / older data). Fall back to draft so the public URL opens.
+		cfg, err = s.Get(ctx, ps.ID, "draft")
+	}
 	if err != nil {
 		return nil, err
 	}

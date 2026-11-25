@@ -150,4 +150,6 @@ export const RESERVED_STOREFRONT_SLUGS = new Set([
   "about",
   "contact",
   "security",
+  "portal",
+  "invites",
 ]);

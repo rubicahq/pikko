@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublicBatches, getPublicLives, getPublicProducts, getPublicStore } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
+import { safeCssColor } from "@/lib/safe-css-color";
 import { RESERVED_STOREFRONT_SLUGS, urls } from "@/lib/urls";
 import { CartBadge } from "@/components/storefront/cart-badge";
 
@@ -55,13 +56,18 @@ export default async function PublicStorePage({ params }: Props) {
   const logoSrc = sf.logo_file_id
     ? urls.publicFile(store.id, sf.logo_file_id)
     : sf.logo_url;
+  const bg = safeCssColor(sf.background_color, "#FFFFFF");
+  const text = safeCssColor(sf.text_color, "#15191E");
+  const primary = safeCssColor(sf.primary_color, "#FF3D00");
+  const border = safeCssColor(sf.border_color, "#E1E3E8");
+  const surface = safeCssColor(sf.surface_color, "#F3F3F7");
 
   return (
     <div
       className="min-h-screen"
       style={{
-        background: sf.background_color,
-        color: sf.text_color,
+        background: bg,
+        color: text,
       }}
     >
       <header className="mx-auto flex max-w-dashboard items-center justify-between gap-4 px-4 py-6 md:px-8">
@@ -77,12 +83,12 @@ export default async function PublicStorePage({ params }: Props) {
           <Link href={`/${storeSlug}/catalog`} className="text-sm opacity-80 hover:opacity-100">
             Catalog
           </Link>
-          <CartBadge storeSlug={storeSlug} color={sf.text_color} />
+          <CartBadge storeSlug={storeSlug} color={text} />
           {sf.whatsapp ? (
             <a
               className="text-sm underline-offset-2 hover:underline"
               href={`https://wa.me/${sf.whatsapp.replace(/\D/g, "")}`}
-              style={{ color: sf.primary_color }}
+              style={{ color: primary }}
             >
               Contact
             </a>
@@ -105,7 +111,7 @@ export default async function PublicStorePage({ params }: Props) {
                   <Link
                     href={urls.storefrontLive(storeSlug, l.slug)}
                     className="block rounded-md border p-4 transition-opacity hover:opacity-90"
-                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                    style={{ borderColor: border }}
                   >
                     <p className="font-medium">{l.name}</p>
                     <p className="mt-1 text-sm opacity-70 capitalize">
@@ -135,7 +141,7 @@ export default async function PublicStorePage({ params }: Props) {
                   <Link
                     href={`/${storeSlug}/preorders/${b.slug}`}
                     className="block rounded-md border p-4 transition-opacity hover:opacity-90"
-                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                    style={{ borderColor: border }}
                   >
                     <p className="font-medium">{b.name}</p>
                     <p className="mt-1 text-sm opacity-70 capitalize">
@@ -166,11 +172,11 @@ export default async function PublicStorePage({ params }: Props) {
                   <Link
                     href={urls.storefrontProduct(storeSlug, p.slug)}
                     className="block rounded-md border p-3 transition-opacity hover:opacity-90"
-                    style={{ borderColor: sf.border_color || "#E1E3E8" }}
+                    style={{ borderColor: border }}
                   >
                     <div
                       className="aspect-square overflow-hidden rounded-md"
-                      style={{ background: sf.surface_color || "#F3F3F7" }}
+                      style={{ background: surface }}
                     >
                       {p.primary_image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -198,7 +204,7 @@ export default async function PublicStorePage({ params }: Props) {
 
       <footer
         className="flex flex-col items-center gap-2 border-t px-4 py-6 text-center text-xs opacity-60 md:px-8"
-        style={{ borderColor: sf.border_color || "#E1E3E8" }}
+        style={{ borderColor: border }}
       >
         <span>{store.name}</span>
         <span className="inline-flex items-center gap-1.5">

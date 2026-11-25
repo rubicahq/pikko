@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeCssColor } from "@/lib/safe-css-color";
 import { urls } from "@/lib/urls";
 
 type Section = "appearance" | "content" | "preview";
@@ -97,7 +98,7 @@ export function StorefrontEditor({
     setMessage(null);
     try {
       await apiFetch(`/api/v1/stores/${store.id}/storefront/publish`, { method: "POST" });
-      setMessage("Storefront published.");
+      setMessage(`Storefront published. Live at ${urls.storefront(store.slug)}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Publish failed.");
@@ -106,13 +107,37 @@ export function StorefrontEditor({
     }
   }
 
+  const liveActions = (
+    <div className="flex flex-wrap gap-3">
+      <Button type="button" loading={saving} onClick={() => publish()}>
+        Publish storefront
+      </Button>
+      {store.publication_status === "published" ? (
+        <Button type="button" variant="outline" asChild>
+          <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
+            Open live storefront
+          </a>
+        </Button>
+      ) : (
+        <p className="self-center text-sm text-foreground-secondary">
+          Live URL opens after you publish — until then{" "}
+          <span className="font-medium text-foreground">{urls.storefront(store.slug)}</span>{" "}
+          returns 404.
+        </p>
+      )}
+    </div>
+  );
+
   const previewPane = (
     <div
       className="rounded-lg border border-border p-6"
       style={{
-        background: cfg.background_color,
-        color: cfg.text_color,
-        borderColor: cfg.border_color || theme?.border_color,
+        background: safeCssColor(cfg.background_color, "#FFFFFF"),
+        color: safeCssColor(cfg.text_color, "#15191E"),
+        borderColor: safeCssColor(
+          cfg.border_color || theme?.border_color,
+          "#E1E3E8",
+        ),
       }}
     >
       <p className="text-xs uppercase tracking-wide opacity-70">Draft preview</p>
@@ -131,8 +156,8 @@ export function StorefrontEditor({
         type="button"
         className="mt-6 rounded-md px-4 py-2 text-sm font-medium"
         style={{
-          background: cfg.primary_color,
-          color: cfg.button_foreground || "#15191E",
+          background: safeCssColor(cfg.primary_color, "#FF3D00"),
+          color: safeCssColor(cfg.button_foreground, "#15191E"),
         }}
       >
         Shop now
@@ -268,16 +293,7 @@ export function StorefrontEditor({
             </>
           ) : null}
 
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" loading={saving} onClick={() => publish()}>
-              Publish storefront
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
-                Open live storefront
-              </a>
-            </Button>
-          </div>
+          {liveActions}
           {message && <p className="text-sm text-success">{message}</p>}
           {error && <p className="text-sm text-error">{error}</p>}
         </div>
@@ -290,16 +306,7 @@ export function StorefrontEditor({
             </p>
           </div>
           {previewPane}
-          <div className="flex flex-wrap gap-3">
-            <Button type="button" loading={saving} onClick={() => publish()}>
-              Publish storefront
-            </Button>
-            <Button type="button" variant="outline" asChild>
-              <a href={urls.storefront(store.slug)} target="_blank" rel="noreferrer">
-                Open live storefront
-              </a>
-            </Button>
-          </div>
+          {liveActions}
           {message && <p className="text-sm text-success">{message}</p>}
           {error && <p className="text-sm text-error">{error}</p>}
         </div>
