@@ -3,7 +3,6 @@ package imports
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -134,17 +133,17 @@ type Item struct {
 }
 
 type Service struct {
-	DB        *pgxpool.Pool
-	Files     *files.Service
-	Catalog   *catalog.Service
-	Queue     *jobs.Queue
-	Outbox    *jobs.Outbox
-	AI        ai.CatalogExtractor
-	Renderer  pdfutil.Renderer
-	Limits    Limits
-	Logger    *slog.Logger
-	Storage   storage.ObjectStore
-	Ent       *entitlements.Service
+	DB       *pgxpool.Pool
+	Files    *files.Service
+	Catalog  *catalog.Service
+	Queue    *jobs.Queue
+	Outbox   *jobs.Outbox
+	AI       ai.CatalogExtractor
+	Renderer pdfutil.Renderer
+	Limits   Limits
+	Logger   *slog.Logger
+	Storage  storage.ObjectStore
+	Ent      *entitlements.Service
 }
 
 type StartInput struct {
@@ -166,7 +165,9 @@ func (s *Service) limits() Limits {
 
 func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in StartInput) (*Job, error) {
 	lim := s.limits()
-	if in.ImageMode == "" { in.ImageMode = "none" }
+	if in.ImageMode == "" {
+		in.ImageMode = "none"
+	}
 	if in.ImageMode != "none" && in.ImageMode != "first_page" && in.ImageMode != "crop" {
 		return nil, fmt.Errorf("%w: invalid product image option", ErrInvalidInput)
 	}
@@ -210,11 +211,8 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	if pages > lim.MaxPages {
 		return nil, fmt.Errorf("%w: PDF has %d pages; maximum is %d", ErrInvalidInput, pages, lim.MaxPages)
 	}
-	if s.Ent != nil {
-		if err := s.Ent.RequireLimit(ctx, storeID, entitlements.LimitAIPDFPagesPerMonth, int64(pages)); err != nil {
-			return nil, err
-		}
-	}
+	// Soft-deprecate AI vision: force none. Product photo modes are retired with AI import.
+	in.ImageMode = "none"
 
 	f, err := s.Files.Upload(ctx, storeID, userID, "catalog_pdf", in.Filename, "application/pdf", bytes.NewReader(full), int64(len(full)))
 	if err != nil {
@@ -243,9 +241,6 @@ func (s *Service) Start(ctx context.Context, storeID, userID uuid.UUID, in Start
 	`, storeID, userID, f.ID, pages, title, idem, in.ImageMode).Scan(&jobID)
 	if err != nil {
 		return nil, err
-	}
-	if s.Ent != nil {
-		_ = s.Ent.IncrementUsage(ctx, storeID, entitlements.LimitAIPDFPagesPerMonth, int64(pages))
 	}
 
 	// Name-first: draft catalog exists as soon as the named import starts.
@@ -929,8 +924,6 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 	`, storeID, jobID)
 	_, _ = s.DB.Exec(ctx, `DELETE FROM catalog_import_items WHERE job_id=$1 AND store_id=$2`, jobID, storeID)
 
-	aiPages := make([]ai.PageImage, 0, len(pages))
-	var firstPageFileID uuid.UUID
 	for _, p := range pages {
 		sf, err := s.Files.Upload(ctx, storeID, uuid.Nil, "catalog_page",
 			fmt.Sprintf("page-%d.png", p.PageNumber), "image/png",
@@ -938,7 +931,6 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, err)
 		}
-		if p.PageNumber == 1 { firstPageFileID = sf.ID }
 		_, err = s.DB.Exec(ctx, `
 			INSERT INTO catalog_pages (store_id, image_file_id, display_order, status, source_import_job_id, page_number)
 			VALUES ($1,$2,$3,'draft',$4,$5)
@@ -946,139 +938,75 @@ func (s *Service) processImport(ctx context.Context, storeID, jobID uuid.UUID) e
 		if err != nil {
 			return s.failJob(ctx, storeID, jobID, err)
 		}
-		aiPages = append(aiPages, ai.PageImage{
-			PageNumber: p.PageNumber,
-			MIMEType:   "image/png",
-			Base64Data: base64.StdEncoding.EncodeToString(p.PNG),
-			Width:      p.Width,
-			Height:     p.Height,
-		})
 	}
 
-	extractor := s.AI
-	if extractor == nil {
-		extractor = ai.NewMockExtractor()
+	// Soft-deprecate AI vision: pages-only flipbook. Link pages to the draft catalog and complete.
+	var catalogID uuid.UUID
+	cerr := s.DB.QueryRow(ctx, `
+		SELECT id FROM catalogs WHERE store_id=$1 AND source_import_job_id=$2
+	`, storeID, jobID).Scan(&catalogID)
+	if errors.Is(cerr, pgx.ErrNoRows) {
+		title := strings.TrimSpace(job.CatalogTitle)
+		if title == "" {
+			title = "Catalog " + job.CreatedAt.Format("2006-01-02")
+		}
+		_ = s.DB.QueryRow(ctx, `
+			INSERT INTO catalogs (store_id, title, status, source_import_job_id)
+			VALUES ($1,$2,'draft',$3) RETURNING id
+		`, storeID, title, jobID).Scan(&catalogID)
 	}
-	provider := ai.ProviderName(extractor)
-	_, _ = s.DB.Exec(ctx, `
-		UPDATE catalog_import_jobs SET ai_provider=$3, updated_at=now() WHERE id=$1 AND store_id=$2
-	`, jobID, storeID, provider)
-
-	count := 0
-	warnCount := 0
-	displayOrder := 0
-	for i, pageImg := range aiPages {
-		pageNum := pageImg.PageNumber
-		pct := 55
-		if totalPages > 0 {
-			pct = 55 + (40 * i / totalPages)
-		}
-		s.setProgress(ctx, storeID, jobID, pct, "analyzing", &pageNum, &totalPages)
-
-		result, err := extractor.ExtractCatalog(ctx, ai.ExtractRequest{
-			Pages:    []ai.PageImage{pageImg},
-			MaxItems: lim.MaxItems - count,
-		})
-		if err != nil {
-			return s.failJob(ctx, storeID, jobID, fmt.Errorf("AI extraction failed on page %d: %w", pageNum, err))
-		}
-
-		var productPageImage image.Image
-		if job.ImageMode == "crop" {
-			if pageBytes, decodeErr := base64.StdEncoding.DecodeString(pageImg.Base64Data); decodeErr == nil {
-				productPageImage, _ = png.Decode(bytes.NewReader(pageBytes))
-			}
-		}
-		for _, ex := range result.Items {
-			if count >= lim.MaxItems {
-				break
-			}
-			ex.NormalizePrices()
-			ex.NormalizeConfidence()
-			if ex.PageNumber == nil {
-				p := pageNum
-				ex.PageNumber = &p
-			}
-			variant := ex.VariantInfo
-			if len(variant) == 0 {
-				variant = json.RawMessage(`{}`)
-			}
-			var imageID *uuid.UUID
-			if job.ImageMode == "first_page" && firstPageFileID != uuid.Nil {
-				imageID = &firstPageFileID
-			}
-			if job.ImageMode == "crop" {
-				imageID = s.cropImportItem(ctx, storeID, productPageImage, ex, displayOrder)
-			}
-			if ex.Uncertain || (ex.Warning != nil && strings.TrimSpace(*ex.Warning) != "") {
-				warnCount++
-			}
-			reviewStatus := "pending"
-			selected := true
-			name := ""
-			if ex.Name != nil {
-				name = strings.TrimSpace(*ex.Name)
-			}
-			if name == "" {
-				selected = false
-				reviewStatus = "rejected"
-				if ex.Warning == nil {
-					w := "missing product name"
-					ex.Warning = &w
-					ex.Uncertain = true
-					warnCount++
-				}
-			}
-			rawItem, _ := json.Marshal(ex)
-			_, err = s.DB.Exec(ctx, `
-				INSERT INTO catalog_import_items (
-					store_id, job_id, display_order, selected, review_status, uncertain, confidence_pct, warning,
-					name, description, brand, price_idr, price_normal_idr, price_discount_idr, sku, category_name, variant_info,
-					image_file_id, page_number, bbox_x_pct, bbox_y_pct, bbox_width_pct, bbox_height_pct, raw_extraction
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-			`, storeID, jobID, displayOrder, selected, reviewStatus, ex.Uncertain, ex.ConfidencePct, ex.Warning,
-				ex.Name, ex.Description, ex.Brand, ex.PriceIDR, ex.PriceNormalIDR, ex.PriceDiscountIDR, ex.SKU, ex.Category, variant,
-				imageID, ex.PageNumber, ex.BBoxXPct, ex.BBoxYPct, ex.BBoxWidthPct, ex.BBoxHeightPct, rawItem)
-			if err != nil {
-				return s.failJob(ctx, storeID, jobID, err)
-			}
-			count++
-			displayOrder++
-		}
+	if catalogID != uuid.Nil {
+		_, _ = s.DB.Exec(ctx, `
+			UPDATE catalog_pages SET catalog_id=$3, updated_at=now()
+			WHERE store_id=$1 AND source_import_job_id=$2
+		`, storeID, jobID, catalogID)
 	}
 
 	_, err = s.DB.Exec(ctx, `
 		UPDATE catalog_import_jobs
-		SET status='review_required', item_count=$3, warning_count=$4, progress_pct=100,
-		    progress_stage='ready_for_review', progress_page=NULL, progress_pages=$5, updated_at=now()
+		SET status='completed', item_count=0, warning_count=0, progress_pct=100,
+		    progress_stage='completed', progress_page=NULL, progress_pages=$3,
+		    ai_provider=NULL, completed_at=now(), updated_at=now()
 		WHERE id=$1 AND store_id=$2
-	`, jobID, storeID, count, warnCount, totalPages)
+	`, jobID, storeID, totalPages)
 	if err != nil {
 		return err
 	}
-	_ = s.Outbox.Write(ctx, &storeID, "catalog_import_review_required", map[string]any{
+	_ = s.Outbox.Write(ctx, &storeID, "catalog_pages_ready", map[string]any{
 		"import_job_id": jobID.String(),
-		"item_count":    count,
-		"ai_provider":   provider,
-	}, "outbox-review-"+job.IdempotencyKey)
+		"page_count":    totalPages,
+		"catalog_id":    catalogID.String(),
+	}, "outbox-pages-"+job.IdempotencyKey)
 	return nil
 }
 
 // cropImportItem derives a product photo from an already rendered PDF page.
 func (s *Service) cropImportItem(ctx context.Context, storeID uuid.UUID, source image.Image, item ai.ExtractedItem, order int) *uuid.UUID {
-	if item.BBoxXPct == nil || item.BBoxYPct == nil || item.BBoxWidthPct == nil || item.BBoxHeightPct == nil { return nil }
+	if item.BBoxXPct == nil || item.BBoxYPct == nil || item.BBoxWidthPct == nil || item.BBoxHeightPct == nil {
+		return nil
+	}
 	x, y, w, h, ok := clampHotspotBBox(*item.BBoxXPct, *item.BBoxYPct, *item.BBoxWidthPct, *item.BBoxHeightPct)
-	if !ok { return nil }
-	if source == nil { return nil }
+	if !ok {
+		return nil
+	}
+	if source == nil {
+		return nil
+	}
 	bounds := source.Bounds()
 	area := image.Rect(bounds.Min.X+int(x*float64(bounds.Dx())/100), bounds.Min.Y+int(y*float64(bounds.Dy())/100), bounds.Min.X+int((x+w)*float64(bounds.Dx())/100), bounds.Min.Y+int((y+h)*float64(bounds.Dy())/100)).Intersect(bounds)
-	if area.Empty() { return nil }
-	cropped := image.NewRGBA(image.Rect(0,0,area.Dx(),area.Dy()))
+	if area.Empty() {
+		return nil
+	}
+	cropped := image.NewRGBA(image.Rect(0, 0, area.Dx(), area.Dy()))
 	draw.Draw(cropped, cropped.Bounds(), source, area.Min, draw.Src)
 	var output bytes.Buffer
-	if err := png.Encode(&output, cropped); err != nil || output.Len() > 5<<20 { return nil }
+	if err := png.Encode(&output, cropped); err != nil || output.Len() > 5<<20 {
+		return nil
+	}
 	file, err := s.Files.Upload(ctx, storeID, uuid.Nil, "import_crop", fmt.Sprintf("item-%d.png", order+1), "image/png", bytes.NewReader(output.Bytes()), int64(output.Len()))
-	if err != nil { return nil }
+	if err != nil {
+		return nil
+	}
 	return &file.ID
 }
 

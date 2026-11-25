@@ -29,8 +29,8 @@ export default async function AddCatalogPage({
           Add Catalog
         </h1>
         <p className="mt-2 text-sm text-foreground-secondary">
-          Set a catalog name first, then upload a PDF. We split pages, extract items, then you review
-          before creating products.
+          Set a catalog name first, then upload a PDF. We split it into flipbook pages for display —
+          no AI product detection.
         </p>
       </div>
 

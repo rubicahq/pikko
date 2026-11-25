@@ -23,7 +23,7 @@ const PLAN_BULLETS: Record<string, string[]> = {
   basic: [
     "Full sell & fulfill journey",
     "Storefront, themes, catalogs & flipbook",
-    "AI PDF catalog extraction",
+    "PDF catalog flipbook",
     "Preorders, live shopping, campaigns",
     "Purchasing, packing by order, shipments",
     "Customer portal, payments & basic analytics",

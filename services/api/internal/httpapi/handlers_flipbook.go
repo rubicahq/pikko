@@ -24,6 +24,11 @@ func (h *FlipbookHandlers) ListPages(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusInternalServerError, "list_failed", "Unable to list catalog pages.")
 		return
 	}
+	// Soft-deprecate product hotspots on merchant list for etalase-only flipbooks.
+	for i := range pages {
+		pages[i].Hotspots = nil
+		pages[i].Items = nil
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"pages": pages})
 }
 
@@ -72,74 +77,26 @@ func (h *FlipbookHandlers) Publish(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *FlipbookHandlers) CreateHotspot(w http.ResponseWriter, r *http.Request) {
-	pageID, err := uuid.Parse(r.PathValue("pageID"))
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Catalog page not found.")
-		return
-	}
-	var in flipbook.HotspotInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
-		return
-	}
-	hs, err := h.Flipbook.CreateHotspot(r.Context(), StoreID(r), pageID, in)
-	if err != nil {
-		if errors.Is(err, flipbook.ErrNotFound) {
-			writeError(w, r, http.StatusNotFound, "not_found", "Catalog page not found.")
-			return
-		}
-		if errors.Is(err, flipbook.ErrInvalidInput) {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid hotspot.")
-			return
-		}
-		writeError(w, r, http.StatusInternalServerError, "create_failed", "Unable to create hotspot.")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"hotspot": hs})
+	writeError(w, r, http.StatusGone, "catalog_hotspots_disabled",
+		"Catalog hotspots are disabled. Flipbooks are display-only etalase.")
 }
 
 func (h *FlipbookHandlers) UpdateHotspot(w http.ResponseWriter, r *http.Request) {
-	hotspotID, err := uuid.Parse(r.PathValue("hotspotID"))
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Hotspot not found.")
-		return
-	}
-	var in flipbook.HotspotInput
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
-		return
-	}
-	hs, err := h.Flipbook.UpdateHotspot(r.Context(), StoreID(r), hotspotID, in)
-	if err != nil {
-		if errors.Is(err, flipbook.ErrNotFound) {
-			writeError(w, r, http.StatusNotFound, "not_found", "Hotspot not found.")
-			return
-		}
-		if errors.Is(err, flipbook.ErrInvalidInput) {
-			writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid hotspot.")
-			return
-		}
-		writeError(w, r, http.StatusInternalServerError, "update_failed", "Unable to update hotspot.")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"hotspot": hs})
+	writeError(w, r, http.StatusGone, "catalog_hotspots_disabled",
+		"Catalog hotspots are disabled. Flipbooks are display-only etalase.")
 }
 
 func (h *FlipbookHandlers) DeleteHotspot(w http.ResponseWriter, r *http.Request) {
-	hotspotID, err := uuid.Parse(r.PathValue("hotspotID"))
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Hotspot not found.")
-		return
+	writeError(w, r, http.StatusGone, "catalog_hotspots_disabled",
+		"Catalog hotspots are disabled. Flipbooks are display-only etalase.")
+}
+
+func stripPublicCommerce(pages []flipbook.Page) []flipbook.Page {
+	for i := range pages {
+		pages[i].Hotspots = nil
+		pages[i].Items = nil
 	}
-	if err := h.Flipbook.DeleteHotspot(r.Context(), StoreID(r), hotspotID); err != nil {
-		if errors.Is(err, flipbook.ErrNotFound) {
-			writeError(w, r, http.StatusNotFound, "not_found", "Hotspot not found.")
-			return
-		}
-		writeError(w, r, http.StatusInternalServerError, "delete_failed", "Unable to delete hotspot.")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+	return pages
 }
 
 func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request) {
@@ -161,7 +118,7 @@ func (h *FlipbookHandlers) PublicCatalog(w http.ResponseWriter, r *http.Request)
 			"whatsapp":    store.WhatsApp,
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog",
 		},
-		"pages": pages,
+		"pages": stripPublicCommerce(pages),
 	})
 }
 
@@ -191,44 +148,12 @@ func (h *FlipbookHandlers) PublicCatalogDoc(w http.ResponseWriter, r *http.Reque
 			"catalog_url": h.URLs.Storefront(slug) + "/catalog/" + catalogID.String(),
 		},
 		"catalog_id": catalogID,
-		"pages":      pages,
+		"pages":      stripPublicCommerce(pages),
 	})
 }
 
-// PublicHotspotProduct returns a published product card payload for flipbook checkout hooks.
+// PublicHotspotProduct is soft-deprecated: catalog flipbooks are display-only.
 func (h *FlipbookHandlers) PublicHotspotProduct(w http.ResponseWriter, r *http.Request) {
-	slug := r.PathValue("slug")
-	productID, err := uuid.Parse(r.PathValue("productID"))
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Product not found.")
-		return
-	}
-	store, _, err := h.Flipbook.PublicByStoreSlug(r.Context(), slug)
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
-		return
-	}
-	p, err := h.Catalog.GetProduct(r.Context(), store.ID, productID, true)
-	if err != nil {
-		writeError(w, r, http.StatusNotFound, "not_found", "Product not found.")
-		return
-	}
-	// Strip cost
-	p.CostPriceIDR = nil
-	hook := "add_to_cart"
-	if p.ContactForPrice {
-		hook = "contact_seller"
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"product": p,
-		"link_ref": map[string]any{
-			"product_id":   p.ID,
-			"product_slug": p.Slug,
-			"product_url":  h.URLs.Product(slug, p.Slug),
-			"cart_url":     h.URLs.Storefront(slug) + "/cart",
-			"checkout_url": h.URLs.Storefront(slug) + "/checkout",
-		},
-		"checkout_hook": hook,
-		"store_whatsapp": store.WhatsApp,
-	})
+	writeError(w, r, http.StatusGone, "catalog_hotspots_disabled",
+		"Catalog product actions are disabled. Flipbooks are display-only etalase.")
 }

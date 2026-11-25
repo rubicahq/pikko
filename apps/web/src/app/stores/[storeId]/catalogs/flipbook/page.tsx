@@ -29,8 +29,8 @@ export default async function CatalogsFlipbookEditorPage({
           Catalog flipbook
         </h1>
         <p className="mt-2 text-sm text-foreground-secondary">
-          Reorder pages, place product hotspots, and publish. Public viewers only see published
-          pages and published products.
+          Reorder pages and publish. Public viewers see published page images only — display
+          etalase, no product actions.
         </p>
       </div>
       <FlipbookEditor storeId={storeId} storeSlug={store.slug} />

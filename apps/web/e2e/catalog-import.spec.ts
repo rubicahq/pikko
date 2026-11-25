@@ -56,8 +56,8 @@ startxref
   return p;
 }
 
-test.describe("AI PDF catalog import", () => {
-  test("upload PDF, review mock extraction, confirm drafts", async ({ page }) => {
+test.describe("PDF catalog flipbook (pages only)", () => {
+  test("upload PDF, wait for pages, land on catalog detail", async ({ page }) => {
     const email = `import-${Date.now()}@example.com`;
     await signInAndCreateStore(page, email, "Import Shop", `import-shop-${Date.now()}`);
 
@@ -72,19 +72,15 @@ test.describe("AI PDF catalog import", () => {
 
     const pdfPath = minimalPdfPath();
     await page.locator("#pdf").setInputFiles(pdfPath);
-    await page.getByRole("button", { name: "Start catalog import" }).click();
+    await page.getByRole("button", { name: "Create flipbook" }).click();
 
-    await expect(page.getByRole("heading", { name: "Review import" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Preparing flipbook" })).toBeVisible({
       timeout: 20000,
     });
-    await expect(page.getByText("review_required").or(page.getByText("processing"))).toBeVisible({
-      timeout: 30000,
+    await expect(page.getByRole("heading", { name: "Summer Lookbook" })).toBeVisible({
+      timeout: 60000,
     });
-    await expect(page.getByText("review_required")).toBeVisible({ timeout: 60000 });
-    await expect(page.locator('input[value="Sample Tee"]').or(page.getByText("Sample Tee"))).toBeVisible({
-      timeout: 10000,
-    });
-    await page.getByRole("button", { name: "Confirm selected" }).click();
-    await expect(page.getByText(/Saved \d+ draft product/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole("link", { name: "Open flipbook" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review import" })).toHaveCount(0);
   });
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/server-api";
 import { urls } from "@/lib/urls";
-import { ImportReview } from "@/components/catalog/import-review";
+import { CatalogPagesProgress } from "@/components/catalog/catalog-pages-progress";
 
 export default async function CatalogsImportJobPage({
   params,
@@ -25,13 +25,13 @@ export default async function CatalogsImportJobPage({
             Add Catalog
           </Link>
           <span className="mx-1.5">/</span>
-          Review
+          Preparing
         </p>
         <h1 className="mt-2 text-[30px] font-medium tracking-tight text-foreground">
-          Review import
+          Preparing flipbook
         </h1>
       </div>
-      <ImportReview storeId={storeId} jobId={jobId} backHref={urls.storeCatalogs(storeId)} />
+      <CatalogPagesProgress storeId={storeId} jobId={jobId} />
     </div>
   );
 }

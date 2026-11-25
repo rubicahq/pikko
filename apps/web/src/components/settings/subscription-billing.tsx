@@ -50,7 +50,7 @@ const FEATURE_LABELS: Record<string, string> = {
   products: "Products",
   product_attributes: "Variants & attributes",
   catalogs: "Catalogs & flipbook",
-  ai_pdf_import: "AI PDF import",
+  ai_pdf_import: "PDF catalog flipbook (legacy AI)",
   campaigns: "Campaigns",
   preorders: "Preorders",
   live_shopping: "Live shopping",
