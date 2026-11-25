@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, apiFetch } from "@/lib/api";
 import { isValidIndonesianPhone } from "@/lib/phone";
+import { AnchoredPortal } from "@/components/ui/anchored-portal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,13 @@ export function OrderCustomerPicker({ storeId, customer, onSelect }: Props) {
   const [addPhone, setAddPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestAnchor, setSuggestAnchor] = useState<HTMLElement | null>(null);
+  const searchWrapRef = useRef<HTMLDivElement | null>(null);
+
+  function dismissSuggest() {
+    setOpen(false);
+    setHits([]);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -57,15 +65,14 @@ export function OrderCustomerPicker({ storeId, customer, onSelect }: Props) {
   function pick(c: OrderCustomer) {
     onSelect(c);
     setQuery("");
-    setHits([]);
-    setOpen(false);
+    dismissSuggest();
     setError(null);
   }
 
   function clear() {
     onSelect(null);
     setQuery("");
-    setHits([]);
+    dismissSuggest();
     setError(null);
   }
 
@@ -114,26 +121,36 @@ export function OrderCustomerPicker({ storeId, customer, onSelect }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="relative">
+        <div>
           <div className="flex flex-wrap gap-2">
-            <Input
-              id="order-customer-search"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setOpen(true);
-              }}
-              onFocus={() => setOpen(true)}
-              placeholder="Search name, phone, or email…"
-              className="min-w-[200px] flex-1"
-              autoComplete="off"
-            />
+            <div ref={searchWrapRef} className="min-w-[200px] flex-1">
+              <Input
+                id="order-customer-search"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setSuggestAnchor(searchWrapRef.current);
+                  setOpen(true);
+                }}
+                onFocus={() => {
+                  setSuggestAnchor(searchWrapRef.current);
+                  setOpen(true);
+                }}
+                placeholder="Search name, phone, or email…"
+                className="w-full"
+                autoComplete="off"
+              />
+            </div>
             <Button type="button" variant="secondary" onClick={() => setAddOpen(true)}>
               Add customer
             </Button>
           </div>
-          {open && query.trim().length > 0 ? (
-            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-border bg-background shadow-sm">
+          <AnchoredPortal
+            anchor={suggestAnchor}
+            open={open && query.trim().length > 0}
+            onDismiss={dismissSuggest}
+          >
+            <ul>
               {hits.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-foreground-muted">
                   No matches.{" "}
@@ -143,6 +160,7 @@ export function OrderCustomerPicker({ storeId, customer, onSelect }: Props) {
                     onClick={() => {
                       setAddName(query.trim());
                       setAddOpen(true);
+                      dismissSuggest();
                     }}
                   >
                     Add new customer
@@ -165,7 +183,7 @@ export function OrderCustomerPicker({ storeId, customer, onSelect }: Props) {
                 ))
               )}
             </ul>
-          ) : null}
+          </AnchoredPortal>
         </div>
       )}
 
