@@ -21,8 +21,9 @@ const (
 	ScopeSellingModel  = "selling_model"
 	ScopeBatch         = "batch"
 
-	FeeModeFixed   = "fixed"
-	FeeModePercent = "percent"
+	FeeModeFixed       = "fixed"
+	FeeModePercent     = "percent"
+	FeeModeConditional = "conditional" // ordered subtotal tiers; first match wins
 )
 
 var (
@@ -34,13 +35,21 @@ var (
 	ErrApprovalRequired  = errors.New("approval required")
 )
 
+// HandlingFeeTier is one conditional handling-fee row (spreadsheet-style).
+// Match when product subtotal > MinSubtotalIDR; first matching tier in list order wins.
+type HandlingFeeTier struct {
+	MinSubtotalIDR int64 `json:"min_subtotal_idr"`
+	FeeFixedIDR    int64 `json:"fee_fixed_idr"`
+}
+
 type RuleConfig struct {
-	FeeMode         string   `json:"fee_mode,omitempty"`          // fixed|percent
-	FeeFixedIDR     *int64   `json:"fee_fixed_idr,omitempty"`
-	FeePercent      *float64 `json:"fee_percent,omitempty"`
-	MinSubtotalIDR  *int64   `json:"min_subtotal_idr,omitempty"`
-	MinQuantity     *int     `json:"min_quantity,omitempty"`
-	RequireApproval *bool    `json:"require_approval,omitempty"`
+	FeeMode         string             `json:"fee_mode,omitempty"` // fixed|percent|conditional
+	FeeFixedIDR     *int64             `json:"fee_fixed_idr,omitempty"`
+	FeePercent      *float64           `json:"fee_percent,omitempty"`
+	Tiers           []HandlingFeeTier  `json:"tiers,omitempty"` // conditional mode only; ordered
+	MinSubtotalIDR  *int64             `json:"min_subtotal_idr,omitempty"`
+	MinQuantity     *int               `json:"min_quantity,omitempty"`
+	RequireApproval *bool              `json:"require_approval,omitempty"`
 }
 
 type BusinessRule struct {
@@ -139,6 +148,15 @@ func validateRuleConfig(ruleType string, cfg RuleConfig) error {
 		case FeeModePercent:
 			if cfg.FeePercent == nil || *cfg.FeePercent < 0 || *cfg.FeePercent > 100 {
 				return ErrInvalidInput
+			}
+		case FeeModeConditional:
+			if len(cfg.Tiers) == 0 {
+				return ErrInvalidInput
+			}
+			for _, tier := range cfg.Tiers {
+				if tier.MinSubtotalIDR < 0 || tier.FeeFixedIDR < 0 {
+					return ErrInvalidInput
+				}
 			}
 		default:
 			return ErrInvalidInput
@@ -435,6 +453,30 @@ func ruleMatchesScope(r BusinessRule, sellingModel string, batchID *uuid.UUID) b
 	}
 }
 
+// computeHandlingFee resolves fixed, percent, or conditional (first-match) tiers.
+// Conditional tiers match when subtotal > MinSubtotalIDR; list order is priority.
+func computeHandlingFee(cfg RuleConfig, subtotalIDR int64) int64 {
+	switch cfg.FeeMode {
+	case FeeModeFixed:
+		if cfg.FeeFixedIDR != nil {
+			return *cfg.FeeFixedIDR
+		}
+	case FeeModePercent:
+		pct := 0.0
+		if cfg.FeePercent != nil {
+			pct = *cfg.FeePercent
+		}
+		return money.PercentOfIDR(subtotalIDR, pct)
+	case FeeModeConditional:
+		for _, tier := range cfg.Tiers {
+			if subtotalIDR > tier.MinSubtotalIDR {
+				return tier.FeeFixedIDR
+			}
+		}
+	}
+	return 0
+}
+
 // EvaluateRules applies precedence and computes fees / minimum / approval (PRD §27).
 func EvaluateRules(
 	all []BusinessRule,
@@ -462,19 +504,7 @@ func EvaluateRules(
 	}
 
 	if feeRule := pickMostSpecific(byType[RuleHandlingFee]); feeRule != nil && feeRule.VersionID != nil {
-		fee := int64(0)
-		switch feeRule.Config.FeeMode {
-		case FeeModeFixed:
-			if feeRule.Config.FeeFixedIDR != nil {
-				fee = *feeRule.Config.FeeFixedIDR
-			}
-		case FeeModePercent:
-			pct := 0.0
-			if feeRule.Config.FeePercent != nil {
-				pct = *feeRule.Config.FeePercent
-			}
-			fee = money.PercentOfIDR(subtotalIDR, pct)
-		}
+		fee := computeHandlingFee(feeRule.Config, subtotalIDR)
 		eval.HandlingFeeIDR = fee
 		result, _ := json.Marshal(map[string]any{"handling_fee_idr": fee})
 		eval.Applied = append(eval.Applied, AppliedRule{
