@@ -4,21 +4,14 @@ import {
   getSession,
   getStore,
   getProducts,
+  getStoreAttributes,
 } from "@/lib/server-api";
 import { Button } from "@/components/ui/button";
-import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusBadge } from "@/components/ui/status-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ProductsTable } from "@/components/catalog/products-table";
+
 
 export default async function ProductsPage({
   params,
@@ -32,6 +25,7 @@ export default async function ProductsPage({
   if (!store) redirect(urls.stores());
   const productPage = await getProducts(storeId);
   const products = productPage.products ?? [];
+  const attributes = await getStoreAttributes(storeId);
 
   return (
     <div className="mx-auto max-w-dashboard space-y-8">
@@ -61,37 +55,7 @@ export default async function ProductsPage({
           }
         />
       ) : (
-        <Table stickyHeader>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead sticky>Product</TableHead>
-              <TableHead sticky>SKU</TableHead>
-              <TableHead sticky className="text-right">
-                Price
-              </TableHead>
-              <TableHead sticky>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>
-                  <Link
-                    href={urls.storeProduct(storeId, p.id)}
-                    className="font-medium text-foreground hover:underline"
-                  >
-                    {p.name}
-                  </Link>
-                </TableCell>
-                <TableCell className="text-foreground-secondary">{p.sku || "—"}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatIDR(p.base_price_idr)}</TableCell>
-                <TableCell>
-                  <StatusBadge status={p.status} />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <ProductsTable storeId={storeId} products={products} attributes={attributes} />
       )}
     </div>
   );
