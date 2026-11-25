@@ -30,14 +30,31 @@ export const urls = {
   accountSettings: () => `/account/settings`,
   storeOverview: (storeId: string) => `/stores/${storeId}/overview`,
   storeStorefront: (storeId: string) => `/stores/${storeId}/storefront`,
-  storeCatalog: (storeId: string) => `/stores/${storeId}/catalog`,
-  storeCatalogNew: (storeId: string) => `/stores/${storeId}/catalog/new`,
+  // Products — master barang (SKU, price, variants, relate/merge, CSV)
+  storeProducts: (storeId: string) => `/stores/${storeId}/products`,
+  storeProductNew: (storeId: string) => `/stores/${storeId}/products/new`,
+  storeProduct: (storeId: string, productId: string) =>
+    `/stores/${storeId}/products/${productId}`,
+  productsImport: (storeId: string) => `/stores/${storeId}/products/import`,
+  productsImportJob: (storeId: string, jobId: string) =>
+    `/stores/${storeId}/products/import/${jobId}`,
+  // Catalogs — PDF flipbook documents
+  storeCatalogs: (storeId: string) => `/stores/${storeId}/catalogs`,
+  storeCatalogsNew: (storeId: string) => `/stores/${storeId}/catalogs/new`,
+  storeCatalogDoc: (storeId: string, catalogId: string) =>
+    `/stores/${storeId}/catalogs/${catalogId}`,
+  catalogsImportJob: (storeId: string, jobId: string) =>
+    `/stores/${storeId}/catalogs/import/${jobId}`,
+  catalogsFlipbook: (storeId: string) => `/stores/${storeId}/catalogs/flipbook`,
+  // Legacy aliases (old /catalog product-master paths)
+  storeCatalog: (storeId: string) => `/stores/${storeId}/products`,
+  storeCatalogNew: (storeId: string) => `/stores/${storeId}/products/new`,
   storeCatalogProduct: (storeId: string, productId: string) =>
-    `/stores/${storeId}/catalog/${productId}`,
-  catalogImport: (storeId: string) => `/stores/${storeId}/catalog/import`,
+    `/stores/${storeId}/products/${productId}`,
+  catalogImport: (storeId: string) => `/stores/${storeId}/products/import`,
   catalogImportJob: (storeId: string, jobId: string) =>
-    `/stores/${storeId}/catalog/import/${jobId}`,
-  catalogFlipbook: (storeId: string) => `/stores/${storeId}/catalog/flipbook`,
+    `/stores/${storeId}/catalogs/import/${jobId}`,
+  catalogFlipbook: (storeId: string) => `/stores/${storeId}/catalogs/flipbook`,
   storeSettings: (storeId: string) => `/stores/${storeId}/settings`,
   storeTeam: (storeId: string) => `/stores/${storeId}/team`,
   inviteAccept: (token: string) => `/invites/accept?token=${encodeURIComponent(token)}`,
@@ -112,6 +129,7 @@ export const RESERVED_STOREFRONT_SLUGS = new Set([
   "dev",
   "track",
   "catalog",
+  "catalogs",
   "flipbook",
   "products",
   "collections",

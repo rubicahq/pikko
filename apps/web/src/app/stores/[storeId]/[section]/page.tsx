@@ -4,7 +4,9 @@ import { urls } from "@/lib/urls";
 
 const PHASE_REDIRECT: Record<string, (storeId: string) => string> = {
   storefront: urls.storeStorefront,
-  catalog: urls.storeCatalog,
+  catalog: urls.storeProducts,
+  products: urls.storeProducts,
+  catalogs: urls.storeCatalogs,
   settings: urls.storeSettings,
   orders: urls.storeOrders,
   preorders: (storeId) => `/stores/${storeId}/preorders`,

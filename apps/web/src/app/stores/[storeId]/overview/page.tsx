@@ -11,7 +11,7 @@ import { urls } from "@/lib/urls";
 
 const CHECKLIST_LABELS: { key: string; label: string; href?: (id: string) => string }[] = [
   { key: "create_store", label: "Create store" },
-  { key: "first_product", label: "Add your first product", href: urls.storeCatalogNew },
+  { key: "first_product", label: "Add your first product", href: urls.storeProductNew },
   {
     key: "customize_storefront",
     label: "Customize storefront",

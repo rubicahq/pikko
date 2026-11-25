@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Catalog flipbook editor", () => {
-  test("merchant can open flipbook editor from catalog", async ({ page }) => {
+  test("merchant can open flipbook editor from catalogs", async ({ page }) => {
     const email = `flip-${Date.now()}@example.com`;
     await page.goto("/auth");
     await page.getByLabel("Email address").fill(email);
@@ -16,18 +16,22 @@ test.describe("Catalog flipbook editor", () => {
     await page.getByLabel("Store URL").click();
     await page.getByLabel("Store URL").fill(slug);
     await expect(page.getByLabel("Store URL")).toHaveValue(slug);
-    await page.locator("#category").selectOption("other");    await page.getByRole("button", { name: "Continue." }).click();
+    await page.locator("#category").selectOption("other");
+    await page.getByRole("button", { name: "Continue." }).click();
     await page.getByRole("button", { name: /Ready Stock/ }).click();
     await page.getByRole("button", { name: "Create my store." }).click();
     await expect(page.getByRole("heading", { name: "Flipbook Store" })).toBeVisible({
       timeout: 15000,
     });
 
-    await page.getByRole("link", { name: "Catalog" }).click();
-    // exact: true — store slug often starts with "flipbook-", which would
-    // substring-match the storefront URL if name matching were loose.
-    await page.getByRole("link", { name: "Flipbook", exact: true }).click();
-    await expect(page).toHaveURL(/\/catalog\/flipbook$/);
+    await page.getByRole("link", { name: "Catalogs" }).click();
+    await expect(page.getByRole("heading", { name: "Catalogs" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add Catalog" })).toBeVisible();
+
+    const storeId = page.url().match(/\/stores\/([^/]+)/)?.[1];
+    expect(storeId).toBeTruthy();
+    await page.goto(`/stores/${storeId}/catalogs/flipbook`);
+    await expect(page).toHaveURL(/\/catalogs\/flipbook$/);
     await expect(page.getByRole("heading", { name: "Catalog flipbook" })).toBeVisible();
     await expect(page.getByText("No catalog pages yet", { exact: false })).toBeVisible();
   });
