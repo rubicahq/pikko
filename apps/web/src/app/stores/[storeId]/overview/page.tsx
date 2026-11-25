@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { ConniePanel } from "@/components/connie/connie-panel";
 import { urls } from "@/lib/urls";
 
 const CHECKLIST_LABELS: { key: string; label: string; href?: (id: string) => string }[] = [
@@ -329,7 +330,7 @@ export default async function StoreOverviewPage({
         </Card>
       </section>
 
-      {/* D) Connie compact entry — visual only, no AI backend */}
+      {/* D) Connie compact entry — MCP store-ops tools */}
       <Card className="bg-warm-feature p-6 shadow-none">
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-background shadow-xs">
@@ -339,11 +340,11 @@ export default async function StoreOverviewPage({
             <CardTitle>Ask Connie</CardTitle>
             <CardDescription>
               Connie helps with catalog setup, order questions, and next steps — as a teammate, not a
-              chatbot. AI replies are not connected yet; this is a visual entry point.
+              chatbot. She can look up orders, products, catalogs, customers, and more via store tools.
             </CardDescription>
-            <Button className="mt-4" variant="secondary" size="sm" disabled>
-              Coming soon
-            </Button>
+            <div className="mt-4">
+              <ConniePanel storeId={storeId} />
+            </div>
           </div>
         </div>
       </Card>

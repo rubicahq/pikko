@@ -17,6 +17,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/catalogs"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/config"
+	"github.com/rubicahq/pikko/services/api/internal/connie"
 	"github.com/rubicahq/pikko/services/api/internal/email"
 	"github.com/rubicahq/pikko/services/api/internal/entitlements"
 	"github.com/rubicahq/pikko/services/api/internal/files"
@@ -112,6 +113,14 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	portalH := &PortalHandlers{Portal: portalSvc, Cfg: d.Cfg}
 	waSvc := &whatsapp.Service{DB: d.DB, URLs: urlGen}
 	waH := &WhatsAppHandlers{WA: waSvc}
+
+	connieSvc := &connie.Service{
+		Cfg: d.Cfg, Logger: d.Logger,
+		Stores: storeSvc, Catalog: catalogSvc, Catalogs: catalogDocSvc,
+		Campaigns: campaignSvc, Commerce: commerceSvc, Storefront: storefrontSvc,
+		Analytics: analyticsSvc, Notifications: notifSvc, Team: teamSvc, Ent: entSvc,
+	}
+	connieH := &ConnieHandlers{Connie: connieSvc}
 
 	authMW := &AuthMiddleware{Auth: authSvc, Cfg: d.Cfg}
 	storeMW := &StoreAuthMiddleware{Stores: storeSvc}
@@ -393,6 +402,11 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PATCH /api/v1/stores/{storeID}/business-rules/{ruleID}", storePerm(rbac.PermBusinessRulesWrite, commerceH.UpdateRule))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/business-rules/{ruleID}", storePerm(rbac.PermBusinessRulesWrite, commerceH.DeleteRule))
 	mux.Handle("POST /api/v1/stores/{storeID}/business-rules/preview", storePerm(rbac.PermBusinessRulesRead, commerceH.PreviewRules))
+
+	// Ask Connie — MCP-shaped store-ops tools (auth + store membership required)
+	mux.Handle("GET /api/v1/stores/{storeID}/connie/tools", storePerm(rbac.PermStoresRead, connieH.ListTools))
+	mux.Handle("POST /api/v1/stores/{storeID}/connie/tools/call", storePerm(rbac.PermStoresRead, connieH.CallTool))
+	mux.Handle("POST /api/v1/stores/{storeID}/connie/chat", storePerm(rbac.PermStoresRead, connieH.Chat))
 
 	// Public storefront + assets (published only)
 	mux.HandleFunc("GET /api/v1/public/stores/{slug}", p2.PublicStore)

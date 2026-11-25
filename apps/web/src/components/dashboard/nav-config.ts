@@ -383,13 +383,14 @@ export const SETTINGS_WORKSPACE: WorkspaceDef = {
   ],
 };
 
-/** Ask Connie lives in the global header (not sidebar). Visual only until AI ships. */
+/** Ask Connie lives in the global header (not sidebar). MCP store-ops tools enabled. */
 export const CONNIE_NAV = {
   id: "connie",
   label: "Ask Connie",
   icon: Sparkles,
-  implemented: false as const,
-  comingSoon: true as const,
+  implemented: true as const,
+  comingSoon: false as const,
+  permission: "stores.read" as const,
 };
 
 export const ACCOUNT_NAV = {
