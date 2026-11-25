@@ -22,6 +22,8 @@ func (h *CommerceHandlers) mapLiveErr(w http.ResponseWriter, r *http.Request, er
 		writeError(w, r, http.StatusConflict, "conflict", "Live shopping conflict.")
 	case errors.Is(err, commerce.ErrLiveSessionClosed):
 		writeError(w, r, http.StatusConflict, "session_closed", "Live session is not accepting orders.")
+	case errors.Is(err, commerce.ErrWishlistUnavailable):
+		writeError(w, r, http.StatusConflict, "wishlist_unavailable", "Wishlist is only available while this live session is scheduled.")
 	case errors.Is(err, commerce.ErrLiveQuickAddDisabled):
 		writeError(w, r, http.StatusConflict, "quick_add_disabled", "Quick-add is disabled for this live session.")
 	case errors.Is(err, commerce.ErrLiveQuotaExceeded):
@@ -30,6 +32,8 @@ func (h *CommerceHandlers) mapLiveErr(w http.ResponseWriter, r *http.Request, er
 		writeError(w, r, http.StatusConflict, "insufficient_stock", "Insufficient stock or product unavailable.")
 	case errors.Is(err, commerce.ErrInvalidTransition):
 		writeError(w, r, http.StatusConflict, "invalid_transition", "Order cannot accept live quick-add.")
+	case errors.Is(err, commerce.ErrRateLimited):
+		writeError(w, r, http.StatusTooManyRequests, "rate_limited", "Too many requests. Try again later.")
 	default:
 		writeError(w, r, http.StatusInternalServerError, "live_failed", "Unable to process live shopping request.")
 	}
@@ -166,4 +170,84 @@ func (h *CommerceHandlers) PublicLiveCampaign(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"live": sess})
+}
+
+func (h *CommerceHandlers) PublicAddWishlist(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	liveSlug := r.PathValue("liveSlug")
+	if err := h.Commerce.AllowPublicRateLimit(r.Context(), commerce.PublicWishlistBucketKey(ClientIP(r), slug), 60); err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	var in commerce.AddWishlistInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	res, err := h.Commerce.AddPublicWishlist(r.Context(), slug, liveSlug, in)
+	if err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	status := http.StatusOK
+	if res.CustomerCreated {
+		status = http.StatusCreated
+	}
+	writeJSON(w, status, res)
+}
+
+func (h *CommerceHandlers) PublicListWishlist(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	liveSlug := r.PathValue("liveSlug")
+	if err := h.Commerce.AllowPublicRateLimit(r.Context(), commerce.PublicWishlistBucketKey(ClientIP(r), slug), 120); err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	phone := r.URL.Query().Get("phone")
+	list, err := h.Commerce.ListPublicWishlist(r.Context(), slug, liveSlug, phone)
+	if err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": list})
+}
+
+func (h *CommerceHandlers) PublicRemoveWishlist(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	liveSlug := r.PathValue("liveSlug")
+	itemID, err := uuid.Parse(r.PathValue("itemID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Wishlist item not found.")
+		return
+	}
+	if err := h.Commerce.AllowPublicRateLimit(r.Context(), commerce.PublicWishlistBucketKey(ClientIP(r), slug), 60); err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	var body struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid request body.")
+		return
+	}
+	if err := h.Commerce.RemovePublicWishlist(r.Context(), slug, liveSlug, body.Phone, itemID); err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *CommerceHandlers) ListCustomerWishlist(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("customerID"))
+	if err != nil {
+		writeError(w, r, http.StatusNotFound, "not_found", "Customer not found.")
+		return
+	}
+	list, err := h.Commerce.ListCustomerWishlist(r.Context(), StoreID(r), id)
+	if err != nil {
+		h.mapLiveErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": list})
 }

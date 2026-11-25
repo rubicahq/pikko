@@ -6,6 +6,7 @@ import { urls } from "@/lib/urls";
 import { Badge } from "@/components/ui/badge";
 import { CustomerNotesForm } from "@/components/customers/customer-notes-form";
 import { CustomerPortalLink } from "@/components/customers/customer-portal-link";
+import { CustomerWishlist } from "@/components/customers/customer-wishlist";
 import { RotatePortalLinkButton } from "@/components/customers/rotate-portal-link-button";
 
 type CustomerDetail = {
@@ -101,6 +102,8 @@ export default async function CustomerDetailPage({
           />
         </div>
       </section>
+
+      <CustomerWishlist storeId={storeId} customerId={c.id} />
 
       <section className="mt-8">
         <h2 className="text-xl font-medium text-foreground">Order history</h2>

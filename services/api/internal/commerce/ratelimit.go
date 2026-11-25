@@ -41,3 +41,7 @@ func PublicTrackingBucket(ip string) string {
 func PublicEvidenceBucket(ip string) string {
 	return fmt.Sprintf("evidence:%s", ip)
 }
+
+func PublicWishlistBucketKey(ip, slug string) string {
+	return fmt.Sprintf("wishlist:%s:%s", slug, ip)
+}
