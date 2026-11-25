@@ -201,7 +201,7 @@ No Workspace / Operations / Relationships / Manage group labels. No accordion / 
 \*Store Credit remains hidden until built (`implemented: false`).
 
 **Settings** (utility): General, Team, Business Rules, Payment Settings, WhatsApp Templates (`/messages`).  
-**Header utilities (right):** **Ask Connie** (compact peach chip + Soon — no AI backend), Messages, Notifications (Search omitted until implemented).
+**Header utilities (right):** **Ask Connie** (compact peach chip — opens Connie panel with MCP store-ops tools), Messages, Notifications (Search omitted until implemented).
 
 Nav items: height 40px, gap 4, radius 10, icons 20px stroke ~1.75, label 14/500.  
 **Active:** `#F0F1F3` bg, `#15191E` text (600), icon `#FF3D00` — **not** a solid orange row.  
@@ -226,7 +226,7 @@ Lucide (or consistent rounded outline set). Stroke ~1.75. Selected nav may use o
 | **A. Store summary** | One card: greeting, store identity, share/view actions, divider, **sales dominant** + supporting metrics from real data |
 | **B. Needs attention** | Actionable list (setup gaps, payment reviews) |
 | **C. Recent orders** | Dense rows linking to order detail |
-| **D. Connie** | Compact warm-gradient entry; no fake insights; no AI backend required |
+| **D. Connie** | Compact warm-gradient entry; opens Ask Connie panel (MCP tools) |
 
 Never fabricate production metrics.
 
@@ -279,7 +279,7 @@ Dense and practical:
 
 ## 20. Connie
 
-**Ask Connie** lives in the global header top-right (with Messages / Notifications). Overview may still show a warm panel. Visual only until an AI backend exists — no fabricated insights, no new AI API in this redesign. Not in the sidebar.
+**Ask Connie** lives in the global header top-right (with Messages / Notifications). Overview may still show a warm panel. Connie calls store-scoped MCP tools (orders, products, catalogs, customers, etc.) with RBAC isolation — no fabricated insights. Not in the sidebar.
 
 ---
 
@@ -346,7 +346,7 @@ Prefer typecheck, lint, build, and targeted unit/API tests. No full Playwright s
 - [x] Hybrid nav: 7 primary workspaces + contextual header tabs
 - [x] Primary buttons Ink Black; brand orange selective
 - [x] Overview is vertical hierarchy (not four KPI cards)
-- [x] Ask Connie is compact header utility (Coming Soon) — not in sidebar
+- [x] Ask Connie is compact header utility (MCP tools panel) — not in sidebar
 - [x] Unimplemented nav remains hidden
 - [x] No API/DB/auth/RBAC/workflow regressions
 - [x] `docs/DESIGN_SYSTEM.md` matches this authority
