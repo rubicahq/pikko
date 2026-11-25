@@ -11,12 +11,14 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/analytics"
 	"github.com/rubicahq/pikko/services/api/internal/commerce"
 	"github.com/rubicahq/pikko/services/api/internal/notifications"
+	"github.com/rubicahq/pikko/services/api/internal/portal"
 )
 
 type Phase5Handlers struct {
 	Notifications *notifications.Service
 	Analytics     *analytics.Service
 	Commerce      *commerce.Service
+	Portal        *portal.Service
 }
 
 func (h *Phase5Handlers) ListNotifications(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +124,41 @@ func (h *Phase5Handlers) RecordAnalyticsEvent(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"ok": true})
+}
+
+func (h *Phase5Handlers) CreateCustomer(w http.ResponseWriter, r *http.Request) {
+	var in commerce.CreateCustomerInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "Invalid JSON body.")
+		return
+	}
+	res, err := h.Commerce.CreateCustomer(r.Context(), StoreID(r), in)
+	if err != nil {
+		if errors.Is(err, commerce.ErrInvalidInput) {
+			writeError(w, r, http.StatusBadRequest, "invalid_input", "Name and a valid Indonesian WhatsApp/phone are required.")
+			return
+		}
+		if errors.Is(err, commerce.ErrConflict) {
+			writeError(w, r, http.StatusConflict, "conflict", "A customer with this phone already exists in this store.")
+			return
+		}
+		if errors.Is(err, commerce.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Store not found.")
+			return
+		}
+		writeError(w, r, http.StatusInternalServerError, "create_failed", "Unable to create customer.")
+		return
+	}
+	if h.Portal != nil {
+		portalURL, accessURL, linkErr := h.Portal.IssueAccessLink(r.Context(), StoreID(r), res.Customer.ID)
+		if linkErr == nil {
+			if portalURL != "" {
+				res.PortalURL = portalURL
+			}
+			res.PortalAccessURL = accessURL
+		}
+	}
+	writeJSON(w, http.StatusCreated, res)
 }
 
 func (h *Phase5Handlers) GetCustomer(w http.ResponseWriter, r *http.Request) {

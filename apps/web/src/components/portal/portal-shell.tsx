@@ -22,7 +22,7 @@ export function PortalShell({
 }: {
   storeSlug: string;
   storeName: string;
-  customerEmail?: string;
+  customerEmail?: string | null;
   primaryColor?: string;
   children: React.ReactNode;
 }) {

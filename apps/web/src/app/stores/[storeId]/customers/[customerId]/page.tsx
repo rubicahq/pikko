@@ -9,7 +9,7 @@ import { CustomerNotesForm } from "@/components/customers/customer-notes-form";
 type CustomerDetail = {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   phone?: string | null;
   total_orders: number;
   completed_order_value_idr: number;
@@ -52,8 +52,7 @@ export default async function CustomerDetailPage({
       </Link>
       <h1 className="mt-4 text-[30px] font-medium text-foreground">{c.name}</h1>
       <p className="mt-2 text-sm text-foreground-secondary">
-        {c.email}
-        {c.phone ? ` · ${c.phone}` : ""}
+        {[c.phone, c.email].filter(Boolean).join(" · ") || "No contact yet"}
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

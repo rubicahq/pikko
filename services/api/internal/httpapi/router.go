@@ -96,10 +96,10 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	campaignSvc := &campaigns.Service{DB: d.DB}
 	campaignH := &CampaignHandlers{Campaigns: campaignSvc}
 	commerceH := &CommerceHandlers{Commerce: commerceSvc, Campaigns: campaignSvc, URLs: urlGen, Cfg: d.Cfg}
-	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc}
 	portalSvc := &portal.Service{
 		DB: d.DB, Cfg: d.Cfg, Email: mailSvc, URLs: urlGen, Logger: d.Logger, Commerce: commerceSvc,
 	}
+	p5 := &Phase5Handlers{Notifications: notifSvc, Analytics: analyticsSvc, Commerce: commerceSvc, Portal: portalSvc}
 	portalH := &PortalHandlers{Portal: portalSvc, Cfg: d.Cfg}
 	waSvc := &whatsapp.Service{DB: d.DB, URLs: urlGen}
 	waH := &WhatsAppHandlers{WA: waSvc}
@@ -289,6 +289,7 @@ func NewRouter(d Deps) (http.Handler, *jobs.Worker) {
 	mux.Handle("PATCH /api/v1/stores/{storeID}/finance/store-credit-settings", storePerm(rbac.PermStoresSettings, commerceH.PatchStoreCreditSettings))
 
 	mux.Handle("GET /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersRead, commerceH.ListCustomers))
+	mux.Handle("POST /api/v1/stores/{storeID}/customers", storePerm(rbac.PermCustomersWrite, p5.CreateCustomer))
 	mux.Handle("GET /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersRead, p5.GetCustomer))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/customers/{customerID}", storePerm(rbac.PermCustomersWrite, p5.PatchCustomer))
 	mux.Handle("GET /api/v1/stores/{storeID}/address-change-requests", storePerm(rbac.PermCustomersRead, portalH.MerchantListAddressChanges))

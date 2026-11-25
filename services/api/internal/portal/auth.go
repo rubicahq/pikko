@@ -145,12 +145,13 @@ func (s *Service) VerifyAndConsume(ctx context.Context, storeSlug, raw, ip, ua s
 
 	var tokenID, tokenStoreID uuid.UUID
 	var normalized string
+	var tokenCustomerID *uuid.UUID
 	var expires time.Time
 	var consumed *time.Time
 	err = tx.QueryRow(ctx, `
-		SELECT id, store_id, email_normalized, expires_at, consumed_at
+		SELECT id, store_id, email_normalized, customer_id, expires_at, consumed_at
 		FROM customer_portal_tokens WHERE token_hash=$1 FOR UPDATE
-	`, hash).Scan(&tokenID, &tokenStoreID, &normalized, &expires, &consumed)
+	`, hash).Scan(&tokenID, &tokenStoreID, &normalized, &tokenCustomerID, &expires, &consumed)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidToken
@@ -174,13 +175,23 @@ func (s *Service) VerifyAndConsume(ctx context.Context, storeSlug, raw, ip, ua s
 	}
 
 	var customer Customer
-	err = tx.QueryRow(ctx, `
-		SELECT id, store_id, name, email, phone, total_orders, created_at
-		FROM customers WHERE store_id=$1 AND lower(email)=lower($2)
-	`, st.ID, normalized).Scan(
-		&customer.ID, &customer.StoreID, &customer.Name, &customer.Email, &customer.Phone,
-		&customer.TotalOrders, &customer.CreatedAt,
-	)
+	if tokenCustomerID != nil {
+		err = tx.QueryRow(ctx, `
+			SELECT id, store_id, name, email, phone, total_orders, created_at
+			FROM customers WHERE id=$1 AND store_id=$2
+		`, *tokenCustomerID, st.ID).Scan(
+			&customer.ID, &customer.StoreID, &customer.Name, &customer.Email, &customer.Phone,
+			&customer.TotalOrders, &customer.CreatedAt,
+		)
+	} else {
+		err = tx.QueryRow(ctx, `
+			SELECT id, store_id, name, email, phone, total_orders, created_at
+			FROM customers WHERE store_id=$1 AND email IS NOT NULL AND lower(email)=lower($2)
+		`, st.ID, normalized).Scan(
+			&customer.ID, &customer.StoreID, &customer.Name, &customer.Email, &customer.Phone,
+			&customer.TotalOrders, &customer.CreatedAt,
+		)
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrInvalidToken
 	}
