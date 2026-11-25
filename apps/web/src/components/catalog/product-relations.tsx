@@ -94,7 +94,7 @@ export function ProductRelations({
   return (
     <section className="space-y-4 rounded-lg border border-border bg-background p-5">
       <div>
-        <h2 className="text-base font-semibold text-foreground">Relate / merge across catalogs</h2>
+        <h2 className="text-base font-semibold text-foreground">Relate / merge across products</h2>
         <p className="mt-1 text-sm text-foreground-secondary">
           AI confirm always creates a new product. Use this to manually mark the same physical item
           across catalogs, or mark a merge target.

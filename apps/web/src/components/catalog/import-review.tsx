@@ -89,7 +89,17 @@ function confidenceLabel(pct: number | null | undefined): string {
   return `Low ${Math.round(pct)}%`;
 }
 
-export function ImportReview({ storeId, jobId }: { storeId: string; jobId: string }) {
+export function ImportReview({
+  storeId,
+  jobId,
+  backHref,
+}: {
+  storeId: string;
+  jobId: string;
+  /** Where "Open catalog/products" goes after confirm. */
+  backHref?: string;
+}) {
+  const doneHref = backHref || urls.storeProducts(storeId);
   const router = useRouter();
   const [job, setJob] = useState<Job | null>(null);
   const [items, setItems] = useState<ImportItem[]>([]);
@@ -228,7 +238,7 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
           ? ` · ${data.hotspot_count} flipbook hotspot(s)`
           : "";
       setMessage(
-        `Saved ${data.created_count} draft product(s)${hotspots}. Publish them from Catalog when ready.`,
+        `Saved ${data.created_count} draft product(s)${hotspots}. Publish them from Products when ready.`,
       );
       await load();
       router.refresh();
@@ -281,10 +291,10 @@ export function ImportReview({ storeId, jobId }: { storeId: string; jobId: strin
           )}
           {job.status === "completed" && (
             <Link
-              href={urls.storeCatalog(storeId)}
+              href={doneHref}
               className="text-sm text-brand-dark underline-offset-2 hover:underline"
             >
-              Open catalog
+              {doneHref.includes("/catalogs") ? "Open catalogs" : "Open products"}
             </Link>
           )}
         </div>

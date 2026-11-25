@@ -61,15 +61,14 @@ test.describe("AI PDF catalog import", () => {
     const email = `import-${Date.now()}@example.com`;
     await signInAndCreateStore(page, email, "Import Shop", `import-shop-${Date.now()}`);
 
-    await page.getByRole("link", { name: "Catalog" }).click();
-    await expect(page.getByRole("heading", { name: "Catalog" })).toBeVisible();
-    await page.getByRole("link", { name: "Import", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /catalog import/i })).toBeVisible();
-    await page.getByRole("button", { name: "PDF", exact: true }).click();
+    await page.getByRole("link", { name: "Catalogs" }).click();
+    await expect(page.getByRole("heading", { name: "Catalogs" })).toBeVisible();
+    await page.getByRole("link", { name: "Add Catalog" }).click();
+    await expect(page.getByRole("heading", { name: "Add Catalog" })).toBeVisible();
 
     const pdfPath = minimalPdfPath();
     await page.locator("#pdf").setInputFiles(pdfPath);
-    await page.getByRole("button", { name: "Start import" }).click();
+    await page.getByRole("button", { name: "Start catalog import" }).click();
 
     await expect(page.getByRole("heading", { name: "Review import" })).toBeVisible({
       timeout: 20000,

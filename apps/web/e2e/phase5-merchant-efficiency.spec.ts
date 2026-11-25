@@ -44,10 +44,9 @@ test.describe("Phase 5 merchant efficiency", () => {
     await page.locator("aside").getByRole("link", { name: "Notifications" }).click();
     await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible();
 
-    await page.locator("aside").getByRole("link", { name: "Catalog" }).click();
-    await page.getByRole("link", { name: "Import", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /catalog import/i })).toBeVisible();
-    await page.getByRole("button", { name: "CSV", exact: true }).click();
+    await page.locator("aside").getByRole("link", { name: "Products" }).click();
+    await page.getByRole("link", { name: "Import CSV", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /import products/i })).toBeVisible();
     await expect(page.getByText(/Download CSV template/)).toBeVisible();
 
     await page.locator("aside").getByRole("link", { name: "Preorders" }).click();

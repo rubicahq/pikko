@@ -80,14 +80,14 @@ export function ProductForm({
           method: "PATCH",
           body,
         });
-        router.push(urls.storeCatalog(storeId));
+        router.push(urls.storeProducts(storeId));
         router.refresh();
       } else {
         const created = await apiFetch<{ product: Product }>(
           `/api/v1/stores/${storeId}/products`,
           { method: "POST", body },
         );
-        router.push(urls.storeCatalogProduct(storeId, created.product.id));
+        router.push(urls.storeProduct(storeId, created.product.id));
         router.refresh();
       }
     } catch (err) {
@@ -221,7 +221,7 @@ export function ProductForm({
         <Button type="submit" loading={saving}>
           Save product
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.push(urls.storeCatalog(storeId))}>
+        <Button type="button" variant="outline" onClick={() => router.push(urls.storeProducts(storeId))}>
           Cancel
         </Button>
       </div>

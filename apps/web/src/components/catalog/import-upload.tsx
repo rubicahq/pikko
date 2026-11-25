@@ -6,9 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { urls } from "@/lib/urls";
 
-export function ImportUpload({ storeId }: { storeId: string }) {
+export function ImportUpload({
+  storeId,
+  source,
+}: {
+  storeId: string;
+  /** PDF = Add Catalog flow; CSV = Products import. */
+  source: "pdf" | "csv";
+}) {
   const router = useRouter();
-  const [mode, setMode] = useState<"pdf" | "csv">("pdf");
   const [file, setFile] = useState<File | null>(null);
   const [extractImages, setExtractImages] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -17,14 +23,25 @@ export function ImportUpload({ storeId }: { storeId: string }) {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) {
-      setError(mode === "csv" ? "Choose a CSV file." : "Choose a PDF catalog file.");
+      setError(source === "csv" ? "Choose a CSV file." : "Choose a PDF catalog file.");
       return;
     }
-    if (mode === "pdf" && file.type && !file.type.includes("pdf") && !file.name.toLowerCase().endsWith(".pdf")) {
+    if (
+      source === "pdf" &&
+      file.type &&
+      !file.type.includes("pdf") &&
+      !file.name.toLowerCase().endsWith(".pdf")
+    ) {
       setError("File must be a PDF.");
       return;
     }
-    if (mode === "csv" && !file.name.toLowerCase().endsWith(".csv") && file.type && !file.type.includes("csv") && !file.type.includes("text")) {
+    if (
+      source === "csv" &&
+      !file.name.toLowerCase().endsWith(".csv") &&
+      file.type &&
+      !file.type.includes("csv") &&
+      !file.type.includes("text")
+    ) {
       setError("File must be a CSV. Download the template if you are unsure of the format.");
       return;
     }
@@ -33,15 +50,15 @@ export function ImportUpload({ storeId }: { storeId: string }) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("source", mode);
-      if (mode === "pdf") {
+      fd.append("source", source);
+      if (source === "pdf") {
         fd.append("extract_images", String(extractImages));
       }
       const res = await fetch(urls.api(`/api/v1/stores/${storeId}/catalog-imports`), {
         method: "POST",
         credentials: "include",
         headers: {
-          "Idempotency-Key": `web-${mode}-${storeId}-${file.name}-${file.size}-${file.lastModified}`,
+          "Idempotency-Key": `web-${source}-${storeId}-${file.name}-${file.size}-${file.lastModified}`,
         },
         body: fd,
       });
@@ -49,7 +66,11 @@ export function ImportUpload({ storeId }: { storeId: string }) {
       if (!res.ok) {
         throw new Error(data?.error?.message || "Upload failed");
       }
-      router.push(urls.catalogImportJob(storeId, data.job.id));
+      const jobPath =
+        source === "pdf"
+          ? urls.catalogsImportJob(storeId, data.job.id)
+          : urls.productsImportJob(storeId, data.job.id);
+      router.push(jobPath);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -59,37 +80,22 @@ export function ImportUpload({ storeId }: { storeId: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-w-xl space-y-5 rounded-lg border border-border bg-background p-5">
+    <form
+      onSubmit={onSubmit}
+      className="max-w-xl space-y-5 rounded-lg border border-border bg-background p-5"
+    >
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Import catalog</h2>
+        <h2 className="text-lg font-semibold text-foreground">
+          {source === "pdf" ? "Upload PDF catalog" : "Import CSV"}
+        </h2>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Import from PDF (AI) or CSV template. Results are drafts — nothing publishes automatically.
+          {source === "pdf"
+            ? "AI extracts items per page. Results are drafts — nothing publishes automatically."
+            : "Use the CSV template. Results are drafts — nothing publishes automatically."}
         </p>
       </div>
 
-      <div className="flex gap-2 border-b border-border text-sm">
-        {(
-          [
-            { id: "pdf" as const, label: "PDF" },
-            { id: "csv" as const, label: "CSV" },
-          ] as const
-        ).map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={`pb-2 ${mode === m.id ? "border-b-2 border-foreground font-medium" : "text-foreground-secondary"}`}
-            onClick={() => {
-              setMode(m.id);
-              setFile(null);
-              setError(null);
-            }}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-
-      {mode === "pdf" ? (
+      {source === "pdf" ? (
         <>
           <div className="space-y-2">
             <Label htmlFor="pdf">PDF file</Label>
@@ -127,8 +133,8 @@ export function ImportUpload({ storeId }: { storeId: string }) {
             />
             <p className="text-xs text-foreground-muted">
               Required columns: <code className="text-foreground">name</code>,{" "}
-              <code className="text-foreground">price_idr</code> (whole rupiah, no decimals). Max 5 MB /
-              500 rows. Use comma separators.
+              <code className="text-foreground">price_idr</code> (whole rupiah, no decimals). Max 5
+              MB / 500 rows. Use comma separators.
             </p>
           </div>
           <a
@@ -146,7 +152,7 @@ export function ImportUpload({ storeId }: { storeId: string }) {
         </p>
       )}
       <Button type="submit" disabled={busy}>
-        {busy ? "Uploading…" : "Start import"}
+        {busy ? "Uploading…" : source === "pdf" ? "Start catalog import" : "Start import"}
       </Button>
     </form>
   );

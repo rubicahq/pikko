@@ -66,7 +66,8 @@ test("invite staff, accept magic link, isolate Store B", async ({ page, browser 
     timeout: 15000,
   });
 
-  await expect(staffPage.getByRole("link", { name: "Catalog" })).toBeVisible();
+  await expect(staffPage.getByRole("link", { name: "Products" })).toBeVisible();
+  await expect(staffPage.getByRole("link", { name: "Catalogs" })).toBeVisible();
   await expect(staffPage.getByRole("navigation", { name: "Store" }).getByRole("link", { name: "Team" })).toHaveCount(0);
 
   const probe = await staffPage.request.get(`/api/v1/stores/${storeBId}/products`);

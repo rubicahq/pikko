@@ -41,6 +41,8 @@ const NAV_PERMISSION: Record<string, Permission> = {
   packing: "packing.read",
   shipments: "packing.read",
   finance: "finance.read",
+  products: "catalog.read",
+  catalogs: "catalog.read",
   catalog: "catalog.read",
   preorders: "campaign.read",
   campaigns: "campaign.read",
