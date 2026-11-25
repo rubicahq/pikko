@@ -30,21 +30,33 @@ type Campaign = {
 
 export default async function CampaignsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ storeId: string }>;
+  searchParams: Promise<{ status?: string }>;
 }) {
   const { storeId } = await params;
+  const { status } = await searchParams;
   const session = await getSession();
   if (!session) redirect(urls.auth());
   const data = await serverFetch<{ campaigns: Campaign[] }>(
     `/api/v1/stores/${storeId}/campaigns`,
   );
-  const campaigns = data?.campaigns || [];
+  const all = data?.campaigns || [];
+  const campaigns =
+    status === "active"
+      ? all.filter((c) => c.operational_status === "open" || c.operational_status === "scheduled")
+      : status === "completed"
+        ? all.filter((c) => c.operational_status === "closed")
+        : all;
+
+  const title =
+    status === "active" ? "Active campaigns" : status === "completed" ? "Completed campaigns" : "Campaigns";
 
   return (
     <div className="mx-auto max-w-dashboard space-y-8">
       <PageHeader
-        title="Campaigns"
+        title={title}
         description="Unified selling windows for preorder batches and live shopping sessions."
         actions={
           <Button asChild>
@@ -55,8 +67,18 @@ export default async function CampaignsPage({
 
       {campaigns.length === 0 ? (
         <EmptyState
-          title="No campaigns yet"
-          description="Create a preorder campaign (links to a batch) or a live session shell for Agent 12."
+          title={
+            status === "active"
+              ? "No active campaigns"
+              : status === "completed"
+                ? "No completed campaigns"
+                : "No campaigns yet"
+          }
+          description={
+            status === "active" || status === "completed"
+              ? "Try All Campaigns, or create a new selling window."
+              : "Create a preorder campaign (links to a batch) or a live shopping session."
+          }
           action={
             <Button asChild size="sm">
               <Link href={urls.storeCampaignNew(storeId)}>Create campaign</Link>

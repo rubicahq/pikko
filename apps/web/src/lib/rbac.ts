@@ -34,6 +34,7 @@ export type Permission =
 const NAV_PERMISSION: Record<string, Permission> = {
   overview: "stores.read",
   notifications: "notifications.read",
+  messages: "notifications.read",
   analytics: "analytics.read",
   orders: "orders.read",
   customers: "customers.read",
@@ -52,6 +53,8 @@ const NAV_PERMISSION: Record<string, Permission> = {
   settings: "stores.settings",
   vendors: "purchasing.read",
   team: "team.read",
+  // Hybrid workspace ids
+  fulfillment: "purchasing.read",
 };
 
 export function hasPermission(

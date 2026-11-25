@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, Sparkles, UserRound } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import type { Store as StoreType, User } from "@/lib/api";
 import { Wordmark } from "@/components/brand/wordmark";
 import { StoreSwitcher } from "@/components/dashboard/store-switcher";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
+import { AccountMenu } from "@/components/dashboard/account-menu";
+import {
+  CONNIE_NAV,
+  liveSettingsWorkspace,
+  matchWorkspace,
+  storeHref,
+} from "@/components/dashboard/nav-config";
 import { cn } from "@/lib/utils";
 import { urls } from "@/lib/urls";
 
@@ -16,77 +23,137 @@ export function DashboardSidebar({
   currentStore,
   permissions,
   className,
+  collapsed = false,
 }: {
   user: User;
   stores: StoreType[];
   currentStore?: StoreType | null;
   permissions?: string[] | null;
   className?: string;
+  collapsed?: boolean;
 }) {
   const pathname = usePathname();
   const storeId = currentStore?.id;
   const storefrontHref =
     currentStore?.storefront_url ||
     (currentStore?.slug ? urls.storefront(currentStore.slug) : null);
+  const settings = liveSettingsWorkspace(permissions);
+  const settingsActive =
+    storeId && settings
+      ? matchWorkspace(settings, pathname, storeId)
+      : false;
 
   return (
     <aside
       className={cn(
-        "flex h-full w-sidebar flex-col border-r border-border bg-background",
+        "flex h-full flex-col border-r border-border bg-background",
+        collapsed ? "w-sidebar-collapsed" : "w-sidebar",
         className,
       )}
     >
-      <div className="px-4 pb-3 pt-4">
-        <Wordmark href={storeId ? urls.storeOverview(storeId) : urls.stores()} />
+      <div className={cn("pb-3 pt-4", collapsed ? "px-2" : "px-3")}>
+        {collapsed ? (
+          <Link
+            href={storeId ? urls.storeOverview(storeId) : urls.stores()}
+            className="flex h-10 items-center justify-center"
+            aria-label="Pikko"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/pikko-icon.png" alt="" className="h-7 w-7" />
+          </Link>
+        ) : (
+          <Wordmark href={storeId ? urls.storeOverview(storeId) : urls.stores()} />
+        )}
       </div>
-      <div className="px-3 pb-3">
-        <StoreSwitcher stores={stores} current={currentStore} />
+
+      <div className={cn("pb-3", collapsed ? "px-2" : "px-3")}>
+        {collapsed ? (
+          <StoreSwitcher stores={stores} current={currentStore} compact />
+        ) : (
+          <StoreSwitcher stores={stores} current={currentStore} />
+        )}
       </div>
+
       {storefrontHref ? (
-        <div className="px-3 pb-3">
+        <div className={cn("pb-3", collapsed ? "px-2" : "px-3")}>
           <a
             href={storefrontHref}
             target="_blank"
             rel="noreferrer"
-            className="flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground-secondary transition-colors hover:bg-surface-hover hover:text-foreground"
+            title={collapsed ? "View store" : undefined}
+            className={cn(
+              "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground-secondary transition-colors hover:bg-background-subtle hover:text-foreground",
+              collapsed && "justify-center px-0",
+            )}
           >
             <ExternalLink className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-            <span className="truncate">View store</span>
+            {!collapsed ? <span className="truncate">View store</span> : (
+              <span className="sr-only">View store</span>
+            )}
           </a>
         </div>
       ) : null}
-      <SidebarNav storeId={storeId} permissions={permissions} />
-      <div className="mt-auto space-y-1 border-t border-border p-3">
-        <div className="rounded-xl bg-warm-feature px-3 py-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-brand" strokeWidth={1.75} />
-            <p className="text-sm font-semibold text-foreground">Connie</p>
-          </div>
-          <p className="mt-1 text-caption text-foreground-secondary">
-            Your commerce teammate — coming soon.
-          </p>
+
+      <div className={cn("mx-3 border-t border-border", collapsed && "mx-2")} />
+
+      <div className="pt-3">
+        <SidebarNav
+          storeId={storeId}
+          permissions={permissions}
+          collapsed={collapsed}
+        />
+      </div>
+
+      <div
+        className={cn(
+          "mt-auto space-y-1 border-t border-border p-3",
+          collapsed && "px-2",
+        )}
+      >
+        <div
+          title="Connie — coming soon"
+          className={cn(
+            "flex h-11 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground",
+            "bg-warm-feature",
+            collapsed && "justify-center px-0",
+          )}
+          aria-disabled
+        >
+          <Sparkles className="h-5 w-5 shrink-0 text-brand" strokeWidth={1.75} />
+          {!collapsed ? (
+            <>
+              <span className="truncate">{CONNIE_NAV.label}</span>
+              <span className="ml-auto rounded-sm bg-background/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                Soon
+              </span>
+            </>
+          ) : (
+            <span className="sr-only">Connie — coming soon</span>
+          )}
         </div>
-        {storeId ? (
+
+        {storeId && settings ? (
           <Link
-            href={urls.storeSettings(storeId)}
+            href={storeHref(storeId, settings.defaultHref)}
+            title={collapsed ? settings.label : undefined}
             className={cn(
-              "flex h-10 items-center gap-2 rounded-md px-3 text-sm font-medium text-foreground-secondary hover:bg-surface-hover hover:text-foreground",
-              pathname.includes("/settings") && "bg-surface-active text-foreground",
+              "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-foreground-secondary hover:bg-surface-hover hover:text-foreground",
+              settingsActive && "bg-surface-active font-semibold text-foreground",
+              collapsed && "justify-center px-0",
             )}
+            aria-current={settingsActive ? "page" : undefined}
           >
-            Settings
+            <settings.icon
+              className={cn("h-5 w-5 shrink-0", settingsActive && "text-brand")}
+              strokeWidth={1.75}
+            />
+            {!collapsed ? <span className="truncate">{settings.label}</span> : (
+              <span className="sr-only">{settings.label}</span>
+            )}
           </Link>
         ) : null}
-        <Link
-          href={urls.accountSettings()}
-          className={cn(
-            "flex h-10 items-center gap-2 rounded-md px-3 text-sm text-foreground-secondary hover:bg-surface-hover hover:text-foreground",
-            pathname.startsWith("/account") && "bg-surface-active font-medium text-foreground",
-          )}
-        >
-          <UserRound className="h-5 w-5 shrink-0" strokeWidth={1.75} />
-          <span className="min-w-0 truncate">{user.display_name || user.email}</span>
-        </Link>
+
+        <AccountMenu user={user} collapsed={collapsed} />
       </div>
     </aside>
   );

@@ -44,7 +44,7 @@
 
   /* Gradients — accents only (Connie, empty art, announcements) */
   --gradient-ambient: linear-gradient(160deg, #f5f6fa 0%, #f5f6fa 70%, #eaf0f7 100%);
-  --gradient-warm: linear-gradient(135deg, #ffffff 0%, #fff7f3 50%, #ffe1d5 100%);
+  --gradient-warm: linear-gradient(135deg, #ffffff 0%, #fff7f3 55%, #ffe1d5 100%);
   --gradient-brand: linear-gradient(135deg, #ff3d00 0%, #ff8050 100%);
   --gradient-chart: linear-gradient(180deg, #ff8050 0%, #ffd1bf 100%);
 
@@ -115,10 +115,10 @@
   --text-display-sm: 28px;
   --text-display-sm-leading: 36px;
 
-  /* Layout — BMC-like shell */
-  --sidebar-width: 232px;
+  /* Layout — hybrid nav shell */
+  --sidebar-width: 224px;
   --sidebar-collapsed: 64px;
-  --topbar-height: 52px;
+  --topbar-height: 60px;
   --content-gutter: 32px;
   --overview-max: 1120px;
 
