@@ -26,7 +26,7 @@ export default async function NewOrderPage({
         <PageHeader
           className="mt-2"
           title="New order"
-          description="Spreadsheet-style entry with autocomplete, keyboard navigation, and draft autosave."
+          description="Create a manual order. Optionally link it to a campaign and/or preorder batch."
         />
       </div>
       <OrderEntryGrid storeId={storeId} />

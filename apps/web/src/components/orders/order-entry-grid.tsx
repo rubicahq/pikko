@@ -33,6 +33,7 @@ type DraftPayload = {
   fulfillment_method: string;
   internal_notes: string;
   campaign_id: string;
+  preorder_batch_id: string;
   items: {
     product_id: string;
     variant_id?: string;
@@ -40,6 +41,20 @@ type DraftPayload = {
     product_label?: string;
     unit_price_idr?: number;
   }[];
+};
+
+type CampaignOption = {
+  id: string;
+  name: string;
+  campaign_type: string;
+  operational_status?: string;
+  preorder_batch_id?: string | null;
+};
+
+type BatchOption = {
+  id: string;
+  name: string;
+  operational_status: string;
 };
 
 function newKey() {
@@ -54,6 +69,9 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const [fulfillment, setFulfillment] = useState("pickup");
   const [notes, setNotes] = useState("");
   const [campaignId, setCampaignId] = useState("");
+  const [batchId, setBatchId] = useState("");
+  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [batches, setBatches] = useState<BatchOption[]>([]);
   const [lines, setLines] = useState<Line[]>([
     { key: newKey(), product_id: "", product_label: "", quantity: 1, unit_price_idr: 0 },
   ]);
@@ -66,6 +84,21 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const syncingRelation = useRef(false);
+
+  useEffect(() => {
+    void Promise.all([
+      apiFetch<{ campaigns: CampaignOption[] }>(`/api/v1/stores/${storeId}/campaigns`),
+      apiFetch<{ batches: BatchOption[] }>(`/api/v1/stores/${storeId}/preorders`),
+    ])
+      .then(([campRes, batchRes]) => {
+        setCampaigns(campRes.campaigns || []);
+        setBatches(batchRes.batches || []);
+      })
+      .catch(() => {
+        /* selectors stay empty; create still works without relations */
+      });
+  }, [storeId]);
 
   const payload = useCallback((): DraftPayload => {
     return {
@@ -75,6 +108,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
       fulfillment_method: fulfillment,
       internal_notes: notes,
       campaign_id: campaignId,
+      preorder_batch_id: batchId,
       items: lines
         .filter((l) => l.product_id)
         .map((l) => ({
@@ -85,7 +119,35 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           unit_price_idr: l.unit_price_idr,
         })),
     };
-  }, [customerName, customerEmail, customerPhone, fulfillment, notes, campaignId, lines]);
+  }, [customerName, customerEmail, customerPhone, fulfillment, notes, campaignId, batchId, lines]);
+
+  function onCampaignChange(next: string) {
+    setCampaignId(next);
+    if (syncingRelation.current) return;
+    if (!next) return;
+    const camp = campaigns.find((c) => c.id === next);
+    if (camp?.preorder_batch_id) {
+      syncingRelation.current = true;
+      setBatchId(camp.preorder_batch_id);
+      queueMicrotask(() => {
+        syncingRelation.current = false;
+      });
+    }
+  }
+
+  function onBatchChange(next: string) {
+    setBatchId(next);
+    if (syncingRelation.current) return;
+    if (!next) return;
+    const linked = campaigns.find((c) => c.preorder_batch_id === next);
+    if (linked && !campaignId) {
+      syncingRelation.current = true;
+      setCampaignId(linked.id);
+      queueMicrotask(() => {
+        syncingRelation.current = false;
+      });
+    }
+  }
 
   const autosave = useCallback(async () => {
     try {
@@ -220,6 +282,7 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
           fulfillment_method: fulfillment,
           internal_notes: notes || undefined,
           campaign_id: campaignId || undefined,
+          preorder_batch_id: batchId || undefined,
           idempotency_key: crypto.randomUUID(),
         },
       });
@@ -318,16 +381,43 @@ export function OrderEntryGrid({ storeId }: { storeId: string }) {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
-          <Label htmlFor="campaign">Campaign ID (optional)</Label>
-          <Input
+          <Label htmlFor="campaign">Campaign (optional)</Label>
+          <select
             id="campaign"
+            className="mt-1.5 flex h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
             value={campaignId}
-            onChange={(e) => setCampaignId(e.target.value)}
-            placeholder="UUID from Campaigns"
-            className="mt-1.5 font-mono text-xs"
-          />
+            onChange={(e) => onCampaignChange(e.target.value)}
+          >
+            <option value="">No campaign</option>
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.campaign_type ? ` · ${c.campaign_type}` : ""}
+                {c.operational_status ? ` · ${c.operational_status}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label htmlFor="preorder">Preorder batch (optional)</Label>
+          <select
+            id="preorder"
+            className="mt-1.5 flex h-11 w-full rounded-md border border-border bg-background px-3 text-sm"
+            value={batchId}
+            onChange={(e) => onBatchChange(e.target.value)}
+          >
+            <option value="">No preorder</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} · {b.operational_status}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-caption text-foreground-muted">
+            Leave both empty for a normal manual order. Selecting a preorder campaign fills its batch.
+          </p>
         </div>
         <div>
           <Label htmlFor="notes">Internal notes</Label>

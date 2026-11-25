@@ -28,9 +28,108 @@ type AdminCreateOrderInput struct {
 	InternalNotes     *string          `json:"internal_notes,omitempty"`
 	PaymentMethodID   *uuid.UUID       `json:"payment_method_id,omitempty"`
 	CampaignID        *uuid.UUID       `json:"campaign_id,omitempty"`
+	PreorderBatchID   *uuid.UUID       `json:"preorder_batch_id,omitempty"`
 	IdempotencyKey    string           `json:"idempotency_key"`
 	Source            string           `json:"source,omitempty"` // admin | csv_import
 	SkipEmails        bool             `json:"-"`
+}
+
+// adminOrderRelations is the store-scoped campaign / preorder link for an order.
+type adminOrderRelations struct {
+	CampaignID *uuid.UUID
+	BatchID    *uuid.UUID
+	BatchName  *string
+	BatchSlug  *string
+	ETAStart   *time.Time
+	ETAEnd     *time.Time
+}
+
+// resolveAdminOrderRelations validates optional campaign + preorder links for the same store.
+// Empty relations are allowed. Cart-derived batch (from line items) must not conflict with an
+// explicit preorder_batch_id. A preorder campaign may auto-fill its linked batch; a batch may
+// auto-fill its linked campaign when the other side is omitted.
+func (s *Service) resolveAdminOrderRelations(
+	ctx context.Context,
+	storeID uuid.UUID,
+	inCampaign, inBatch, cartBatch *uuid.UUID,
+) (*adminOrderRelations, error) {
+	out := &adminOrderRelations{}
+	if cartBatch != nil {
+		out.BatchID = cartBatch
+	}
+
+	if inBatch != nil {
+		batch, err := s.GetBatch(ctx, storeID, *inBatch, false)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return nil, fmt.Errorf("%w: preorder batch not found in this store", ErrInvalidInput)
+			}
+			return nil, err
+		}
+		if cartBatch != nil && *cartBatch != *inBatch {
+			return nil, fmt.Errorf("%w: preorder batch does not match the batch on order items", ErrInvalidInput)
+		}
+		out.BatchID = inBatch
+		name, slug := batch.Name, batch.Slug
+		out.BatchName = &name
+		out.BatchSlug = &slug
+		out.ETAStart = batch.ETAStart
+		out.ETAEnd = batch.ETAEnd
+	}
+
+	if inCampaign != nil {
+		var linkedBatch *uuid.UUID
+		err := s.DB.QueryRow(ctx, `
+			SELECT preorder_batch_id
+			FROM campaigns WHERE id=$1 AND store_id=$2
+		`, *inCampaign, storeID).Scan(&linkedBatch)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%w: campaign not found in this store", ErrInvalidInput)
+		}
+		if err != nil {
+			return nil, err
+		}
+		out.CampaignID = inCampaign
+		if linkedBatch != nil {
+			if out.BatchID != nil && *out.BatchID != *linkedBatch {
+				return nil, fmt.Errorf("%w: campaign is linked to a different preorder batch", ErrInvalidInput)
+			}
+			if out.BatchID == nil {
+				out.BatchID = linkedBatch
+			}
+		}
+	}
+
+	if out.BatchID != nil {
+		if out.BatchName == nil {
+			batch, err := s.GetBatch(ctx, storeID, *out.BatchID, false)
+			if err != nil {
+				if errors.Is(err, ErrNotFound) {
+					return nil, fmt.Errorf("%w: preorder batch not found in this store", ErrInvalidInput)
+				}
+				return nil, err
+			}
+			name, slug := batch.Name, batch.Slug
+			out.BatchName = &name
+			out.BatchSlug = &slug
+			out.ETAStart = batch.ETAStart
+			out.ETAEnd = batch.ETAEnd
+		}
+		if out.CampaignID == nil {
+			var cid uuid.UUID
+			cerr := s.DB.QueryRow(ctx, `
+				SELECT campaign_id FROM preorder_batches
+				WHERE id=$1 AND store_id=$2 AND campaign_id IS NOT NULL
+			`, *out.BatchID, storeID).Scan(&cid)
+			if cerr == nil {
+				out.CampaignID = &cid
+			} else if !errors.Is(cerr, pgx.ErrNoRows) {
+				return nil, cerr
+			}
+		}
+	}
+
+	return out, nil
 }
 
 type AdminCreateResult struct {
@@ -232,39 +331,19 @@ func (s *Service) CreateAdminOrder(ctx context.Context, storeID, actorID uuid.UU
 	}
 	total := eval.TotalIDR
 
-	var campaignID *uuid.UUID
-	var batchName, batchSlug *string
-	var etaStart, etaEnd *time.Time
-	if batchID != nil {
-		batch, err := s.GetBatch(ctx, storeID, *batchID, false)
-		if err != nil {
-			return nil, err
-		}
-		batchName = &batch.Name
-		batchSlug = &batch.Slug
-		etaStart = batch.ETAStart
-		etaEnd = batch.ETAEnd
-		var cid uuid.UUID
-		cerr := s.DB.QueryRow(ctx, `
-			SELECT campaign_id FROM preorder_batches
-			WHERE id=$1 AND store_id=$2 AND campaign_id IS NOT NULL
-		`, *batchID, storeID).Scan(&cid)
-		if cerr == nil {
-			campaignID = &cid
-		}
+	rels, err := s.resolveAdminOrderRelations(ctx, storeID, in.CampaignID, in.PreorderBatchID, batchID)
+	if err != nil {
+		return nil, err
 	}
-	if in.CampaignID != nil {
-		var exists bool
-		err = s.DB.QueryRow(ctx, `
-			SELECT EXISTS(SELECT 1 FROM campaigns WHERE id=$1 AND store_id=$2)
-		`, *in.CampaignID, storeID).Scan(&exists)
-		if err != nil {
-			return nil, err
-		}
-		if !exists {
-			return nil, ErrNotFound
-		}
-		campaignID = in.CampaignID
+	campaignID := rels.CampaignID
+	if rels.BatchID != nil {
+		batchID = rels.BatchID
+	}
+	batchName, batchSlug := rels.BatchName, rels.BatchSlug
+	etaStart, etaEnd := rels.ETAStart, rels.ETAEnd
+	// Order-level preorder link (without batch_id on lines) still runs as preorder ops.
+	if sellingModel == "ready_stock" && batchID != nil {
+		sellingModel = "preorder"
 	}
 
 	var pm *PaymentMethod

@@ -4,6 +4,7 @@ import { getSession, serverFetch } from "@/lib/server-api";
 import { formatIDR } from "@/lib/api";
 import { urls } from "@/lib/urls";
 import { OrderActions } from "@/components/orders/order-actions";
+import { OrderRelationsEditor } from "@/components/orders/order-relations-editor";
 import { OrderItemsAndRevisions } from "@/components/orders/order-revisions-panel";
 import { Badge } from "@/components/ui/badge";
 
@@ -37,6 +38,8 @@ export default async function OrderDetailPage({
       shipping_city?: string | null;
       source?: string;
       campaign_id?: string | null;
+      preorder_batch_id?: string | null;
+      batch_name_snapshot?: string | null;
       items?: {
         id: string;
         product_name: string;
@@ -75,7 +78,7 @@ export default async function OrderDetailPage({
           <p className="mt-1 text-sm text-foreground-secondary">
             {new Date(o.created_at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} (Asia/Jakarta)
             {o.source ? ` · ${o.source.replaceAll("_", " ")}` : ""}
-            {o.campaign_id ? ` · campaign ${o.campaign_id.slice(0, 8)}…` : ""}
+            {o.batch_name_snapshot ? ` · ${o.batch_name_snapshot}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
@@ -164,6 +167,16 @@ export default async function OrderDetailPage({
             </div>
           </div>
         </section>
+      </div>
+
+      <div className="mt-6">
+        <OrderRelationsEditor
+          storeId={storeId}
+          orderId={o.id}
+          campaignId={o.campaign_id}
+          preorderBatchId={o.preorder_batch_id}
+          batchName={o.batch_name_snapshot}
+        />
       </div>
 
       <div className="mt-6">

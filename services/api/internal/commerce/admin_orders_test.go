@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -223,5 +224,189 @@ func TestAdminOrderCreateRevisionAndCSV(t *testing.T) {
 	total := int(list["total"].(float64))
 	if total < 2 {
 		t.Fatalf("expected >=2 orders, got %d %v", total, list)
+	}
+}
+
+func TestAdminOrderCampaignAndPreorderRelations(t *testing.T) {
+	pool := testPool(t)
+	defer pool.Close()
+	reset(t, pool)
+
+	dir := t.TempDir()
+	store, err := storage.NewLocal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cfg()
+	router, _ := httpapi.NewRouter(httpapi.Deps{Cfg: c, DB: pool, Logger: slog.Default(), Storage: store})
+	storeSvc := &stores.Service{DB: pool, Cfg: c}
+
+	userA, tokenA := signIn(t, pool, "admin-rel@example.com")
+	userB, tokenB := signIn(t, pool, "admin-rel-b@example.com")
+	stA, err := storeSvc.CreateStore(context.Background(), userA, stores.CreateDirectInput{
+		Name: "Rel Mart", Slug: "rel-mart", Category: "other", SellingModel: "both",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stB, err := storeSvc.CreateStore(context.Background(), userB, stores.CreateDirectInput{
+		Name: "Other Mart", Slug: "other-mart", Category: "other", SellingModel: "both",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sid := stA.ID.String()
+
+	code, _ := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/payment-methods", tokenA, map[string]any{
+		"bank_name": "BCA", "account_holder": "Rel", "account_number": "112233",
+	})
+	if code != 201 {
+		t.Fatalf("payment method %d", code)
+	}
+	code, _ = doJSON(t, router, "PATCH", "/api/v1/stores/"+sid+"/fulfillment", tokenA, map[string]any{
+		"pickup_enabled": true,
+	})
+	if code != 200 {
+		t.Fatalf("fulfillment %d", code)
+	}
+	code, prodBody := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products", tokenA, map[string]any{
+		"product": map[string]any{
+			"name": "Rel Tee", "slug": "rel-tee", "sku": "REL-TEE", "base_price_idr": 40000,
+			"ready_stock_eligible": true, "inventory_mode": "unlimited",
+		},
+	})
+	if code != 201 {
+		t.Fatalf("product %d %v", code, prodBody)
+	}
+	productID := prodBody["product"].(map[string]any)["id"].(string)
+	code, _ = doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/products/"+productID+"/status", tokenA, map[string]any{
+		"status": "published",
+	})
+	if code != 200 {
+		t.Fatalf("publish %d", code)
+	}
+
+	opens := time.Now().UTC().Add(-time.Hour)
+	closes := time.Now().UTC().Add(48 * time.Hour)
+	code, campBody := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/campaigns", tokenA, map[string]any{
+		"campaign_type": "preorder", "name": "Rel Drop", "slug": "rel-drop",
+		"opens_at": opens.Format(time.RFC3339), "closes_at": closes.Format(time.RFC3339),
+		"publication_status": "published",
+	})
+	if code != 201 {
+		t.Fatalf("campaign %d %v", code, campBody)
+	}
+	camp := campBody["campaign"].(map[string]any)
+	campaignID := camp["id"].(string)
+	batchID := camp["preorder_batch_id"].(string)
+
+	code, foreignCamp := doJSON(t, router, "POST", "/api/v1/stores/"+stB.ID.String()+"/campaigns", tokenB, map[string]any{
+		"campaign_type": "live", "name": "Foreign Live", "slug": "foreign-live",
+		"opens_at": opens.Format(time.RFC3339), "closes_at": closes.Format(time.RFC3339),
+		"publication_status": "draft", "live_quick_add_enabled": true,
+	})
+	if code != 201 {
+		t.Fatalf("foreign campaign %d %v", code, foreignCamp)
+	}
+	foreignCampaignID := foreignCamp["campaign"].(map[string]any)["id"].(string)
+
+	// Manual order with no relations
+	code, plain := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Plain", "customer_email": "plain@example.com",
+		"fulfillment_method": "pickup",
+		"idempotency_key": uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("plain create %d %v", code, plain)
+	}
+	plainOrder := plain["order"].(map[string]any)
+	if plainOrder["campaign_id"] != nil || plainOrder["preorder_batch_id"] != nil {
+		t.Fatalf("expected no relations, got %#v", plainOrder)
+	}
+
+	// Manual order linked to campaign (auto-fills preorder batch)
+	code, linked := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Linked", "customer_email": "linked@example.com",
+		"fulfillment_method": "pickup",
+		"campaign_id": campaignID,
+		"idempotency_key": uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("linked create %d %v", code, linked)
+	}
+	lo := linked["order"].(map[string]any)
+	if lo["campaign_id"] != campaignID {
+		t.Fatalf("campaign_id=%v", lo["campaign_id"])
+	}
+	if lo["preorder_batch_id"] != batchID {
+		t.Fatalf("preorder_batch_id=%v want %s", lo["preorder_batch_id"], batchID)
+	}
+	if lo["selling_model"] != "preorder" {
+		t.Fatalf("selling_model=%v", lo["selling_model"])
+	}
+
+	// Explicit preorder batch only
+	code, batchOnly := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Batch", "customer_email": "batch@example.com",
+		"fulfillment_method": "pickup",
+		"preorder_batch_id": batchID,
+		"idempotency_key": uuid.NewString(),
+	})
+	if code != 201 {
+		t.Fatalf("batch-only create %d %v", code, batchOnly)
+	}
+	bo := batchOnly["order"].(map[string]any)
+	if bo["preorder_batch_id"] != batchID {
+		t.Fatalf("batch-only preorder_batch_id=%v", bo["preorder_batch_id"])
+	}
+	if bo["campaign_id"] != campaignID {
+		t.Fatalf("batch-only should auto-fill campaign, got %v", bo["campaign_id"])
+	}
+
+	// Cross-store campaign rejected with clear error
+	code, bad := doJSON(t, router, "POST", "/api/v1/stores/"+sid+"/orders", tokenA, map[string]any{
+		"items": []map[string]any{{"product_id": productID, "quantity": 1}},
+		"customer_name": "Bad", "customer_email": "bad@example.com",
+		"fulfillment_method": "pickup",
+		"campaign_id": foreignCampaignID,
+		"idempotency_key": uuid.NewString(),
+	})
+	if code != 400 {
+		t.Fatalf("cross-store campaign want 400 got %d %v", code, bad)
+	}
+	errObj, _ := bad["error"].(map[string]any)
+	msg, _ := errObj["message"].(string)
+	if !strings.Contains(strings.ToLower(msg), "campaign") {
+		t.Fatalf("expected clear campaign error, got %q", msg)
+	}
+
+	// Patch relations on existing plain order
+	plainID := plainOrder["id"].(string)
+	code, patched := doJSON(t, router, "PATCH", "/api/v1/stores/"+sid+"/orders/"+plainID, tokenA, map[string]any{
+		"campaign_id": campaignID,
+		"preorder_batch_id": batchID,
+	})
+	if code != 200 {
+		t.Fatalf("patch relations %d %v", code, patched)
+	}
+	po := patched["order"].(map[string]any)
+	if po["campaign_id"] != campaignID || po["preorder_batch_id"] != batchID {
+		t.Fatalf("patched relations %#v", po)
+	}
+
+	// Clear relations
+	code, cleared := doJSON(t, router, "PATCH", "/api/v1/stores/"+sid+"/orders/"+plainID, tokenA, map[string]any{
+		"campaign_id": "",
+		"preorder_batch_id": "",
+	})
+	if code != 200 {
+		t.Fatalf("clear relations %d %v", code, cleared)
+	}
+	co := cleared["order"].(map[string]any)
+	if co["campaign_id"] != nil || co["preorder_batch_id"] != nil {
+		t.Fatalf("expected cleared relations %#v", co)
 	}
 }
