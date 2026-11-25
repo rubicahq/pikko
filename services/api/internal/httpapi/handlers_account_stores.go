@@ -56,6 +56,10 @@ type StoreHandlers struct {
 
 func (h *StoreHandlers) decorate(st *stores.Store) {
 	st.StorefrontURL = h.URLs.Storefront(st.Slug)
+	// Same-origin relative file URL — never prefix API_BASE_URL (Docker hostname).
+	if st.StoreIconFileID != nil {
+		st.StoreIconURL = "/api/v1/stores/" + st.ID.String() + "/files/" + st.StoreIconFileID.String()
+	}
 }
 
 func (h *StoreHandlers) List(w http.ResponseWriter, r *http.Request) {

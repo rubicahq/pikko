@@ -103,6 +103,8 @@ export type Store = {
   updated_at: string;
   role?: string;
   storefront_url?: string;
+  store_icon_file_id?: string | null;
+  store_icon_url?: string;
   permissions?: string[];
 };
 
