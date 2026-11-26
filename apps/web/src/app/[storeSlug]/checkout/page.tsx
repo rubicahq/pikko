@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 
 type PaymentMethod = {
   id: string;
+  method_type: string;
   bank_name: string;
   account_holder: string;
   account_number: string;
@@ -143,6 +144,7 @@ function CheckoutInner() {
         order: { id: string };
         tracking_token: string;
         tracking_url: string;
+		checkout_url?: string;
       }>(`/api/v1/public/stores/${storeSlug}/checkout/submit`, {
         method: "POST",
         body: {
@@ -169,6 +171,10 @@ function CheckoutInner() {
         },
       });
       clearCart(storeSlug, activeGroupKey);
+	  if (res.checkout_url) {
+		window.location.assign(res.checkout_url);
+		return;
+	  }
       router.push(`/track/${res.tracking_token}`);
     } catch (err) {
       if (err instanceof ApiError && err.code === "price_changed") {
@@ -306,7 +312,7 @@ function CheckoutInner() {
 
             <section className="space-y-3">
               <h2 className="text-lg font-medium">Payment</h2>
-              <p className="text-sm text-foreground-secondary">Manual bank transfer after order confirmation.</p>
+              <p className="text-sm text-foreground-secondary">Choose DOKU Checkout or manual bank transfer.</p>
               {(preview?.payment_methods || []).map((pm) => (
                 <label key={pm.id} className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
                   <input
@@ -318,7 +324,7 @@ function CheckoutInner() {
                   />
                   <span>
                     <span className="font-medium">
-                      {pm.bank_name} · {pm.account_number}
+                      {pm.method_type === "doku_checkout" ? "DOKU Checkout" : `${pm.bank_name} · ${pm.account_number}`}
                     </span>
                     <span className="mt-1 block text-foreground-secondary">{pm.account_holder}</span>
                   </span>

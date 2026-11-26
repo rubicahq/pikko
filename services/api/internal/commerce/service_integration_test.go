@@ -53,7 +53,7 @@ func reset(t *testing.T, pool *pgxpool.Pool) {
 		         preorder_item_allocations, preorder_purchasing_records,
 		         inventory_adjustments, inventory_reservations,
 		         store_credit_ledger, store_credits, refunds, financial_adjustments, financial_events,
-		         payment_allocations, payment_evidence, payments, store_deposit_policies,
+		         payment_attempts, payment_allocations, payment_evidence, payments, store_deposit_policies,
 		         order_tracking_tokens, order_status_history, order_item_events, order_revisions, live_quick_adds, admin_order_drafts, order_items, orders,
 		         store_order_counters, customer_addresses, customers,
 		         store_payment_methods, store_fulfillment_settings,
@@ -200,7 +200,7 @@ func TestCheckoutPaymentVerifyAndCrossStoreIsolation(t *testing.T) {
 
 	idem := uuid.NewString()
 	code, submit := doJSON(t, router, "POST", "/api/v1/public/stores/alpha-mart/checkout/submit", "", map[string]any{
-		"items": []map[string]any{{"product_id": productID, "quantity": 2}},
+		"items":         []map[string]any{{"product_id": productID, "quantity": 2}},
 		"customer_name": "Budi", "customer_email": "budi@example.com", "customer_phone": "081234",
 		"fulfillment_method": "shipping",
 		"shipping_address": map[string]any{
@@ -224,7 +224,7 @@ func TestCheckoutPaymentVerifyAndCrossStoreIsolation(t *testing.T) {
 
 	// Idempotent replay
 	code, submit2 := doJSON(t, router, "POST", "/api/v1/public/stores/alpha-mart/checkout/submit", "", map[string]any{
-		"items": []map[string]any{{"product_id": productID, "quantity": 2}},
+		"items":         []map[string]any{{"product_id": productID, "quantity": 2}},
 		"customer_name": "Budi", "customer_email": "budi@example.com",
 		"fulfillment_method": "shipping",
 		"shipping_address": map[string]any{

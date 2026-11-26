@@ -37,15 +37,15 @@ const (
 	PaymentRefunded             = "refunded"
 	PaymentPartiallyRefunded    = "partially_refunded"
 
-	FulfillmentUnfulfilled    = "unfulfilled"
-	FulfillmentPurchasing     = "purchasing"
+	FulfillmentUnfulfilled     = "unfulfilled"
+	FulfillmentPurchasing      = "purchasing"
 	FulfillmentAwaitingArrival = "awaiting_arrival"
-	FulfillmentReadyToShip    = "ready_to_ship"
-	FulfillmentReadyForPickup = "ready_for_pickup"
-	FulfillmentShipped        = "shipped"
-	FulfillmentDelivered      = "delivered"
-	FulfillmentCollected      = "collected"
-	FulfillmentCancelled      = "cancelled"
+	FulfillmentReadyToShip     = "ready_to_ship"
+	FulfillmentReadyForPickup  = "ready_for_pickup"
+	FulfillmentShipped         = "shipped"
+	FulfillmentDelivered       = "delivered"
+	FulfillmentCollected       = "collected"
+	FulfillmentCancelled       = "cancelled"
 
 	PaymentRecordPending              = "pending"
 	PaymentRecordAwaitingVerification = "awaiting_verification"
@@ -62,6 +62,7 @@ const (
 
 	MethodTypeBankTransfer = "bank_transfer"
 	MethodTypePaidByAdmin  = "paid_by_admin"
+	MethodTypeDOKUCheckout = "doku_checkout"
 
 	PaymentOptionBankTransfer = "bank_transfer"
 	PaymentOptionPaidByAdmin  = "paid_by_admin"
@@ -80,6 +81,23 @@ type PaymentMethod struct {
 	DisplayOrder         int       `json:"display_order"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
+}
+
+// PaymentAttempt is the provider-facing checkout attempt. Order numbers and
+// provider invoice numbers are deliberately separate identifiers.
+type PaymentAttempt struct {
+	ID                    uuid.UUID  `json:"id"`
+	StoreID               uuid.UUID  `json:"store_id"`
+	OrderID               uuid.UUID  `json:"order_id"`
+	PaymentID             *uuid.UUID `json:"payment_id,omitempty"`
+	Provider              string     `json:"provider"`
+	ProviderInvoiceNumber *string    `json:"provider_invoice_number,omitempty"`
+	AmountIDR             int64      `json:"amount_idr"`
+	Status                string     `json:"status"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	RequestID             *string    `json:"request_id,omitempty"`
+	CheckoutURL           *string    `json:"checkout_url,omitempty"`
 }
 
 type FulfillmentSettings struct {
@@ -142,27 +160,27 @@ type PricedLine struct {
 }
 
 type CheckoutPreview struct {
-	StoreID            uuid.UUID              `json:"store_id"`
-	StoreSlug          string                 `json:"store_slug"`
-	StoreName          string                 `json:"store_name"`
-	Currency           string                 `json:"currency"`
-	SellingModel       string                 `json:"selling_model"`
-	BatchID            *uuid.UUID             `json:"batch_id,omitempty"`
-	BatchName          string                 `json:"batch_name,omitempty"`
-	BatchSlug          string                 `json:"batch_slug,omitempty"`
-	Lines              []PricedLine           `json:"lines"`
-	SubtotalIDR        int64                  `json:"subtotal_idr"`
-	ShippingFeeIDR     int64                  `json:"shipping_fee_idr"`
-	HandlingFeeIDR     int64                  `json:"handling_fee_idr"`
-	TotalIDR           int64                  `json:"total_idr"`
-	RequiresApproval   bool                   `json:"requires_approval"`
-	MinimumOK          bool                   `json:"minimum_ok"`
-	MinimumMessage     string                 `json:"minimum_message,omitempty"`
-	AppliedRules       []AppliedRule          `json:"applied_rules,omitempty"`
-	FulfillmentMethod  string                 `json:"fulfillment_method,omitempty"`
-	CheckoutEnabled    bool                   `json:"checkout_enabled"`
-	PaymentMethods     []PaymentMethod        `json:"payment_methods,omitempty"`
-	Fulfillment        *FulfillmentSettings   `json:"fulfillment,omitempty"`
+	StoreID           uuid.UUID            `json:"store_id"`
+	StoreSlug         string               `json:"store_slug"`
+	StoreName         string               `json:"store_name"`
+	Currency          string               `json:"currency"`
+	SellingModel      string               `json:"selling_model"`
+	BatchID           *uuid.UUID           `json:"batch_id,omitempty"`
+	BatchName         string               `json:"batch_name,omitempty"`
+	BatchSlug         string               `json:"batch_slug,omitempty"`
+	Lines             []PricedLine         `json:"lines"`
+	SubtotalIDR       int64                `json:"subtotal_idr"`
+	ShippingFeeIDR    int64                `json:"shipping_fee_idr"`
+	HandlingFeeIDR    int64                `json:"handling_fee_idr"`
+	TotalIDR          int64                `json:"total_idr"`
+	RequiresApproval  bool                 `json:"requires_approval"`
+	MinimumOK         bool                 `json:"minimum_ok"`
+	MinimumMessage    string               `json:"minimum_message,omitempty"`
+	AppliedRules      []AppliedRule        `json:"applied_rules,omitempty"`
+	FulfillmentMethod string               `json:"fulfillment_method,omitempty"`
+	CheckoutEnabled   bool                 `json:"checkout_enabled"`
+	PaymentMethods    []PaymentMethod      `json:"payment_methods,omitempty"`
+	Fulfillment       *FulfillmentSettings `json:"fulfillment,omitempty"`
 }
 
 type OrderItem struct {
@@ -185,50 +203,50 @@ type OrderItem struct {
 }
 
 type Order struct {
-	ID                  uuid.UUID   `json:"id"`
-	StoreID             uuid.UUID   `json:"store_id"`
-	CustomerID          *uuid.UUID  `json:"customer_id,omitempty"`
-	OrderNumber         string      `json:"order_number"`
-	SellingModel        string      `json:"selling_model"`
-	OrderStatus         string      `json:"order_status"`
-	PaymentStatus       string      `json:"payment_status"`
-	FulfillmentStatus   string      `json:"fulfillment_status"`
-	Currency            string      `json:"currency"`
-	SubtotalIDR         int64       `json:"subtotal_idr"`
-	ShippingFeeIDR      int64       `json:"shipping_fee_idr"`
-	HandlingFeeIDR      int64       `json:"handling_fee_idr"`
-	TotalIDR            int64       `json:"total_idr"`
-	FulfillmentMethod   string      `json:"fulfillment_method"`
-	CustomerName        string      `json:"customer_name"`
-	CustomerEmail       string      `json:"customer_email"`
-	CustomerPhone       *string     `json:"customer_phone,omitempty"`
-	ShippingRecipient   *string     `json:"shipping_recipient,omitempty"`
-	ShippingPhone       *string     `json:"shipping_phone,omitempty"`
-	ShippingLine1       *string     `json:"shipping_line1,omitempty"`
-	ShippingLine2       *string     `json:"shipping_line2,omitempty"`
-	ShippingCity        *string     `json:"shipping_city,omitempty"`
-	ShippingProvince    *string     `json:"shipping_province,omitempty"`
-	ShippingPostalCode  *string     `json:"shipping_postal_code,omitempty"`
-	ShippingCountry     *string     `json:"shipping_country,omitempty"`
-	CustomerNotes       *string     `json:"customer_notes,omitempty"`
-	InternalNotes       *string     `json:"internal_notes,omitempty"`
-	CancelReason        *string     `json:"cancel_reason,omitempty"`
-	PaymentDeadlineAt   *time.Time  `json:"payment_deadline_at,omitempty"`
-	ConfirmedAt         *time.Time  `json:"confirmed_at,omitempty"`
-	CompletedAt         *time.Time  `json:"completed_at,omitempty"`
-	CancelledAt         *time.Time  `json:"cancelled_at,omitempty"`
-	CreatedAt           time.Time   `json:"created_at"`
-	UpdatedAt           time.Time   `json:"updated_at"`
-	PreorderBatchID     *uuid.UUID  `json:"preorder_batch_id,omitempty"`
-	BatchNameSnapshot   *string     `json:"batch_name_snapshot,omitempty"`
-	BatchSlugSnapshot   *string     `json:"batch_slug_snapshot,omitempty"`
-	RequiresApproval    bool        `json:"requires_approval"`
-	Source              string      `json:"source"`
-	CreatedByUserID     *uuid.UUID  `json:"created_by_user_id,omitempty"`
-	CampaignID          *uuid.UUID  `json:"campaign_id,omitempty"`
-	Items               []OrderItem `json:"items,omitempty"`
-	TrackingURL         string      `json:"tracking_url,omitempty"`
-	TrackingToken       string      `json:"tracking_token,omitempty"` // only on create response
+	ID                 uuid.UUID   `json:"id"`
+	StoreID            uuid.UUID   `json:"store_id"`
+	CustomerID         *uuid.UUID  `json:"customer_id,omitempty"`
+	OrderNumber        string      `json:"order_number"`
+	SellingModel       string      `json:"selling_model"`
+	OrderStatus        string      `json:"order_status"`
+	PaymentStatus      string      `json:"payment_status"`
+	FulfillmentStatus  string      `json:"fulfillment_status"`
+	Currency           string      `json:"currency"`
+	SubtotalIDR        int64       `json:"subtotal_idr"`
+	ShippingFeeIDR     int64       `json:"shipping_fee_idr"`
+	HandlingFeeIDR     int64       `json:"handling_fee_idr"`
+	TotalIDR           int64       `json:"total_idr"`
+	FulfillmentMethod  string      `json:"fulfillment_method"`
+	CustomerName       string      `json:"customer_name"`
+	CustomerEmail      string      `json:"customer_email"`
+	CustomerPhone      *string     `json:"customer_phone,omitempty"`
+	ShippingRecipient  *string     `json:"shipping_recipient,omitempty"`
+	ShippingPhone      *string     `json:"shipping_phone,omitempty"`
+	ShippingLine1      *string     `json:"shipping_line1,omitempty"`
+	ShippingLine2      *string     `json:"shipping_line2,omitempty"`
+	ShippingCity       *string     `json:"shipping_city,omitempty"`
+	ShippingProvince   *string     `json:"shipping_province,omitempty"`
+	ShippingPostalCode *string     `json:"shipping_postal_code,omitempty"`
+	ShippingCountry    *string     `json:"shipping_country,omitempty"`
+	CustomerNotes      *string     `json:"customer_notes,omitempty"`
+	InternalNotes      *string     `json:"internal_notes,omitempty"`
+	CancelReason       *string     `json:"cancel_reason,omitempty"`
+	PaymentDeadlineAt  *time.Time  `json:"payment_deadline_at,omitempty"`
+	ConfirmedAt        *time.Time  `json:"confirmed_at,omitempty"`
+	CompletedAt        *time.Time  `json:"completed_at,omitempty"`
+	CancelledAt        *time.Time  `json:"cancelled_at,omitempty"`
+	CreatedAt          time.Time   `json:"created_at"`
+	UpdatedAt          time.Time   `json:"updated_at"`
+	PreorderBatchID    *uuid.UUID  `json:"preorder_batch_id,omitempty"`
+	BatchNameSnapshot  *string     `json:"batch_name_snapshot,omitempty"`
+	BatchSlugSnapshot  *string     `json:"batch_slug_snapshot,omitempty"`
+	RequiresApproval   bool        `json:"requires_approval"`
+	Source             string      `json:"source"`
+	CreatedByUserID    *uuid.UUID  `json:"created_by_user_id,omitempty"`
+	CampaignID         *uuid.UUID  `json:"campaign_id,omitempty"`
+	Items              []OrderItem `json:"items,omitempty"`
+	TrackingURL        string      `json:"tracking_url,omitempty"`
+	TrackingToken      string      `json:"tracking_token,omitempty"` // only on create response
 }
 
 const (
@@ -285,28 +303,28 @@ type AdminOrderDraft struct {
 }
 
 type Payment struct {
-	ID                      uuid.UUID           `json:"id"`
-	StoreID                 uuid.UUID           `json:"store_id"`
-	OrderID                 uuid.UUID           `json:"order_id"`
-	PaymentMethodID         *uuid.UUID          `json:"payment_method_id,omitempty"`
-	MethodType              string              `json:"method_type"`
-	AmountIDR               int64               `json:"amount_idr"`
-	Status                  string              `json:"status"`
-	BankNameSnapshot        *string             `json:"bank_name_snapshot,omitempty"`
-	AccountHolderSnapshot   *string             `json:"account_holder_snapshot,omitempty"`
-	AccountNumberSnapshot   *string             `json:"account_number_snapshot,omitempty"`
-	InstructionsSnapshot    *string             `json:"instructions_snapshot,omitempty"`
-	VerifiedAt              *time.Time          `json:"verified_at,omitempty"`
-	RejectedAt              *time.Time          `json:"rejected_at,omitempty"`
-	RejectReason            *string             `json:"reject_reason,omitempty"`
-	CreatedAt               time.Time           `json:"created_at"`
-	UpdatedAt               time.Time           `json:"updated_at"`
-	Evidence                []Evidence          `json:"evidence,omitempty"`
-	PaymentKind             string              `json:"payment_kind,omitempty"`
-	IdempotencyKey          *string             `json:"idempotency_key,omitempty"`
-	Note                    *string             `json:"note,omitempty"`
-	Version                 int                 `json:"version,omitempty"`
-	Allocations             []PaymentAllocation `json:"allocations,omitempty"`
+	ID                    uuid.UUID           `json:"id"`
+	StoreID               uuid.UUID           `json:"store_id"`
+	OrderID               uuid.UUID           `json:"order_id"`
+	PaymentMethodID       *uuid.UUID          `json:"payment_method_id,omitempty"`
+	MethodType            string              `json:"method_type"`
+	AmountIDR             int64               `json:"amount_idr"`
+	Status                string              `json:"status"`
+	BankNameSnapshot      *string             `json:"bank_name_snapshot,omitempty"`
+	AccountHolderSnapshot *string             `json:"account_holder_snapshot,omitempty"`
+	AccountNumberSnapshot *string             `json:"account_number_snapshot,omitempty"`
+	InstructionsSnapshot  *string             `json:"instructions_snapshot,omitempty"`
+	VerifiedAt            *time.Time          `json:"verified_at,omitempty"`
+	RejectedAt            *time.Time          `json:"rejected_at,omitempty"`
+	RejectReason          *string             `json:"reject_reason,omitempty"`
+	CreatedAt             time.Time           `json:"created_at"`
+	UpdatedAt             time.Time           `json:"updated_at"`
+	Evidence              []Evidence          `json:"evidence,omitempty"`
+	PaymentKind           string              `json:"payment_kind,omitempty"`
+	IdempotencyKey        *string             `json:"idempotency_key,omitempty"`
+	Note                  *string             `json:"note,omitempty"`
+	Version               int                 `json:"version,omitempty"`
+	Allocations           []PaymentAllocation `json:"allocations,omitempty"`
 }
 
 type Evidence struct {
@@ -334,13 +352,13 @@ type Customer struct {
 }
 
 type TrackingView struct {
-	StoreName         string         `json:"store_name"`
-	StoreSlug         string         `json:"store_slug"`
-	PrimaryColor      string         `json:"primary_color,omitempty"`
-	ContactEmail      *string        `json:"contact_email,omitempty"`
-	WhatsApp          *string        `json:"whatsapp,omitempty"`
-	Order             Order          `json:"order"`
-	Payment           *Payment       `json:"payment,omitempty"`
-	Shipments         []Shipment     `json:"shipments,omitempty"`
-	CanSubmitEvidence bool           `json:"can_submit_evidence"`
+	StoreName         string     `json:"store_name"`
+	StoreSlug         string     `json:"store_slug"`
+	PrimaryColor      string     `json:"primary_color,omitempty"`
+	ContactEmail      *string    `json:"contact_email,omitempty"`
+	WhatsApp          *string    `json:"whatsapp,omitempty"`
+	Order             Order      `json:"order"`
+	Payment           *Payment   `json:"payment,omitempty"`
+	Shipments         []Shipment `json:"shipments,omitempty"`
+	CanSubmitEvidence bool       `json:"can_submit_evidence"`
 }

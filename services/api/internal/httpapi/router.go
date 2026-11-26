@@ -337,6 +337,8 @@ func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
 	mux.Handle("POST /api/v1/stores/{storeID}/payment-methods", storePerm(rbac.PermStoresSettings, commerceH.CreatePaymentMethod))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/payment-methods/{methodID}", storePerm(rbac.PermStoresSettings, commerceH.UpdatePaymentMethod))
 	mux.Handle("DELETE /api/v1/stores/{storeID}/payment-methods/{methodID}", storePerm(rbac.PermStoresSettings, commerceH.DeletePaymentMethod))
+	mux.Handle("GET /api/v1/stores/{storeID}/doku-credentials", storePerm(rbac.PermStoresSettings, commerceH.GetDOKUCredentials))
+	mux.Handle("PUT /api/v1/stores/{storeID}/doku-credentials", storePerm(rbac.PermStoresSettings, commerceH.PutDOKUCredentials))
 	mux.Handle("GET /api/v1/stores/{storeID}/fulfillment", storePerm(rbac.PermStoresSettings, commerceH.GetFulfillment))
 	mux.Handle("PATCH /api/v1/stores/{storeID}/fulfillment", storePerm(rbac.PermStoresSettings, commerceH.PatchFulfillment))
 	mux.Handle("GET /api/v1/stores/{storeID}/orders", storePerm(rbac.PermOrdersRead, commerceH.ListOrders))
@@ -478,6 +480,7 @@ func NewRouterWithExtras(d Deps) (http.Handler, *jobs.Worker, RouterExtras) {
 	// Phase 3: public checkout + tracking
 	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/preview", commerceH.CheckoutPreview)
 	mux.HandleFunc("POST /api/v1/public/stores/{slug}/checkout/submit", commerceH.CheckoutSubmit)
+	mux.HandleFunc("POST /api/v1/webhooks/doku", commerceH.DOKUWebhook)
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}", commerceH.TrackingGet)
 	mux.HandleFunc("POST /api/v1/public/tracking/{token}/evidence", commerceH.TrackingEvidenceUpload)
 	mux.HandleFunc("GET /api/v1/public/tracking/{token}/evidence/{evidenceID}/file", commerceH.TrackingEvidenceFile)

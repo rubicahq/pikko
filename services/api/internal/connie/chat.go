@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -97,6 +98,13 @@ func (s *Service) chatHeuristic(ctx context.Context, cc CallContext, msgs []Chat
 func matchHeuristicTool(q string) (string, json.RawMessage) {
 	empty := json.RawMessage(`{}`)
 	switch {
+	case (strings.Contains(q, "doku") || strings.Contains(q, "cek pembayaran")) && (strings.Contains(q, "order") || strings.Contains(q, "pesanan")):
+		identifier := regexp.MustCompile(`(?i)\b(?:PK-[A-Z0-9-]+|[0-9a-f]{8}-[0-9a-f-]{27,})\b`).FindString(q)
+		if identifier == "" {
+			return "", nil
+		}
+		args, _ := json.Marshal(map[string]string{"order_identifier": identifier})
+		return "check_doku_payment", args
 	case strings.Contains(q, "subscription") && strings.Contains(q, "usage"),
 		strings.Contains(q, "usage") && (strings.Contains(q, "plan") || strings.Contains(q, "limit")):
 		return "get_subscription_usage", empty
@@ -139,7 +147,7 @@ func matchHeuristicTool(q string) (string, json.RawMessage) {
 	case strings.Contains(q, "order"), strings.Contains(q, "pesanan"):
 		args := empty
 		if strings.Contains(q, "pending") || strings.Contains(q, "unpaid") || strings.Contains(q, "belum bayar") {
-			args = json.RawMessage(`{"payment_status":"pending","limit":25}`)
+			args = json.RawMessage(`{"payment_status":"unpaid","limit":25}`)
 		}
 		return "list_orders", args
 	case strings.Contains(q, "store"), strings.Contains(q, "toko"):
@@ -172,7 +180,7 @@ func (s *Service) chatWithAI(ctx context.Context, cc CallContext, msgs []ChatMes
 			"function": map[string]any{
 				"name":        t.Name,
 				"description": t.Description,
-				"parameters":   params,
+				"parameters":  params,
 			},
 		})
 	}

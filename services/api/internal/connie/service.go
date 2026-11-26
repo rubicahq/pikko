@@ -38,6 +38,7 @@ type Service struct {
 	Notifications *notifications.Service
 	Team          *team.Service
 	Ent           *entitlements.Service
+	DOKU          DOKUInquirer
 
 	tools []ToolMeta
 }
@@ -131,6 +132,8 @@ func mapToolErr(err error) (code, msg string) {
 		return "invalid_arguments", "Invalid tool arguments."
 	case errors.Is(err, commerce.ErrConflict):
 		return "conflict", err.Error()
+	case errors.Is(err, ErrProviderUnavailable), errors.Is(err, context.DeadlineExceeded):
+		return "provider_unavailable", "DOKU inquiry could not be verified. The latest Pikko status is still authoritative."
 	default:
 		return "tool_error", fmt.Sprintf("Tool failed: %v", err)
 	}

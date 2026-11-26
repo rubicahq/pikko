@@ -3,6 +3,9 @@ package connie
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -11,7 +14,7 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 )
 
-// buildTools registers the top-30 primary store-ops MCP tools.
+// buildTools registers the primary store-ops MCP tools.
 func (s *Service) buildTools() []ToolMeta {
 	return []ToolMeta{
 		s.tool("get_store", "Get the current store profile (name, slug, selling model, publication status).",
@@ -86,6 +89,12 @@ func (s *Service) buildTools() []ToolMeta {
 				"properties":           map[string]any{"order_id": propString("Order UUID")},
 				"additionalProperties": false,
 			}), rbac.PermOrdersPayments, s.listOrderPayments),
+		s.tool("check_doku_payment", "Read-only payment inquiry for one Pikko order number or UUID via its stored DOKU invoice.",
+			schema(map[string]any{
+				"type": "object", "required": []string{"order_identifier"},
+				"properties":           map[string]any{"order_identifier": propString("Pikko order number or UUID; never a DOKU invoice")},
+				"additionalProperties": false,
+			}), rbac.PermOrdersPayments, s.checkDOKUPayment),
 		s.tool("list_customers", "List customers. Optional name/phone/email query.",
 			schema(map[string]any{
 				"type": "object",
@@ -193,6 +202,84 @@ func (s *Service) buildTools() []ToolMeta {
 		s.tool("list_vendors", "List purchasing vendors linked to the store.",
 			emptyObjectSchema(), rbac.PermPurchasingRead, s.listVendors),
 	}
+}
+
+type dokuPaymentCheck struct {
+	OrderID      string `json:"order_id"`
+	OrderNumber  string `json:"order_number"`
+	OrderURL     string `json:"order_url"`
+	PikkoStatus  string `json:"pikko_status"`
+	DOKUStatus   string `json:"doku_status,omitempty"`
+	CheckedAt    string `json:"checked_at"`
+	Verification string `json:"verification"`
+	Explanation  string `json:"explanation"`
+	InvoiceMatch bool   `json:"invoice_match"`
+	AmountMatch  bool   `json:"amount_match"`
+}
+
+func (s *Service) checkDOKUPayment(ctx context.Context, cc CallContext, args json.RawMessage) (any, error) {
+	in, err := decodeArgs[struct {
+		OrderIdentifier string `json:"order_identifier"`
+	}](args)
+	if err != nil {
+		return nil, err
+	}
+	order, err := s.Commerce.GetOrderByIdentifier(ctx, cc.StoreID, in.OrderIdentifier)
+	if err != nil {
+		return nil, err
+	}
+	out := dokuPaymentCheck{OrderID: order.ID.String(), OrderNumber: order.OrderNumber, OrderURL: "/stores/" + cc.StoreID.String() + "/orders/" + order.ID.String(), PikkoStatus: order.PaymentStatus, CheckedAt: time.Now().UTC().Format(time.RFC3339), Verification: "unverified"}
+	attempt, err := s.Commerce.GetLatestPaymentAttempt(ctx, cc.StoreID, order.ID)
+	if errors.Is(err, commerce.ErrNotFound) {
+		out.Explanation = "Order ini belum memiliki payment attempt atau invoice DOKU."
+		return out, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(attempt.Provider, "doku") {
+		out.Explanation = "Pembayaran order ini menggunakan provider lain, bukan DOKU."
+		return out, nil
+	}
+	if attempt.ProviderInvoiceNumber == nil || strings.TrimSpace(*attempt.ProviderInvoiceNumber) == "" {
+		out.Explanation = "Payment attempt DOKU belum memiliki invoice yang dapat diperiksa."
+		return out, nil
+	}
+	credentials, credentialErr := s.Commerce.LoadDOKUCredentials(ctx, cc.StoreID)
+	if credentialErr != nil {
+		out.Explanation = "Credential DOKU Sandbox belum dikonfigurasi untuk toko ini."
+		return out, nil
+	}
+	if s.Cfg == nil {
+		out.Explanation = "Konfigurasi DOKU MCP Sandbox belum tersedia; status DOKU belum terverifikasi."
+		return out, nil
+	}
+	client := s.DOKU
+	if client == nil {
+		client = &DOKUMCPClient{Endpoint: s.Cfg.DOKUMCPEndpoint, ClientID: credentials.MCPClientID, APIKey: credentials.MCPAPIKey, Timeout: s.Cfg.DOKUMCPTimeout}
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, s.Cfg.DOKUMCPTimeout)
+	defer cancel()
+	inq, err := client.GetTransactionByInvoiceNumber(checkCtx, *attempt.ProviderInvoiceNumber)
+	if err != nil {
+		out.Explanation = "DOKU tidak dapat diverifikasi saat ini; gunakan status terakhir di Pikko."
+		return out, nil
+	}
+	out.DOKUStatus = inq.Status
+	out.InvoiceMatch = strings.EqualFold(strings.TrimSpace(inq.InvoiceNumber), strings.TrimSpace(*attempt.ProviderInvoiceNumber))
+	out.AmountMatch = inq.AmountIDR == attempt.AmountIDR && attempt.AmountIDR == order.TotalIDR
+	paid := strings.EqualFold(inq.Status, "success") || strings.EqualFold(inq.Status, "paid")
+	if out.InvoiceMatch && out.AmountMatch && paid {
+		out.Verification = "confirmed"
+		if order.PaymentStatus == commerce.PaymentPaid {
+			out.Explanation = "Pembayaran terkonfirmasi di DOKU dan Pikko."
+		} else {
+			out.Explanation = "DOKU mengonfirmasi pembayaran, tetapi Pikko masih " + order.PaymentStatus + ". Webhook/rekonsiliasi tetap menangani pembaruan status."
+		}
+	} else {
+		out.Explanation = "Hasil DOKU belum dapat mengonfirmasi pembayaran karena status, invoice, atau nominal tidak cocok."
+	}
+	return out, nil
 }
 
 func (s *Service) tool(name, desc string, schema json.RawMessage, perm rbac.Permission, h ToolHandler) ToolMeta {
