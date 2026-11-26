@@ -321,7 +321,7 @@ func (s *Service) PreviewCheckout(ctx context.Context, slug string, items []Cart
 		TotalIDR: eval.TotalIDR, RequiresApproval: eval.RequiresApproval,
 		MinimumOK: eval.MinimumOK, MinimumMessage: eval.MinimumMessage, AppliedRules: eval.Applied,
 		FulfillmentMethod: fulfillmentMethod,
-		CheckoutEnabled: st.CheckoutEnabled, PaymentMethods: methods, Fulfillment: fulfillment,
+		CheckoutEnabled:   st.CheckoutEnabled, PaymentMethods: methods, Fulfillment: fulfillment,
 	}, nil
 }
 
@@ -330,451 +330,4 @@ type SubmitResult struct {
 	Payment       *Payment `json:"payment"`
 	TrackingToken string   `json:"tracking_token"`
 	TrackingURL   string   `json:"tracking_url"`
-}
-
-func (s *Service) SubmitCheckout(ctx context.Context, slug string, in CheckoutSubmitInput) (*SubmitResult, error) {
-	st, err := s.loadPublicStore(ctx, slug)
-	if err != nil {
-		return nil, err
-	}
-	if !st.CheckoutEnabled {
-		return nil, ErrCheckoutDisabled
-	}
-	if strings.TrimSpace(in.IdempotencyKey) == "" {
-		return nil, ErrInvalidInput
-	}
-	// Idempotent replay
-	var existingID uuid.UUID
-	err = s.DB.QueryRow(ctx, `SELECT id FROM orders WHERE idempotency_key=$1`, in.IdempotencyKey).Scan(&existingID)
-	if err == nil {
-		o, err := s.GetOrder(ctx, st.ID, existingID)
-		if err != nil {
-			return nil, err
-		}
-		pay, _ := s.GetLatestPayment(ctx, st.ID, existingID)
-		return &SubmitResult{Order: o, Payment: pay}, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return nil, err
-	}
-
-	name := strings.TrimSpace(in.CustomerName)
-	_, emailAddr, emailOK := validate.NormalizeEmail(in.CustomerEmail)
-	if len(name) < 2 || !emailOK {
-		return nil, ErrInvalidInput
-	}
-	if in.FulfillmentMethod == FulfillmentShipping || in.FulfillmentMethod == FulfillmentFreeShipping {
-		if in.ShippingAddress == nil || strings.TrimSpace(in.ShippingAddress.Line1) == "" ||
-			strings.TrimSpace(in.ShippingAddress.City) == "" || strings.TrimSpace(in.ShippingAddress.RecipientName) == "" {
-			return nil, ErrInvalidInput
-		}
-		if in.ShippingAddress.Country == "" {
-			in.ShippingAddress.Country = "ID"
-		}
-	}
-
-	pm, err := s.getPaymentMethod(ctx, st.ID, in.PaymentMethodID)
-	if err != nil || !pm.IsEnabled {
-		return nil, ErrInvalidInput
-	}
-
-	sellingModel, batchID, err := resolveCartGroup(in.Items)
-	if err != nil {
-		return nil, err
-	}
-	lines, subtotal, err := s.priceLines(ctx, st.ID, in.Items)
-	if err != nil {
-		return nil, err
-	}
-	shipFee, err := s.resolveShipping(ctx, st.ID, in.FulfillmentMethod)
-	if err != nil {
-		return nil, err
-	}
-	itemQty := 0
-	for _, l := range lines {
-		itemQty += l.Quantity
-	}
-	eval, evalErr := s.EvaluateCheckoutRules(ctx, st.ID, sellingModel, batchID, subtotal, itemQty, shipFee)
-	if evalErr != nil {
-		return nil, evalErr
-	}
-	total := eval.TotalIDR
-	if in.ClientExpectedTotalIDR != nil && *in.ClientExpectedTotalIDR != total {
-		return nil, ErrPriceChanged
-	}
-
-	var batch *PreorderBatch
-	var batchName, batchSlug *string
-	var etaStart, etaEnd *time.Time
-	var campaignID *uuid.UUID
-	if batchID != nil {
-		batch, err = s.assertBatchOpenForCheckout(ctx, st.ID, *batchID)
-		if err != nil {
-			return nil, err
-		}
-		batchName = &batch.Name
-		batchSlug = &batch.Slug
-		etaStart = batch.ETAStart
-		etaEnd = batch.ETAEnd
-		var cid uuid.UUID
-		cerr := s.DB.QueryRow(ctx, `
-			SELECT campaign_id FROM preorder_batches
-			WHERE id=$1 AND store_id=$2 AND campaign_id IS NOT NULL
-		`, *batchID, st.ID).Scan(&cid)
-		if cerr == nil {
-			campaignID = &cid
-		}
-	}
-
-	tx, err := s.DB.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback(ctx)
-
-	customerID, err := upsertCustomerTx(ctx, tx, st.ID, name, emailAddr, in.CustomerPhone)
-	if err != nil {
-		return nil, err
-	}
-
-	orderNumber, err := nextOrderNumberTx(ctx, tx, st.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	deadline := s.now().Add(time.Duration(pm.PaymentDeadlineHours) * time.Hour)
-	orderStatus := OrderConfirmed
-	var confirmedAt *time.Time
-	var approvalDeadline *time.Time
-	now := s.now()
-	if eval.RequiresApproval {
-		orderStatus = OrderPendingConfirmation
-		ad := now.Add(48 * time.Hour)
-		approvalDeadline = &ad
-	} else {
-		confirmedAt = &now
-	}
-	initialFulfillment := FulfillmentUnfulfilled
-	if sellingModel == "preorder" {
-		initialFulfillment = FulfillmentPurchasing
-	}
-
-	var shipRecipient, shipPhone, shipLine1, shipLine2, shipCity, shipProvince, shipPostal, shipCountry *string
-	if in.ShippingAddress != nil {
-		shipRecipient = ptrStr(in.ShippingAddress.RecipientName)
-		shipPhone = in.ShippingAddress.Phone
-		shipLine1 = ptrStr(in.ShippingAddress.Line1)
-		shipLine2 = in.ShippingAddress.Line2
-		shipCity = ptrStr(in.ShippingAddress.City)
-		shipProvince = in.ShippingAddress.Province
-		shipPostal = in.ShippingAddress.PostalCode
-		shipCountry = ptrStr(in.ShippingAddress.Country)
-	}
-
-	var orderID uuid.UUID
-	err = tx.QueryRow(ctx, `
-		INSERT INTO orders (
-			store_id, customer_id, order_number, idempotency_key, selling_model,
-			order_status, payment_status, fulfillment_status, currency,
-			subtotal_idr, shipping_fee_idr, handling_fee_idr, total_idr,
-			original_total_idr, payable_idr,
-			fulfillment_method, customer_name, customer_email, customer_phone,
-			shipping_recipient, shipping_phone, shipping_line1, shipping_line2,
-			shipping_city, shipping_province, shipping_postal_code, shipping_country,
-			customer_notes, payment_deadline_at, confirmed_at,
-			preorder_batch_id, batch_name_snapshot, batch_slug_snapshot,
-			batch_eta_start_snapshot, batch_eta_end_snapshot,
-			requires_approval, approval_deadline_at,
-			source, campaign_id
-		) VALUES (
-			$1,$2,$3,$4,$5,
-			$6,'unpaid',$7,$8,
-			$9,$10,$11,$12,
-			$12,$12,
-			$13,$14,$15,$16,
-			$17,$18,$19,$20,
-			$21,$22,$23,$24,
-			$25,$26,$27,
-			$28,$29,$30,
-			$31,$32,
-			$33,$34,
-			'customer',$35
-		)
-		RETURNING id
-	`, st.ID, customerID, orderNumber, in.IdempotencyKey, sellingModel,
-		orderStatus, initialFulfillment, st.Currency,
-		subtotal, shipFee, eval.HandlingFeeIDR, total,
-		in.FulfillmentMethod, name, emailAddr, in.CustomerPhone,
-		shipRecipient, shipPhone, shipLine1, shipLine2,
-		shipCity, shipProvince, shipPostal, shipCountry,
-		in.CustomerNotes, deadline, confirmedAt,
-		batchID, batchName, batchSlug,
-		etaStart, etaEnd,
-		eval.RequiresApproval, approvalDeadline,
-		campaignID,
-	).Scan(&orderID)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tx.Exec(ctx, `
-		INSERT INTO order_status_history (store_id, order_id, dimension, from_status, to_status, reason)
-		VALUES ($1,$2,'order',NULL,$3,'checkout'),
-		       ($1,$2,'payment',NULL,'unpaid','checkout'),
-		       ($1,$2,'fulfillment',NULL,$4,'checkout')
-	`, st.ID, orderID, orderStatus, initialFulfillment)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, applied := range eval.Applied {
-		cfgRaw, _ := json.Marshal(applied.Config)
-		_, err = tx.Exec(ctx, `
-			INSERT INTO order_rule_applications (
-				store_id, order_id, rule_id, rule_version_id, rule_type, scope_type,
-				config_snapshot, result_snapshot
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-		`, st.ID, orderID, applied.RuleID, applied.VersionID, applied.RuleType, applied.ScopeType,
-			cfgRaw, applied.Result)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	for _, line := range lines {
-		var itemID uuid.UUID
-		err = tx.QueryRow(ctx, `
-			INSERT INTO order_items (
-				store_id, order_id, product_id, variant_id, batch_id, product_name, product_slug,
-				sku, variant_label, unit_price_idr, quantity, line_total_idr, batch_price_idr
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-			RETURNING id
-		`, st.ID, orderID, line.ProductID, line.VariantID, line.BatchID, line.ProductName, line.ProductSlug,
-			line.SKU, line.VariantLabel, line.UnitPriceIDR, line.Quantity, line.LineTotalIDR, line.UnitPriceIDR,
-		).Scan(&itemID)
-		if err != nil {
-			return nil, err
-		}
-		if line.InventoryMode == "finite" {
-			var stock int
-			var invMode, availability string
-			err = tx.QueryRow(ctx, `
-				SELECT inventory_mode, availability, COALESCE(stock_quantity,0)
-				FROM products WHERE id=$1 AND store_id=$2 FOR UPDATE
-			`, line.ProductID, st.ID).Scan(&invMode, &availability, &stock)
-			if err != nil {
-				return nil, err
-			}
-			if line.VariantID != nil {
-				_ = tx.QueryRow(ctx, `
-					SELECT COALESCE(stock_quantity, $2) FROM product_variants
-					WHERE id=$1 FOR UPDATE
-				`, *line.VariantID, stock).Scan(&stock)
-			}
-			var reserved int
-			err = tx.QueryRow(ctx, `
-				SELECT COALESCE(SUM(quantity),0) FROM inventory_reservations
-				WHERE store_id=$1 AND product_id=$2 AND status='active' AND batch_id IS NULL
-				  AND (($3::uuid IS NULL AND variant_id IS NULL) OR variant_id=$3)
-			`, st.ID, line.ProductID, line.VariantID).Scan(&reserved)
-			if err != nil {
-				return nil, err
-			}
-			if stock-reserved < line.Quantity {
-				return nil, ErrInsufficientStock
-			}
-			_, err = tx.Exec(ctx, `
-				INSERT INTO inventory_reservations (
-					store_id, order_id, order_item_id, product_id, variant_id, quantity, status
-				) VALUES ($1,$2,$3,$4,$5,$6,'active')
-			`, st.ID, orderID, itemID, line.ProductID, line.VariantID, line.Quantity)
-			if err != nil {
-				return nil, err
-			}
-		} else if line.InventoryMode == "quota" && line.BatchID != nil {
-			// Lock batch product and re-check quota under transaction
-			var limit *int
-			err = tx.QueryRow(ctx, `
-				SELECT quantity_limit FROM preorder_batch_products
-				WHERE store_id=$1 AND batch_id=$2 AND product_id=$3 FOR UPDATE
-			`, st.ID, *line.BatchID, line.ProductID).Scan(&limit)
-			if err != nil {
-				return nil, err
-			}
-			if limit != nil {
-				var reserved int
-				err = tx.QueryRow(ctx, `
-					SELECT COALESCE(SUM(quantity),0) FROM inventory_reservations
-					WHERE store_id=$1 AND batch_id=$2 AND product_id=$3 AND status='active'
-					  AND (($4::uuid IS NULL AND variant_id IS NULL) OR variant_id=$4)
-				`, st.ID, *line.BatchID, line.ProductID, line.VariantID).Scan(&reserved)
-				if err != nil {
-					return nil, err
-				}
-				if reserved+line.Quantity > *limit {
-					return nil, ErrQuotaExceeded
-				}
-			}
-			_, err = tx.Exec(ctx, `
-				INSERT INTO inventory_reservations (
-					store_id, order_id, order_item_id, product_id, variant_id, batch_id, quantity, status
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,'active')
-			`, st.ID, orderID, itemID, line.ProductID, line.VariantID, line.BatchID, line.Quantity)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	var paymentID uuid.UUID
-	err = tx.QueryRow(ctx, `
-		INSERT INTO payments (
-			store_id, order_id, payment_method_id, method_type, amount_idr, status,
-			bank_name_snapshot, account_holder_snapshot, account_number_snapshot, instructions_snapshot
-		) VALUES ($1,$2,$3,'bank_transfer',$4,'pending',$5,$6,$7,$8)
-		RETURNING id
-	`, st.ID, orderID, pm.ID, total, pm.BankName, pm.AccountHolder, pm.AccountNumber, pm.Instructions,
-	).Scan(&paymentID)
-	if err != nil {
-		return nil, err
-	}
-
-	rawToken, tokenHash, err := auth.NewToken()
-	if err != nil {
-		return nil, err
-	}
-	_, err = tx.Exec(ctx, `
-		INSERT INTO order_tracking_tokens (store_id, order_id, token_hash)
-		VALUES ($1,$2,$3)
-	`, st.ID, orderID, tokenHash)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-
-	if s.Outbox != nil {
-		_ = s.Outbox.Write(ctx, &st.ID, "order.order_created", map[string]any{
-			"order_id": orderID.String(), "order_number": orderNumber, "total_idr": total,
-		}, "order_created:"+orderID.String())
-	}
-
-	order, err := s.GetOrder(ctx, st.ID, orderID)
-	if err != nil {
-		return nil, err
-	}
-	order.TrackingToken = rawToken
-	if s.URLs != nil {
-		order.TrackingURL = s.URLs.Tracking(rawToken)
-	}
-	pay, _ := s.GetLatestPayment(ctx, st.ID, orderID)
-
-	s.enqueueOrderEmails(ctx, st, order, pay, rawToken)
-
-	return &SubmitResult{
-		Order: order, Payment: pay, TrackingToken: rawToken, TrackingURL: order.TrackingURL,
-	}, nil
-}
-
-func upsertCustomerTx(ctx context.Context, tx pgx.Tx, storeID uuid.UUID, name, emailAddr string, phone *string) (uuid.UUID, error) {
-	secret, err := validate.NewPortalAccessSecret()
-	if err != nil {
-		return uuid.Nil, err
-	}
-	var normalizedPhone *string
-	if phone != nil {
-		if p, ok := validate.NormalizeIndonesianPhone(*phone); ok {
-			normalizedPhone = &p
-		} else {
-			// Keep raw digits-ish phone when not a valid ID mobile (legacy guests).
-			trimmed := strings.TrimSpace(*phone)
-			if trimmed != "" {
-				normalizedPhone = &trimmed
-			}
-		}
-	}
-	var id uuid.UUID
-	err = tx.QueryRow(ctx, `
-		INSERT INTO customers (store_id, name, email, phone, first_order_at, last_order_at, total_orders, portal_access_secret)
-		VALUES ($1,$2,$3,$4,now(),now(),1,$5)
-		ON CONFLICT (store_id, email) DO UPDATE SET
-			name=EXCLUDED.name,
-			phone=COALESCE(EXCLUDED.phone, customers.phone),
-			last_order_at=now(),
-			total_orders=customers.total_orders+1,
-			updated_at=now()
-		RETURNING id
-	`, storeID, name, emailAddr, normalizedPhone, secret).Scan(&id)
-	return id, err
-}
-
-func nextOrderNumberTx(ctx context.Context, tx pgx.Tx, storeID uuid.UUID) (string, error) {
-	var n int64
-	err := tx.QueryRow(ctx, `
-		INSERT INTO store_order_counters (store_id, last_number) VALUES ($1,1)
-		ON CONFLICT (store_id) DO UPDATE SET last_number=store_order_counters.last_number+1
-		RETURNING last_number
-	`, storeID).Scan(&n)
-	if err != nil {
-		return "", err
-	}
-	day := time.Now().UTC().Format("20060102")
-	return fmt.Sprintf("PK-%s-%04d", day, n), nil
-}
-
-func (s *Service) enqueueOrderEmails(ctx context.Context, st *publicStoreMeta, order *Order, pay *Payment, trackingToken string) {
-	if s.Email == nil || s.Cfg == nil {
-		return
-	}
-	trackURL := ""
-	if s.URLs != nil {
-		trackURL = s.URLs.Tracking(trackingToken)
-	}
-	from := s.Cfg.EmailNotificationFrom
-	fromName := st.Name
-	if fromName == "" {
-		fromName = s.Cfg.EmailFromName
-	}
-
-	// Skip customer confirmation for synthetic phone-only CRM snapshots.
-	if order.CustomerEmail != "" && !strings.HasSuffix(order.CustomerEmail, "@customers.local") {
-		custSubject, custHTML, custText := email.OrderConfirmationContent(
-			st.Name, order.OrderNumber, money.FormatIDR(order.TotalIDR), trackURL,
-		)
-		_ = s.Email.Enqueue(ctx, email.Message{
-			TemplateKey: "order_confirmation_customer", To: order.CustomerEmail,
-			From: from, FromName: fromName, ReplyTo: s.Cfg.EmailReplyTo,
-			Subject: custSubject, HTML: custHTML, Text: custText,
-			IdempotencyKey: "email:order_confirm:" + order.ID.String(),
-		})
-	}
-
-	if st.OwnerEmail != "" {
-		dashURL := ""
-		if s.URLs != nil {
-			dashURL = fmt.Sprintf("%s/stores/%s/orders/%s", strings.TrimRight(s.Cfg.DashboardURL, "/"), st.ID, order.ID)
-		}
-		mSubject, mHTML, mText := email.NewOrderMerchantContent(
-			st.Name, order.OrderNumber, order.CustomerName, money.FormatIDR(order.TotalIDR), dashURL,
-		)
-		key := "email:order_merchant:" + order.ID.String()
-		tmpl := "order_new_merchant"
-		if order.RequiresApproval || order.OrderStatus == OrderPendingConfirmation {
-			mSubject, mHTML, mText = email.OrderNeedsConfirmationContent(
-				st.Name, order.OrderNumber, order.CustomerName, money.FormatIDR(order.TotalIDR), dashURL,
-			)
-			key = "email:order_confirm_needed:" + order.ID.String()
-			tmpl = "order_needs_confirmation"
-		}
-	_ = s.Email.Enqueue(ctx, email.Message{
-		TemplateKey: tmpl, To: st.OwnerEmail,
-		From: from, FromName: s.Cfg.EmailFromName, ReplyTo: s.Cfg.EmailReplyTo,
-		Subject: mSubject, HTML: mHTML, Text: mText,
-		IdempotencyKey: key,
-	})
-	}
-	s.notifyNewOrderInApp(ctx, st.ID, order)
-	_ = pay
-}
+	CheckoutURL   ~5ãO-¢G§²ÚîÆ­yÝŒ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰¡•­±¥ÍÐˆè±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑMÑ½É•™É½¹ÑMÑ…ÑÕÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%‘É…™Ð°•ÉÈ€èôÌ¹MÑ½É•™É½¹Ð¹•Ð¡Ñà°Œ¹MÑ½É•%°€‰‘É…™Ðˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%ÁÕ‰±¥Í¡•°•ÉÈ€èôÌ¹MÑ½É•™É½¹Ð¹•Ð¡Ñà°Œ¹MÑ½É•%°€‰ÁÕ‰±¥Í¡•ˆ¤(%½ÕÐ€èôµ…ÁmÍÑÉ¥¹u…¹åì‰‘É…™Ðˆè‘É…™Ð°€‰¡…Í}ÁÕ‰±¥Í¡•ˆè•ÉÈ€ôô¹¥±ô(%¥˜•ÉÈ€ôô¹¥°ì($%½ÕÑl‰ÁÕ‰±¥Í¡•‰t€ôÁÕ‰±¥Í¡•(%ô(%É•ÑÕÉ¸½ÕÐ°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑAÉ½‘ÕÑÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%EÕ•Éä€ÍÑÉ¥¹œ©Í½¸è‰ÅÕ•Éä‰€($%MÑ…ÑÕÌÍÑÉ¥¹œ©Í½¸è‰ÍÑ…ÑÕÌ‰€($%1¥µ¥Ð€¥¹Ð€€€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð¥¹Ð€€€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹…Ñ…±½œ¹1¥ÍÑAÉ½‘ÕÑÌ¡Ñà°Œ¹MÑ½É•%°…Ñ…±½œ¹AÉ½‘ÕÑ1¥ÍÑ¥±Ñ•Éì($%EÕ•Éäè€¥¸¹EÕ•Éä°($%MÑ…ÑÕÌè¥¸¹MÑ…ÑÕÌ°($%1¥µ¥Ðè€±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÔ°€ÄÀÀ¤°($%=™™Í•Ðè¥¸¹=™™Í•Ð°(%ô°™…±Í”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÁÉ½‘ÕÑÌˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑAÉ½‘ÕÐ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%AÉ½‘ÕÑ%ÍÑÉ¥¹œ©Í½¸è‰ÁÉ½‘ÕÑ}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹AÉ½‘ÕÑ%°€‰ÁÉ½‘ÕÑ}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%À°•ÉÈ€èôÌ¹…Ñ…±½œ¹•ÑAÉ½‘ÕÐ¡Ñà°Œ¹MÑ½É•%°¥°™…±Í”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÁÉ½‘ÕÐˆèÁô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑ…Ñ…±½Ì¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%±¥ÍÐ°•ÉÈ€èôÌ¹…Ñ…±½Ì¹1¥ÍÐ¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰…Ñ…±½Ìˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ…Ñ…±½œ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%…Ñ…±½%ÍÑÉ¥¹œ©Í½¸è‰…Ñ…±½}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹…Ñ…±½%°€‰…Ñ…±½}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Œ°•ÉÈ€èôÌ¹…Ñ…±½Ì¹•Ð¡Ñà°Œ¹MÑ½É•%°¥¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰…Ñ…±½œˆèô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑ…µÁ…¥¹Ì¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%QåÁ”ÍÑÉ¥¹œ©Í½¸è‰ÑåÁ”‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°•ÉÈ€èôÌ¹…µÁ…¥¹Ì¹1¥ÍÐ¡Ñà°Œ¹MÑ½É•%°¥¸¹QåÁ”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰…µÁ…¥¹Ìˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ…µÁ…¥¸¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%…µÁ…¥¹%ÍÑÉ¥¹œ©Í½¸è‰…µÁ…¥¹}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹…µÁ…¥¹%°€‰…µÁ…¥¹}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Œ°•ÉÈ€èôÌ¹…µÁ…¥¹Ì¹•Ð¡Ñà°Œ¹MÑ½É•%°¥°ÑÉÕ”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰…µÁ…¥¸ˆèô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑ=É‘•ÉÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%EÕ•Éä€€€€€€€€€€€€ÍÑÉ¥¹œ©Í½¸è‰ÅÕ•Éä‰€($%=É‘•ÉMÑ…ÑÕÌ€€€€€€ÍÑÉ¥¹œ©Í½¸è‰½É‘•É}ÍÑ…ÑÕÌ‰€($%A…åµ•¹ÑMÑ…ÑÕÌ€€€€ÍÑÉ¥¹œ©Í½¸è‰Á…åµ•¹Ñ}ÍÑ…ÑÕÌ‰€($%Õ±™¥±±µ•¹ÑMÑ…ÑÕÌÍÑÉ¥¹œ©Í½¸è‰™Õ±™¥±±µ•¹Ñ}ÍÑ…ÑÕÌ‰€($%1¥µ¥Ð€€€€€€€€€€€€¥¹Ð€€€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð€€€€€€€€€€€¥¹Ð€€€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑ=É‘•ÉÌ¡Ñà°Œ¹MÑ½É•%°½µµ•É”¹1¥ÍÑ=É‘•ÉÍ¥±Ñ•Éì($%EÕ•Éäè€€€€€€€€€€€€¥¸¹EÕ•Éä°($%=É‘•ÉMÑ…ÑÕÌè€€€€€€¥¸¹=É‘•ÉMÑ…ÑÕÌ°($%A…åµ•¹ÑMÑ…ÑÕÌè€€€€¥¸¹A…åµ•¹ÑMÑ…ÑÕÌ°($%Õ±™¥±±µ•¹ÑMÑ…ÑÕÌè¥¸¹Õ±™¥±±µ•¹ÑMÑ…ÑÕÌ°($%1¥µ¥Ðè€€€€€€€€€€€€±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÔ°€ÄÀÀ¤°($%=™™Í•Ðè€€€€€€€€€€€¥¸¹=™™Í•Ð°(%ô¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰½É‘•ÉÌˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ=É‘•È¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%=É‘•É%ÍÑÉ¥¹œ©Í½¸è‰½É‘•É}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹=É‘•É%°€‰½É‘•É}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¼°•ÉÈ€èôÌ¹½µµ•É”¹•Ñ=É‘•È¡Ñà°Œ¹MÑ½É•%°¥¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰½É‘•Èˆè½ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑ=É‘•ÉA…åµ•¹ÑÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%=É‘•É%ÍÑÉ¥¹œ©Í½¸è‰½É‘•É}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹=É‘•É%°€‰½É‘•É}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑ=É‘•ÉA…åµ•¹ÑÌ¡Ñà°Œ¹MÑ½É•%°¥¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰Á…åµ•¹ÑÌˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑÕÍÑ½µ•ÉÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%EÕ•Éä€ÍÑÉ¥¹œ©Í½¸è‰ÅÕ•Éä‰€($%1¥µ¥Ð€¥¹Ð€€€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð¥¹Ð€€€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑÕÍÑ½µ•ÉÌ¡Ñà°Œ¹MÑ½É•%°¥¸¹EÕ•Éä°±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÔ°€ÄÀÀ¤°¥¸¹=™™Í•Ð¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÕÍÑ½µ•ÉÌˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑÕÍÑ½µ•È¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%ÕÍÑ½µ•É%ÍÑÉ¥¹œ©Í½¸è‰ÕÍÑ½µ•É}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹ÕÍÑ½µ•É%°€‰ÕÍÑ½µ•É}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Œ°•ÉÈ€èôÌ¹½µµ•É”¹•ÑÕÍÑ½µ•È¡Ñà°Œ¹MÑ½É•%°¥¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÕÍÑ½µ•Èˆèô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤É•…Ñ•ÕÍÑ½µ•È¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍm½µµ•É”¹É•…Ñ•ÕÍÑ½µ•É%¹ÁÕÑt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•Ì°•ÉÈ€èôÌ¹½µµ•É”¹É•…Ñ•ÕÍÑ½µ•È¡Ñà°Œ¹MÑ½É•%°¥¸¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸É•Ì°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑAÉ•½É‘•ÉÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%±¥ÍÐ°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑ	…Ñ¡•Ì¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÁÉ•½É‘•ÉÌˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑAÉ•½É‘•È¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%	…Ñ¡%ÍÑÉ¥¹œ©Í½¸è‰‰…Ñ¡}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹	…Ñ¡%°€‰‰…Ñ¡}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%ˆ°•ÉÈ€èôÌ¹½µµ•É”¹•Ñ	…Ñ ¡Ñà°Œ¹MÑ½É•%°¥°ÑÉÕ”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰ÁÉ•½É‘•Èˆè‰ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑAÕÉ¡…Í¥¹MÕµµ…Éä¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%	…Ñ¡%€€€ÍÑÉ¥¹œ©Í½¸è‰‰…Ñ¡}¥‰€($%…µÁ…¥¹%ÍÑÉ¥¹œ©Í½¸è‰…µÁ…¥¹}¥‰€($%É½ÕÁ	ä€€€ÍÑÉ¥¹œ©Í½¸è‰É½ÕÁ}‰ä‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%˜€èô½µµ•É”¹AÕÉ¡…Í¥¹¥±Ñ•ÉíÉ½ÕÁ	äè¥¸¹É½ÕÁ	åô(%¥˜¥¸¹	…Ñ¡%€„ô€ˆˆì($%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹	…Ñ¡%°€‰‰…Ñ¡}¥ˆ¤($%¥˜•ÉÈ€„ô¹¥°ì($$%É•ÑÕÉ¸¹¥°°•ÉÈ($%ô($%˜¹	…Ñ¡%€ô€™¥(%ô(%¥˜¥¸¹…µÁ…¥¹%€„ô€ˆˆì($%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹…µÁ…¥¹%°€‰…µÁ…¥¹}¥ˆ¤($%¥˜•ÉÈ€„ô¹¥°ì($$%É•ÑÕÉ¸¹¥°°•ÉÈ($%ô($%˜¹…µÁ…¥¹%€ô€™¥(%ô(%±¥ÍÐ°•ÉÈ€èôÌ¹½µµ•É”¹É•…Ñ•AÕÉ¡…Í¥¹œ¡Ñà°Œ¹MÑ½É•%°˜¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰±¥¹•Ìˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑA…­¥¹EÕ•Õ”¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%É½ÕÁ	äÍÑÉ¥¹œ©Í½¸è‰É½ÕÁ}‰ä‰€($%MÑ…ÑÕÌ€ÍÑÉ¥¹œ©Í½¸è‰ÍÑ…ÑÕÌ‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%½ÕÐ°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑA…­¥¹EÕ•Õ”¡Ñà°Œ¹MÑ½É•%°¥¸¹É½ÕÁ	ä°¥¸¹MÑ…ÑÕÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸½ÕÐ°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑM¡¥Áµ•¹ÑÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%=É‘•É%ÍÑÉ¥¹œ©Í½¸è‰½É‘•É}¥‰€($%1¥µ¥Ð€€¥¹Ð€€€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð€¥¹Ð€€€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Ù…È½É‘•É%€©ÕÕ¥¹UU%(%¥˜¥¸¹=É‘•É%€„ô€ˆˆì($%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹=É‘•É%°€‰½É‘•É}¥ˆ¤($%¥˜•ÉÈ€„ô¹¥°ì($$%É•ÑÕÉ¸¹¥°°•ÉÈ($%ô($%½É‘•É%€ô€™¥(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑM¡¥Áµ•¹ÑÌ¡Ñà°Œ¹MÑ½É•%°½É‘•É%°±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÔ°€ÄÀÀ¤°¥¸¹=™™Í•Ð¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰Í¡¥Áµ•¹ÑÌˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ¥¹…¹•]½É­ÍÁ…”¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%M•ÑÑ±•µ•¹ÑMÑ…ÑÕÌÍÑÉ¥¹œ©Í½¸è‰Í•ÑÑ±•µ•¹Ñ}ÍÑ…ÑÕÌ‰€($%1¥µ¥Ð€€€€€€€€€€€¥¹Ð€€€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð€€€€€€€€€€¥¹Ð€€€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑ¥¹…¹•]½É­ÍÁ…”¡Ñà°Œ¹MÑ½É•%°¥¸¹M•ÑÑ±•µ•¹ÑMÑ…ÑÕÌ°±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÔ°€ÄÀÀ¤°¥¸¹=™™Í•Ð¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰½É‘•ÉÌˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ=É‘•É¥¹…¹”¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%=É‘•É%ÍÑÉ¥¹œ©Í½¸è‰½É‘•É}¥‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%¥°•ÉÈ€èôÁ…ÉÍ•UU%Éœ¡¥¸¹=É‘•É%°€‰½É‘•É}¥ˆ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%ÍÕ´°•ÉÈ€èôÌ¹½µµ•É”¹•Ñ=É‘•É¥¹…¹”¡Ñà°Œ¹MÑ½É•%°¥¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰™¥¹…¹”ˆèÍÕµô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑMÕ‰ÍÉ¥ÁÑ¥½¸¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%Í¹…À°•ÉÈ€èôÌ¹¹Ð¹M¹…ÁÍ¡½Ð¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸Í¹…À°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑMÕ‰ÍÉ¥ÁÑ¥½¹UÍ…”¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%Í¹…À°•ÉÈ€èôÌ¹¹Ð¹M¹…ÁÍ¡½Ð¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Á•É¥½€èô€ˆˆ(%¥˜±•¸¡Í¹…À¹UÍ…”¤€ø€Àì($%Á•É¥½€ôÍ¹…À¹UÍ…•lÁt¹A•É¥½‘e4(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì($$‰ÕÍ…”ˆè€Í¹…À¹UÍ…”°($$‰±¥µ¥ÑÌˆèÍ¹…À¹1¥µ¥ÑÌ°($$‰Á•É¥½ˆèÁ•É¥½°(%ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•Ñ¹…±åÑ¥Í=Ù•ÉÙ¥•Ü¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%É½´ÍÑÉ¥¹œ©Í½¸è‰™É½´‰€($%Q¼€€ÍÑÉ¥¹œ©Í½¸è‰Ñ¼‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%Ñè€èô€‰Í¥„½)…­…ÉÑ„ˆ(%¥˜Ì¹™œ€„ô¹¥°€˜˜Ì¹™œ¹•™…Õ±ÑQh€„ô€ˆˆì($%Ñè€ôÌ¹™œ¹•™…Õ±ÑQh(%ô(%½Ø°•ÉÈ€èôÌ¹¹…±åÑ¥Ì¹=Ù•ÉÙ¥•Ü¡Ñà°Œ¹MÑ½É•%°¥¸¹É½´°¥¸¹Q¼°Ñè¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰…¹…±åÑ¥Ìˆè½Ùô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑ9½Ñ¥™¥…Ñ¥½¹Ì¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°…ÉÌ©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%¥¸°•ÉÈ€èô‘•½‘•ÉÍmÍÑÉÕÐì($%U¹É•…‘=¹±ä‰½½°©Í½¸è‰Õ¹É•…‘}½¹±ä‰€($%1¥µ¥Ð€€€€€¥¹Ð€©Í½¸è‰±¥µ¥Ð‰€($%=™™Í•Ð€€€€¥¹Ð€©Í½¸è‰½™™Í•Ð‰€(%õt¡…ÉÌ¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%±¥ÍÐ°Ñ½Ñ…°°•ÉÈ€èôÌ¹9½Ñ¥™¥…Ñ¥½¹Ì¹1¥ÍÐ¡Ñà°Œ¹MÑ½É•%°¥¸¹U¹É•…‘=¹±ä°±…µÁ1¥µ¥Ð¡¥¸¹1¥µ¥Ð°€ÈÀ°€ÄÀÀ¤°¥¸¹=™™Í•Ð¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰¹½Ñ¥™¥…Ñ¥½¹Ìˆè±¥ÍÐ°€‰Ñ½Ñ…°ˆèÑ½Ñ…±ô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤•ÑÕ±™¥±±µ•¹ÑM•ÑÑ¥¹Ì¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%™Ì°•ÉÈ€èôÌ¹½µµ•É”¹•ÑÕ±™¥±±µ•¹ÑM•ÑÑ¥¹Ì¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰™Õ±™¥±±µ•¹Ðˆè™Íô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑA…åµ•¹Ñ5•Ñ¡½‘Ì¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%±¥ÍÐ°•ÉÈ€èôÌ¹½µµ•É”¹1¥ÍÑA…åµ•¹Ñ5•Ñ¡½‘Ì¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰Á…åµ•¹Ñ}µ•Ñ¡½‘Ìˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑQ•…µ5•µ‰•ÉÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%±¥ÍÐ°•ÉÈ€èôÌ¹Q•…´¹1¥ÍÑ5•µ‰•ÉÌ¡Ñà°Œ¹MÑ½É•%¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰µ•µ‰•ÉÌˆè±¥ÍÑô°¹¥°)ô()™Õ¹Œ€¡Ì€©M•ÉÙ¥”¤±¥ÍÑY•¹‘½ÉÌ¡Ñà½¹Ñ•áÐ¹½¹Ñ•áÐ°Œ…±±½¹Ñ•áÐ°|©Í½¸¹I…Ý5•ÍÍ…”¤€¡…¹ä°•ÉÉ½È¤ì(%±¥ÍÐ°•ÉÈ€èôÌ¹…Ñ…±½œ¹1¥ÍÑY•¹‘½ÉÌ¡Ñà°Œ¹MÑ½É•%°™…±Í”¤(%¥˜•ÉÈ€„ô¹¥°ì($%É•ÑÕÉ¸¹¥°°•ÉÈ(%ô(%É•ÑÕÉ¸µ…ÁmÍÑÉ¥¹u…¹åì‰Ù•¹‘½ÉÌˆè±¥ÍÑô°¹¥°)ô(

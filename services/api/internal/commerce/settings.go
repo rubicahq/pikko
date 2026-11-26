@@ -10,6 +10,7 @@ import (
 )
 
 type UpsertPaymentMethodInput struct {
+	MethodType           string  `json:"method_type,omitempty"`
 	BankName             string  `json:"bank_name"`
 	AccountHolder        string  `json:"account_holder"`
 	AccountNumber        string  `json:"account_number"`
@@ -69,10 +70,24 @@ func (s *Service) ListEnabledPaymentMethods(ctx context.Context, storeID uuid.UU
 }
 
 func (s *Service) CreatePaymentMethod(ctx context.Context, storeID uuid.UUID, in UpsertPaymentMethodInput) (*PaymentMethod, error) {
+	methodType := strings.TrimSpace(in.MethodType)
+	if methodType == "" {
+		methodType = MethodTypeBankTransfer
+	}
+	if methodType != MethodTypeBankTransfer && methodType != MethodTypeDOKUCheckout {
+		return nil, ErrInvalidInput
+	}
+	if methodType == MethodTypeDOKUCheckout {
+		if _, err := s.LoadDOKUCredentials(ctx, storeID); err != nil {
+			return nil, ErrDOKUUnavailable
+		}
+	}
 	bank := strings.TrimSpace(in.BankName)
 	holder := strings.TrimSpace(in.AccountHolder)
 	number := strings.TrimSpace(in.AccountNumber)
-	if bank == "" || holder == "" || number == "" {
+	if methodType == MethodTypeDOKUCheckout {
+		bank, holder, number = "DOKU Checkout", "DOKU", "DOKU"
+	} else if bank == "" || holder == "" || number == "" {
 		return nil, ErrInvalidInput
 	}
 	hours := 48
@@ -93,12 +108,12 @@ func (s *Service) CreatePaymentMethod(ctx context.Context, storeID uuid.UUID, in
 	var m PaymentMethod
 	err := s.DB.QueryRow(ctx, `
 		INSERT INTO store_payment_methods (
-			store_id, bank_name, account_holder, account_number, instructions,
+			store_id, method_type, bank_name, account_holder, account_number, instructions,
 			payment_deadline_hours, is_enabled, display_order
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING id, store_id, method_type, bank_name, account_holder, account_number, instructions,
 		          payment_deadline_hours, is_enabled, display_order, created_at, updated_at
-	`, storeID, bank, holder, number, in.Instructions, hours, enabled, order).Scan(
+	`, storeID, methodType, bank, holder, number, in.Instructions, hours, enabled, order).Scan(
 		&m.ID, &m.StoreID, &m.MethodType, &m.BankName, &m.AccountHolder, &m.AccountNumber, &m.Instructions,
 		&m.PaymentDeadlineHours, &m.IsEnabled, &m.DisplayOrder, &m.CreatedAt, &m.UpdatedAt,
 	)

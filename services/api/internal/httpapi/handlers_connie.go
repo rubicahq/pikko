@@ -15,9 +15,9 @@ type ConnieHandlers struct {
 func (h *ConnieHandlers) ListTools(w http.ResponseWriter, r *http.Request) {
 	tools := h.Connie.ListTools(MembershipRole(r))
 	writeJSON(w, http.StatusOK, map[string]any{
-		"tools":        tools,
-		"count":        len(tools),
-		"primary_cap":  30,
+		"tools":         tools,
+		"count":         len(tools),
+		"primary_cap":   31,
 		"ai_configured": h.Connie.AIConfigured(),
 	})
 }

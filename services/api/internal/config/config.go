@@ -31,13 +31,13 @@ type Config struct {
 	StorageSecretKey string
 	StorageLocalPath string
 
-	EmailProvider          string
-	EmailMode              string
-	BrevoAPIKey            string
-	EmailFromName          string
-	EmailAccountFrom       string
-	EmailNotificationFrom  string
-	EmailReplyTo           string
+	EmailProvider         string
+	EmailMode             string
+	BrevoAPIKey           string
+	EmailFromName         string
+	EmailAccountFrom      string
+	EmailNotificationFrom string
+	EmailReplyTo          string
 
 	MagicLinkTTL       time.Duration
 	ResendCooldown     time.Duration
@@ -59,6 +59,13 @@ type Config struct {
 	AIAPIKey  string
 	AIBaseURL string
 	AIModel   string
+
+	// DOKU MCP is a read-only sandbox inquiry used by Ask Connie. Checkout
+	// credentials remain separate and must never be reused here.
+	DOKUMCPEndpoint             string
+	DOKUMCPTimeout              time.Duration
+	DOKUCheckoutBaseURL         string
+	DOKUCredentialEncryptionKey string
 
 	ImportMaxPDFBytes int64
 	ImportMaxPages    int
@@ -181,6 +188,14 @@ func Load() (*Config, error) {
 	c.AIAPIKey = os.Getenv("AI_API_KEY")
 	c.AIBaseURL = getenv("AI_BASE_URL", "")
 	c.AIModel = getenv("AI_MODEL", "gemini/gemini-3.5-flash")
+	c.DOKUMCPEndpoint = getenv("DOKU_MCP_ENDPOINT", "https://api-sandbox.doku.com/doku-mcp-server/mcp")
+	dokuTimeoutSeconds, timeoutErr := getenvInt("DOKU_MCP_TIMEOUT_SECONDS", 8)
+	if timeoutErr != nil {
+		return nil, timeoutErr
+	}
+	c.DOKUMCPTimeout = time.Duration(dokuTimeoutSeconds) * time.Second
+	c.DOKUCheckoutBaseURL = getenv("DOKU_CHECKOUT_BASE_URL", "https://api-sandbox.doku.com")
+	c.DOKUCredentialEncryptionKey = os.Getenv("DOKU_CREDENTIAL_ENCRYPTION_KEY")
 
 	c.ImportMaxPDFBytes = int64(25 << 20)
 	if n, err := getenvInt("IMPORT_MAX_PDF_BYTES", 25<<20); err == nil {

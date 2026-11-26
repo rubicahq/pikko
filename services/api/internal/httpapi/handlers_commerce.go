@@ -18,12 +18,56 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/urls"
 )
 
+func (h *CommerceHandlers) DOKUWebhook(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid notification.")
+		return
+	}
+	if err := h.Commerce.HandleDOKUWebhook(r.Context(), r.Header, body); err != nil {
+		if errors.Is(err, commerce.ErrForbidden) {
+			writeError(w, r, http.StatusUnauthorized, "invalid_signature", "Invalid notification signature.")
+			return
+		}
+		if errors.Is(err, commerce.ErrNotFound) {
+			writeError(w, r, http.StatusNotFound, "not_found", "Invoice not found.")
+			return
+		}
+		writeError(w, r, http.StatusBadRequest, "invalid_notification", "Invalid notification.")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 type CommerceHandlers struct {
 	Commerce  *commerce.Service
 	Campaigns *campaigns.Service
 	URLs      *urls.Generator
 	Cfg       *config.Config
 	Ent       *entitlements.Service
+}
+
+func (h *CommerceHandlers) GetDOKUCredentials(w http.ResponseWriter, r *http.Request) {
+	status, err := h.Commerce.GetDOKUCredentialStatus(r.Context(), StoreID(r))
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"doku": status})
+}
+
+func (h *CommerceHandlers) PutDOKUCredentials(w http.ResponseWriter, r *http.Request) {
+	var in commerce.DOKUCredentialInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, r, http.StatusBadRequest, "invalid_input", "Invalid JSON.")
+		return
+	}
+	status, err := h.Commerce.UpsertDOKUCredentials(r.Context(), StoreID(r), in)
+	if err != nil {
+		h.mapErr(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"doku": status})
 }
 
 func commerceInvalidInputMessage(err error) string {
@@ -49,6 +93,8 @@ func (h *CommerceHandlers) mapErr(w http.ResponseWriter, r *http.Request, err er
 		writeError(w, r, http.StatusBadRequest, "invalid_input", commerceInvalidInputMessage(err))
 	case errors.Is(err, commerce.ErrCheckoutDisabled):
 		writeError(w, r, http.StatusConflict, "checkout_disabled", "Checkout is not available for this store yet.")
+	case errors.Is(err, commerce.ErrDOKUUnavailable):
+		writeError(w, r, http.StatusBadGateway, "doku_unavailable", "DOKU Checkout is not available for this store right now.")
 	case errors.Is(err, commerce.ErrPriceChanged):
 		writeError(w, r, http.StatusConflict, "price_changed", "Prices changed. Please review the updated total.")
 	case errors.Is(err, commerce.ErrInsufficientStock), errors.Is(err, commerce.ErrQuotaExceeded):

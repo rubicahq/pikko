@@ -7,11 +7,11 @@ import (
 	"github.com/rubicahq/pikko/services/api/internal/rbac"
 )
 
-func TestTop30ToolsRegistered(t *testing.T) {
+func TestTop31ToolsRegistered(t *testing.T) {
 	s := &Service{}
 	tools := s.buildTools()
-	if len(tools) != 30 {
-		t.Fatalf("want 30 primary tools, got %d", len(tools))
+	if len(tools) != 31 {
+		t.Fatalf("want 31 primary tools, got %d", len(tools))
 	}
 	seen := map[string]struct{}{}
 	for _, tool := range tools {
@@ -57,8 +57,8 @@ func TestTop30ToolsRegistered(t *testing.T) {
 func TestListToolsFiltersByRole(t *testing.T) {
 	s := &Service{}
 	owner := s.ListTools(rbac.RoleOwner)
-	if len(owner) != 30 {
-		t.Fatalf("owner should see all 30, got %d", len(owner))
+	if len(owner) != 31 {
+		t.Fatalf("owner should see all 31, got %d", len(owner))
 	}
 	packing := s.ListTools(rbac.RolePacking)
 	names := map[string]bool{}

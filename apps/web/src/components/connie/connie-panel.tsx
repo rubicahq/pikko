@@ -13,14 +13,28 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
+
+type PaymentCheck = {
+  order_id: string;
+  order_number: string;
+  order_url: string;
+  pikko_status: string;
+  doku_status?: string;
+  checked_at: string;
+  verification: string;
+  explanation: string;
+};
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  paymentCheck?: PaymentCheck;
 };
 
 type ChatResponse = {
   message: { role: string; content: string };
+  tool_results?: Array<{ name: string; ok: boolean; result?: PaymentCheck }>;
 };
 
 const QUICK_PROMPTS = [
@@ -75,6 +89,7 @@ export function ConniePanel({
         {
           role: "assistant",
           content: data.message?.content || "…",
+          paymentCheck: data.tool_results?.find((r) => r.name === "check_doku_payment" && r.ok)?.result,
         },
       ]);
     } catch (e) {
@@ -142,6 +157,21 @@ export function ConniePanel({
                 )}
               >
                 {m.content}
+                {m.paymentCheck ? (
+                  <div className="mt-3 rounded-md border border-border bg-background p-3 whitespace-normal">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{m.paymentCheck.order_number}</span>
+                      <span className={cn("rounded-full px-2 py-0.5 text-xs", m.paymentCheck.verification === "confirmed" ? "bg-success/10 text-success" : "bg-warning/10 text-warning")}>{m.paymentCheck.verification}</span>
+                    </div>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                      <dt className="text-foreground-muted">Pikko</dt><dd>{m.paymentCheck.pikko_status}</dd>
+                      <dt className="text-foreground-muted">DOKU</dt><dd>{m.paymentCheck.doku_status || "Belum terverifikasi"}</dd>
+                      <dt className="text-foreground-muted">Dicek</dt><dd>{new Date(m.paymentCheck.checked_at).toLocaleString("id-ID")}</dd>
+                    </dl>
+                    <p className="mt-2 text-xs text-foreground-secondary">{m.paymentCheck.explanation}</p>
+                    <Link href={m.paymentCheck.order_url} className="mt-2 inline-block text-xs font-medium text-brand-accessible-dark">Buka detail order</Link>
+                  </div>
+                ) : null}
               </div>
             ))}
             {busy ? (

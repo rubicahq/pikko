@@ -94,6 +94,7 @@ time_step() {
     TIMINGS+=("${name}=0s")
     return 0
   fi
+  [[ -f .env ]] || { log "ERROR: .env is required before generating the DOKU encryption key"; return 1; }
   set +e
   "$@"
   rc=$?
@@ -128,6 +129,24 @@ preflight() {
   local head_mig
   head_mig="$(ls -1 database/migrations/*_*.up.sql 2>/dev/null | sed 's|.*/||' | sort | tail -1 || true)"
   log "migration tree tip file: ${head_mig:-none}"
+}
+
+ensure_doku_encryption_key() {
+  if (( DRY_RUN )); then
+    log "DOKU credential encryption key: dry-run (not inspected or changed)"
+    return 0
+  fi
+  if grep -Eq '^DOKU_CREDENTIAL_ENCRYPTION_KEY=.{40,}$' .env 2>/dev/null; then
+    log "DOKU credential encryption key: configured"
+    return 0
+  fi
+  umask 077
+  local generated
+  generated="$(openssl rand -base64 32 | tr -d '\n')"
+  printf '\nDOKU_CREDENTIAL_ENCRYPTION_KEY=%s\n' "$generated" >> .env
+  chmod 600 .env
+  unset generated
+  log "DOKU credential encryption key: generated and stored in .env"
 }
 
 tag_rollback_images() {
@@ -295,6 +314,7 @@ wait_local_health() {
 # --- main ---
 ensure_emplicon_untouched
 preflight
+ensure_doku_encryption_key
 log "root=$ROOT ref=$REF buildkit=${DOCKER_BUILDKIT} dry_run=${DRY_RUN}"
 
 OLD_SHA="$(git rev-parse HEAD)"
